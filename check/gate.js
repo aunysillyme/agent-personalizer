@@ -97,9 +97,30 @@ function* gitFiles(root) {
   }
 }
 
+/* Does any ancestor (root included) carry .git metadata? Checked without git. */
+function hasGitMetadata(root) {
+  let dir = root;
+  for (;;) {
+    if (fs.existsSync(path.join(dir, '.git'))) return true;
+    const parent = path.dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+}
+
+/* true = inside a git work tree; false = git confirmed "not a repository", or git could
+   not run AND no .git metadata exists anywhere above. Git failing while .git metadata is
+   present is a setup error: a walk over a repo can miss tracked files under skipped
+   directories, so the gate refuses rather than degrades. */
 function insideGitRepo(root) {
-  try { return execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true'; }
-  catch (_) { return false; }
+  try {
+    return execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() === 'true';
+  } catch (e) {
+    const err = String(e.stderr || e.message || '');
+    if (e.status === 128 && /not a git repository/i.test(err)) return false;
+    if (!hasGitMetadata(root)) return false;
+    die(`${root} carries git metadata but git could not run (${err.trim().split('\n')[0] || e.code || 'unknown error'}). Fix git, or pass --all to scan every file under --dir.`);
+  }
 }
 
 function fileSet(root, all) {

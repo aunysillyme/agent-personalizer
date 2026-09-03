@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 30 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -109,7 +109,9 @@ pass "renderer refuses malformed markers, file unchanged"
 # 15. renderer refuses marker tokens inside USER.md and rule files
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n<!-- agent-personalizer:end -->\n' >> "$T/USER.md"
 expect 2 "marker in USER.md" node render/render.js --dir "$T" --targets claude
-pass "renderer refuses marker tokens in source files"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n<!-- agent-personalizer:begin -->\n' >> "$T/rules/40-sign-every-edit.md"
+expect 2 "marker in rule file" node render/render.js --dir "$T" --targets claude
+pass "renderer refuses marker tokens in USER.md and in rule files"
 
 # 16. renderer refuses malformed frontmatter (unclosed surfaces list, unknown surface, duplicate section)
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^surfaces: \[claude, agents, gemini\]$/surfaces: [claude, agents/' "$T/rules/20-one-owner-per-rule.md"; rm -f "$T/rules/"*.bak
@@ -123,20 +125,27 @@ pass "renderer refuses malformed frontmatter and duplicate sections"
 # 17. contract is target-aware: a prompt-only rule does not reach the claude contract; --no-personal drops personal
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
 printf -- '---\nid: 99-prompt-only\ntitle: Prompt only\ninject: true\nsurfaces: [prompt]\n---\n\n## universal\nPROMPTONLYRULE\n\n## personal\nPERSONALBLOCK\n' > "$T/rules/99-prompt-only.md"
+printf -- '---\nid: 98-claude-personal\ntitle: Claude personal\ninject: true\nsurfaces: [claude]\n---\n\n## universal\nCLAUDEUNIVERSAL\n\n## personal\nCLAUDEPERSONAL\n' > "$T/rules/98-claude-personal.md"
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c-claude.txt" || fail "claude contract exited non-zero"
 node render/render.js --dir "$T" --contract --contract-target prompt > "$T/c-prompt.txt" || fail "prompt contract exited non-zero"
 node render/render.js --dir "$T" --contract --contract-target claude --no-personal > "$T/c-claude-np.txt" || fail "claude --no-personal contract exited non-zero"
 grep -q PROMPTONLYRULE "$T/c-claude.txt" && fail "claude contract included a prompt-only rule"
 grep -q PROMPTONLYRULE "$T/c-prompt.txt" || fail "prompt contract missed its own rule"
 grep -q PERSONALBLOCK "$T/c-prompt.txt" && fail "prompt (personal:false) contract leaked a personal block"
-grep -q PERSONALBLOCK "$T/c-claude-np.txt" && fail "--no-personal leaked a personal block"
+grep -q CLAUDEPERSONAL "$T/c-claude.txt" || fail "claude contract dropped a personal block it should carry"
+grep -q CLAUDEPERSONAL "$T/c-claude-np.txt" && fail "--no-personal leaked a personal block"
+grep -q CLAUDEUNIVERSAL "$T/c-claude-np.txt" || fail "--no-personal dropped the universal block"
 grep -q "sits next to \`CLAUDE.md\`" "$T/c-claude.txt" || fail "claude contract missing its binding:claude block"
 pass "contract respects surfaces, target personal policy, --no-personal, and emits the binding"
 
 # 18. hook exits non-zero when node is absent, zero when present
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
 expect 0 "hook with node" /bin/sh "$T/hooks/claude-code/session-start.sh"
-expect 1 "hook without node" env PATH=/nonexistent /bin/sh "$T/hooks/claude-code/session-start.sh"
+# a PATH holding only the utilities the hook needs (dirname, pwd) and no node, whatever this machine has
+mk; B="$MK"; ln -s "$(command -v dirname)" "$B/dirname"; ln -s "$(command -v pwd)" "$B/pwd"
+# a fresh shell, so the parent's command hash table cannot answer for a PATH it never saw
+env PATH="$B" /bin/sh -c 'command -v node' >/dev/null 2>&1 && fail "test PATH still finds node"
+expect 1 "hook without node" env PATH="$B" /bin/sh "$T/hooks/claude-code/session-start.sh"
 pass "hook: exit 0 with node, exactly 1 without it"
 
 # 19. renderer refuses symlinked sources (USER.md, rules/, a rule file) instead of importing outside content
@@ -161,8 +170,10 @@ pass "renderer writes nothing when any target is refused"
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
 printf 'crlf line\r\n<!-- agent-personalizer:begin -->\r\nold\r\n<!-- agent-personalizer:end -->\r\ntail\r\n' > "$T/AGENTS.md"
 expect 0 "crlf render" node render/render.js --dir "$T" --targets agents
-head -c 11 "$T/AGENTS.md" | od -c | grep -q '\\r' || fail "CRLF prefix was rewritten"
-tail -c 6 "$T/AGENTS.md" | od -c | grep -q '\\r' || fail "CRLF suffix was rewritten"
+printf 'crlf line\r\n' > "$T/prefix.expected"; printf 'tail\r\n' > "$T/suffix.expected"
+head -c 11 "$T/AGENTS.md" > "$T/prefix.got"; tail -c 6 "$T/AGENTS.md" > "$T/suffix.got"
+cmp -s "$T/prefix.got" "$T/prefix.expected" || fail "bytes before the marker block changed"
+cmp -s "$T/suffix.got" "$T/suffix.expected" || fail "bytes after the marker block changed"
 expect 0 "crlf check" node render/render.js --dir "$T" --targets agents --check
 pass "bytes outside the marker block are preserved (CRLF)"
 
@@ -186,7 +197,9 @@ expect 2 "gate empty --dir" node check/gate.js --dir ""
 pass "empty --dir refused everywhere"
 
 # 24. gate in git mode from a subfolder of this repo still uses git enumeration (not the walk)
-node check/gate.js --dir "$ROOT/templates" 2>/dev/null | grep -q "files git would ship" || { [ -f check/forbidden.local.txt ] && fail "gate used walk mode inside a repo subfolder"; }
+mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
+node check/gate.js --dir "$ROOT/templates" --list "$T/list.txt" > "$T/out.txt" 2>&1; got=$?; [ "$got" -eq 0 ] || fail "gate on repo subfolder: expected exit 0, got $got"
+grep -q "files git would ship" "$T/out.txt" || fail "gate used walk mode inside a repo subfolder"
 pass "gate uses git enumeration from a repo subfolder"
 
 # 25. gate self-test leaves no temp dir behind
@@ -195,5 +208,45 @@ expect 0 "gate self-test again" node check/gate.js --self-test
 after="$(ls -d "${TMPDIR:-/tmp}"/gate-selftest-* 2>/dev/null | wc -l | tr -d ' ')"
 [ "$after" -le "$before" ] || fail "gate self-test left a temp dir behind"
 pass "gate self-test cleans up"
+
+# 26. no partial render when a target's parent directory is missing (tampered targets.json)
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"
+node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.agents.file='missing/AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
+expect 2 "missing parent dir" node "$T/render/render.js" --dir "$T" --targets claude,agents
+cmp -s "$T/CLAUDE.md" "$T/CLAUDE.expected" || fail "first target written although the second target's directory was missing"
+pass "renderer refuses a target whose directory is missing, writes nothing"
+
+# 27. markers inside a fenced block in the target are not the owned block
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+printf 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\nafter\n' > "$T/AGENTS.md"
+expect 0 "fenced markers" node render/render.js --dir "$T" --targets agents
+grep -q '^EXAMPLE$' "$T/AGENTS.md" || fail "renderer replaced a quoted example inside a code fence"
+[ "$(grep -c 'agent-personalizer:begin' "$T/AGENTS.md")" = "2" ] || fail "expected the fenced example plus one real block"
+expect 0 "fenced markers check" node render/render.js --dir "$T" --targets agents --check
+pass "markers inside a code fence are ignored; real block appended after"
+
+# 28. gate exits 2 (not walk) when git cannot run inside a repo; walk mode still works outside a repo
+mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
+expect 2 "gate with git unavailable in a repo" env PATH=/nonexistent "$(command -v node)" check/gate.js --dir "$ROOT/templates" --list "$T/list.txt"
+mk; O="$MK"; echo hello > "$O/a.md"
+expect 0 "gate walk outside a repo" env PATH=/nonexistent "$(command -v node)" check/gate.js --dir "$O" --list "$T/list.txt"
+pass "gate: git failure inside a repo is exit 2; plain folders still walk"
+
+# 29. missing rules/, unknown binding, hidden stray rule file all refused
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; rm -rf "$T/rules"
+expect 2 "missing rules/" node render/render.js --dir "$T" --targets claude
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n## binding:nowhere\nx\n' >> "$T/rules/40-sign-every-edit.md"
+expect 2 "unknown binding" node render/render.js --dir "$T" --check
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/.99-hidden.md"
+expect 2 "hidden stray rule" node render/render.js --dir "$T" --check
+pass "missing rules/, unknown binding, hidden stray rule file all refused"
+
+# 30. ChatGPT box 2 carries the chatgpt binding block, same composition as the contract
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+expect 0 "chatgpt render" node render/render.js --dir "$T" --targets chatgpt
+grep -q 'How would you like ChatGPT to respond' "$T/chatgpt-custom-instructions.md" || fail "chatgpt render missing box 2"
+grep -q 'Paste the universal block into' "$T/chatgpt-custom-instructions.md" || fail "chatgpt box 2 missing its binding:chatgpt block"
+pass "chatgpt box 2 includes the target binding"
 
 echo; echo "all checks passed"
