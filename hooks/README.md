@@ -18,7 +18,9 @@ Which rules? The ones with `inject: true` in their frontmatter. Keep that set sm
 }
 ```
 
-The hook's stdout lands in the session context before your first message. That is the whole mechanism.
+The hook's stdout lands in the session context before your first message. That is the whole mechanism. If `node` is missing the hook exits non-zero and says so on stderr, so a session that starts without its contract is visible, not silent.
+
+The contract is target-aware: `--contract-target claude` applies each rule's `surfaces` filter. Personal blocks are included by default because the hook runs in your own project; add `--no-personal` for a shared machine.
 
 **Subagents do not get SessionStart.** A subagent you spawn from a session sees none of this unless you pass it in the task. That is why the rendered `CLAUDE.md` also carries pointers to every rule: the pointer survives, the injection does not.
 

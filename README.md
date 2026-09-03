@@ -70,6 +70,7 @@ Three pieces, all in this repo, no dependencies beyond Node.
 - **Rule source + renderer.** Each rule is one file in [`rules/`](rules/) with three fenced blocks: `universal` (any AI), `personal` (your curation), `binding:<ai>` (tool names and paths for one AI). [`render/render.js`](render/render.js) renders `USER.md` plus the rules into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, ChatGPT custom-instruction boxes, or a plain system prompt. `--check` fails if any rendered file drifted from its source.
 - **Session-start contract.** [`hooks/`](hooks/) shows how to inject the rules in full at the start of every Claude Code session, and the plain-prompt fallback for AIs without hooks.
 - **Drift check.** `npm run check` in CI or a pre-commit hook. A rule stated in five places drifts in five places; this is how you find out the same day.
+- **Zero-personal-data gate.** [`check/gate.js`](check/gate.js) scans every file git would ship (or every file under a folder, with `--all`) for terms in a gitignored list, never follows symlinks, and fails closed when the list is missing. This repo runs it on itself before every push. Copy `check/forbidden.example.txt` to `check/forbidden.local.txt` and fill it in.
 
 ## Level 4: hand-off
 
@@ -94,7 +95,7 @@ check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md
-test/        run.sh: every check proven able to fail
+test/        run.sh: 18 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers)
 ```
 
 ## Contributing

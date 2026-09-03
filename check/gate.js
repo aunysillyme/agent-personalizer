@@ -3,57 +3,74 @@
 /*
   gate.js: the zero-personal-data gate.
 
-  Scans every file in a directory tree for terms listed in check/forbidden.local.txt
-  and fails loudly on any hit. The list itself is gitignored: a list of your own
-  identifiers must never ship in a public repo.
+  Scans every regular, non-binary file under a directory for terms listed in
+  check/forbidden.local.txt and fails loudly on any hit. The list itself is gitignored:
+  a list of your own identifiers must never ship in a public repo.
 
   usage:
     node check/gate.js [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
-  Fail-closed: a missing list is exit 2, never a pass.
+  Fail-closed: a missing or empty list is exit 2, never a pass.
+  Coverage: inside a git repo, exactly the files git would ship (tracked plus untracked
+  and not ignored: `git ls-files --cached --others --exclude-standard`), so a gitignored
+  scratch file cannot fail the gate and a forgotten new file cannot dodge it. Outside a
+  repo, or with --all, every regular file under --dir. Any extension. Binary files (a NUL
+  byte in the first 8 KB) are skipped. Symlinks are never followed.
   Matching: case-insensitive substring. Lines "allow:<exact text>" whitelist that exact
   string (attribution you keep on purpose); a forbidden term inside an allowed string
-  does not count.
+  does not count. Unicode lookalikes are not detected; the list is for your real strings.
 */
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
-const SKIP_DIRS = new Set(['.git', 'node_modules', '.DS_Store']);
-const SKIP_FILES = new Set(['forbidden.local.txt']);
-const TEXT_EXT = /\.(md|txt|js|json|sh|yml|yaml|toml|html|css|ts|mjs|cjs)$/i;
+const SKIP_DIRS = new Set(['.git', 'node_modules']);
+
+function die(msg) { console.error(`GATE SETUP ERROR: ${msg}`); process.exit(2); }
 
 function arg(name, dflt) {
   const i = process.argv.indexOf(name);
   if (i === -1) return dflt;
   const v = process.argv[i + 1];
-  return v && !v.startsWith('--') ? v : true;
+  if (v === undefined || v.startsWith('--')) die(`${name} needs a value`);
+  return v;
 }
 
 function loadList(file) {
-  if (!fs.existsSync(file)) {
-    console.error(`GATE SETUP ERROR: ${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
-    process.exit(2);
-  }
+  if (!fs.existsSync(file)) die(`${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
   const terms = [], allow = [];
-  for (const raw of fs.readFileSync(file, 'utf8').split('\n')) {
+  fs.readFileSync(file, 'utf8').split('\n').forEach((raw, n) => {
     const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    if (line.startsWith('allow:')) allow.push(line.slice(6).trim());
-    else terms.push(line);
-  }
-  if (!terms.length) { console.error('GATE SETUP ERROR: forbidden list has no terms.'); process.exit(2); }
+    if (!line || line.startsWith('#')) return;
+    if (line.startsWith('allow:')) {
+      const a = line.slice(6).trim();
+      if (!a) die(`${file}:${n + 1}: empty allow entry`);
+      allow.push(a);
+    } else terms.push(line);
+  });
+  if (!terms.length) die('forbidden list has no terms.');
   return { terms, allow };
 }
 
+function isBinary(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(8192);
+    const n = fs.readSync(fd, buf, 0, 8192, 0);
+    return buf.subarray(0, n).includes(0);
+  } finally { fs.closeSync(fd); }
+}
+
 function* walk(root) {
-  for (const name of fs.readdirSync(root)) {
+  for (const name of fs.readdirSync(root).sort()) {
     if (SKIP_DIRS.has(name)) continue;
     const p = path.join(root, name);
-    const st = fs.statSync(p);
+    const st = fs.lstatSync(p);
+    if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) yield* walk(p);
-    else if (!SKIP_FILES.has(name) && TEXT_EXT.test(name)) yield p;
+    else if (st.isFile()) yield p;
   }
 }
 
@@ -61,17 +78,40 @@ function allowedSpans(lineLower, allow) {
   const spans = [];
   for (const a of allow) {
     const al = a.toLowerCase();
+    if (!al.length) continue;
     let i = lineLower.indexOf(al);
-    while (i !== -1) { spans.push([i, i + al.length]); i = lineLower.indexOf(al, i + 1); }
+    while (i !== -1) { spans.push([i, i + al.length]); i = lineLower.indexOf(al, i + al.length); }
   }
   return spans;
 }
 
-function scan(root, list, listFile) {
+function* gitFiles(root) {
+  const out = execFileSync('git', ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' });
+  for (const rel of out.split('\0')) {
+    if (!rel) continue;
+    const p = path.join(root, rel);
+    let st; try { st = fs.lstatSync(p); } catch (_) { continue; }
+    if (st.isFile() && !st.isSymbolicLink()) yield p;
+  }
+}
+
+function fileSet(root, all) {
+  if (!all && fs.existsSync(path.join(root, '.git'))) {
+    try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return { files: gitFiles(root), mode: 'git' }; } catch (_) { /* fall through */ }
+  }
+  return { files: walk(root), mode: 'walk' };
+}
+
+function scan(root, list, listFile, all) {
   const hits = [];
+  let files = 0;
   const skipPath = listFile ? path.resolve(listFile) : null;
-  for (const file of walk(root)) {
+  const set = fileSet(root, all);
+  scan.mode = set.mode;
+  for (const file of set.files) {
     if (skipPath && path.resolve(file) === skipPath) continue;
+    if (isBinary(file)) continue;
+    files++;
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, n) => {
       const lower = line.toLowerCase();
@@ -87,33 +127,41 @@ function scan(root, list, listFile) {
       }
     });
   }
-  return hits;
+  return { hits, files };
 }
 
 function selfTest() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-selftest-'));
-  const listFile = path.join(tmp, 'forbidden.txt');
-  fs.writeFileSync(listFile, 'Seeded Secret Name\nallow:Copyright Seeded Secret Name Ltd\n');
-  fs.writeFileSync(path.join(tmp, 'clean.md'), 'Nothing to see. Copyright Seeded Secret Name Ltd is allowed.\n');
-  fs.writeFileSync(path.join(tmp, 'dirty.md'), 'This mentions seeded secret name in prose.\n');
-  const hits = scan(tmp, loadList(listFile), listFile);
-  fs.rmSync(tmp, { recursive: true, force: true });
-  const ok = hits.length === 1 && hits[0].file === 'dirty.md';
-  console.log(ok ? 'self-test: gate went red on the seeded hit and stayed green on the allowed string (1 hit, dirty.md)' : `self-test FAILED: expected exactly 1 hit in dirty.md, got ${JSON.stringify(hits)}`);
-  process.exit(ok ? 0 : 1);
+  try {
+    const listFile = path.join(tmp, 'forbidden.txt');
+    fs.writeFileSync(listFile, 'Seeded Secret Name\nallow:Copyright Seeded Secret Name Ltd\n');
+    fs.writeFileSync(path.join(tmp, 'clean.md'), 'Nothing to see. Copyright Seeded Secret Name Ltd is allowed.\n');
+    fs.writeFileSync(path.join(tmp, 'dirty.md'), 'This mentions seeded secret name in prose.\n');
+    fs.writeFileSync(path.join(tmp, 'Dockerfile'), 'RUN echo seeded secret name\n');
+    fs.writeFileSync(path.join(tmp, 'blob.bin'), Buffer.from([0x73, 0x65, 0x00, 0x65, 0x64]));
+    const { hits } = scan(tmp, loadList(listFile), listFile, true);
+    const files = hits.map(h => h.file).sort().join(',');
+    const ok = hits.length === 2 && files === 'Dockerfile,dirty.md';
+    console.log(ok ? 'self-test: gate went red on the seeded hits (dirty.md, Dockerfile), green on the allowed string, skipped the binary' : `self-test FAILED: expected hits in Dockerfile and dirty.md only, got ${JSON.stringify(hits)}`);
+    process.exit(ok ? 0 : 1);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 function main() {
   if (process.argv.includes('--self-test')) return selfTest();
-  const root = path.resolve(String(arg('--dir', path.join(__dirname, '..'))));
-  const listFile = path.resolve(String(arg('--list', path.join(__dirname, 'forbidden.local.txt'))));
-  const hits = scan(root, loadList(listFile), listFile);
+  const root = path.resolve(arg('--dir', path.join(__dirname, '..')));
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) die(`--dir ${root} is not a directory`);
+  const listFile = path.resolve(arg('--list', path.join(__dirname, 'forbidden.local.txt')));
+  const all = process.argv.includes('--all');
+  const { hits, files } = scan(root, loadList(listFile), listFile, all);
   if (hits.length) {
     console.log(`GATE FAILED: ${hits.length} hit(s)`);
     for (const h of hits) console.log(`  ${h.file}:${h.line}  "${h.term}"`);
     process.exit(1);
   }
-  console.log(`gate clean: 0 hits across ${[...walk(root)].length} files`);
+  console.log(`gate clean: 0 hits across ${files} files (${scan.mode === 'git' ? 'files git would ship' : 'every file under --dir'})`);
 }
 
 main();
