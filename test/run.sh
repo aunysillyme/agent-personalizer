@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 40 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 41 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -341,5 +341,18 @@ pass "target modes preserved (600 kept, new file 644)"
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
 node test/rollback.test.js "$T" > "$T/rollback.out" 2>&1 || { cat "$T/rollback.out"; fail "rollback fault-injection test"; }
 pass "rollback: complete on a commit failure; backup kept and named when a restore fails"
+
+# 41. gate scans the INDEX blob: a leak staged then cleaned on disk is caught; a clean index with a leak on disk is caught too
+mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
+mk; R="$MK"; git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.name t
+echo "zzqqxx-no-such-term staged" > "$R/leak.md"; git -C "$R" add leak.md; echo "clean now" > "$R/leak.md"
+node check/gate.js --dir "$R" --list "$T/list.txt" > "$T/g1.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "gate missed a leak that is staged but cleaned on disk (exit $got)"
+grep -q 'leak.md (index)' "$T/g1.txt" || fail "gate did not attribute the hit to the index blob"
+echo "clean" > "$R/leak.md"; git -C "$R" add leak.md; echo "zzqqxx-no-such-term on disk" > "$R/leak.md"
+node check/gate.js --dir "$R" --list "$T/list.txt" > "$T/g2.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "gate missed a leak on disk in a tracked file (exit $got)"
+grep -q 'leak.md (working tree)' "$T/g2.txt" || fail "gate did not attribute the hit to the working tree"
+echo "clean" > "$R/leak.md"; git -C "$R" add leak.md
+expect 0 "gate clean index and tree" node check/gate.js --dir "$R" --list "$T/list.txt"
+pass "gate scans index blobs and differing working-tree copies"
 
 echo; echo "all checks passed"

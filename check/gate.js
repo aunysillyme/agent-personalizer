@@ -12,10 +12,12 @@
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
   Fail-closed: a missing or empty list is exit 2, never a pass.
-  Coverage: anywhere inside a git work tree (a subfolder included), exactly the files git
-  would ship from --dir down (tracked plus untracked and not ignored:
-  `git ls-files --cached --others --exclude-standard`), so a gitignored scratch file cannot
-  fail the gate and a forgotten new file cannot dodge it. Git enumeration failing inside a
+  Coverage: anywhere inside a git work tree (a subfolder included), exactly what git would
+  ship from --dir down: for every cached path the INDEX blob (what a commit publishes) plus
+  the working-tree copy when it differs (what the next `git add` publishes); for every
+  untracked, not-ignored path the working-tree copy. A gitignored scratch file cannot fail
+  the gate, a forgotten new file cannot dodge it, and a leak staged then cleaned on disk is
+  still caught. Git enumeration failing inside a
   repo is a setup error (exit 2), never a silent fallback. Outside a repo, or with --all,
   every regular file under --dir. Any extension. Binary files (a NUL
   byte in the first 8 KB) are skipped. Symlinks are never followed.
@@ -56,14 +58,7 @@ function loadList(file) {
   return { terms, allow };
 }
 
-function isBinary(file) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(8192);
-    const n = fs.readSync(fd, buf, 0, 8192, 0);
-    return buf.subarray(0, n).includes(0);
-  } finally { fs.closeSync(fd); }
-}
+function isBinary(bytes) { return bytes.subarray(0, 8192).includes(0); }
 
 function* walk(root) {
   for (const name of fs.readdirSync(root).sort()) {
@@ -87,20 +82,62 @@ function allowedSpans(lineLower, allow) {
   return spans;
 }
 
-function* gitFiles(root) {
-  // A tracked submodule is a gitlink (mode 160000): its files are not in this index, so a
-  // scan of the parent would silently skip them. Refuse rather than report clean.
-  const stage = execFileSync('git', ['-C', root, 'ls-files', '-z', '--stage'], { encoding: 'utf8' });
+/* What git would ship, as {label, bytes} items:
+   - every cached path: the INDEX blob (that is what a commit publishes), and the working-tree
+     copy as well when it differs from the index (that is what `git add` would publish next);
+   - every untracked, not-ignored path: the working-tree copy.
+   A tracked submodule (gitlink, mode 160000) is refused: its files are not in this index. */
+function git(root, args, input) {
+  return execFileSync('git', ['-C', root, ...args], { input, maxBuffer: 1 << 28 });
+}
+
+function* gitItems(root) {
+  const stage = git(root, ['ls-files', '-z', '--stage']).toString('utf8');
+  const cached = [];
   for (const rec of stage.split('\0')) {
-    if (rec.startsWith('160000 ')) die(`tracked submodule at ${rec.split('\t')[1]}: the gate does not descend into submodules. Run it inside the submodule, or pass --all to walk every file under --dir.`);
+    if (!rec) continue;
+    const m = rec.match(/^(\d{6}) ([0-9a-f]{40,64}) (\d)\t([\s\S]*)$/);
+    if (!m) die(`unreadable index record: ${rec.slice(0, 80)}`);
+    const [, mode, oid, , rel] = m;
+    if (mode === '160000') die(`tracked submodule at ${rel}: the gate does not descend into submodules. Run it inside the submodule, or pass --all to walk every file under --dir.`);
+    if (mode === '120000') continue; // a symlink entry; never followed
+    cached.push({ oid, rel });
   }
-  const out = execFileSync('git', ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' });
-  for (const rel of out.split('\0')) {
-    if (!rel) continue;
+  // index blobs, in one batch
+  if (cached.length) {
+    const out = git(root, ['cat-file', '--batch'], cached.map(c => c.oid).join('\n') + '\n');
+    let pos = 0;
+    for (const c of cached) {
+      const nl = out.indexOf(0x0a, pos);
+      if (nl === -1) die(`git cat-file: short output for ${c.rel}`);
+      const header = out.subarray(pos, nl).toString('utf8');
+      const hm = header.match(/^([0-9a-f]+) (\w+) (\d+)$/);
+      if (!hm) die(`git cat-file: unexpected header for ${c.rel}: ${header}`);
+      const size = Number(hm[3]);
+      const body = out.subarray(nl + 1, nl + 1 + size);
+      pos = nl + 1 + size + 1;
+      yield { label: `${c.rel} (index)`, bytes: body };
+    }
+  }
+  // working-tree copies that differ from the index
+  const changed = new Set(git(root, ['diff', '--name-only', '-z']).toString('utf8').split('\0').filter(Boolean));
+  for (const c of cached) {
+    if (!changed.has(c.rel)) continue;
+    const p = path.join(root, c.rel);
+    let st; try { st = fs.lstatSync(p); } catch (_) { continue; }
+    if (st.isFile() && !st.isSymbolicLink()) yield { label: `${c.rel} (working tree)`, bytes: fs.readFileSync(p) };
+  }
+  // untracked, not ignored
+  const others = git(root, ['ls-files', '-z', '--others', '--exclude-standard']).toString('utf8').split('\0').filter(Boolean);
+  for (const rel of others) {
     const p = path.join(root, rel);
     let st; try { st = fs.lstatSync(p); } catch (_) { continue; }
-    if (st.isFile() && !st.isSymbolicLink()) yield p;
+    if (st.isFile() && !st.isSymbolicLink()) yield { label: rel, bytes: fs.readFileSync(p) };
   }
+}
+
+function* walkItems(root) {
+  for (const p of walk(root)) yield { label: path.relative(root, p), bytes: fs.readFileSync(p) };
 }
 
 /* Does any ancestor (root included) carry .git metadata? Checked without git. */
@@ -130,13 +167,13 @@ function insideGitRepo(root) {
 }
 
 function fileSet(root, all) {
-  if (all) return { files: walk(root), mode: 'walk' };
+  if (all) return { items: walkItems(root), mode: 'walk' };
   if (insideGitRepo(root)) {
-    let files;
-    try { files = [...gitFiles(root)]; } catch (e) { die(`git enumeration failed inside a repository: ${e.message}`); }
-    return { files, mode: 'git' };
+    let items;
+    try { items = [...gitItems(root)]; } catch (e) { if (e && e.message && /^(tracked submodule|unreadable index|git cat-file)/.test(e.message)) throw e; die(`git enumeration failed inside a repository: ${e.message}`); }
+    return { items, mode: 'git' };
   }
-  return { files: walk(root), mode: 'walk' };
+  return { items: walkItems(root), mode: 'walk' };
 }
 
 function scan(root, list, listFile, all) {
@@ -145,11 +182,12 @@ function scan(root, list, listFile, all) {
   const skipPath = listFile ? path.resolve(listFile) : null;
   const set = fileSet(root, all);
   scan.mode = set.mode;
-  for (const file of set.files) {
-    if (skipPath && path.resolve(file) === skipPath) continue;
-    if (isBinary(file)) continue;
+  const skipRel = skipPath && (skipPath + '').startsWith(root + path.sep) ? path.relative(root, skipPath) : null;
+  for (const item of set.items) {
+    if (skipRel && (item.label === skipRel || item.label.startsWith(skipRel + ' ('))) continue;
+    if (isBinary(item.bytes)) continue;
     files++;
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    const lines = item.bytes.toString('utf8').split('\n');
     lines.forEach((line, n) => {
       const lower = line.toLowerCase();
       const spans = allowedSpans(lower, list.allow);
@@ -158,7 +196,7 @@ function scan(root, list, listFile, all) {
         let i = lower.indexOf(t);
         while (i !== -1) {
           const inside = spans.some(([a, b]) => i >= a && i + t.length <= b);
-          if (!inside) hits.push({ file: path.relative(root, file), line: n + 1, term });
+          if (!inside) hits.push({ file: item.label, line: n + 1, term });
           i = lower.indexOf(t, i + 1);
         }
       }
@@ -199,7 +237,7 @@ function main() {
     for (const h of hits) console.log(`  ${h.file}:${h.line}  "${h.term}"`);
     process.exit(1);
   }
-  console.log(`gate clean: 0 hits across ${files} files (${scan.mode === 'git' ? 'files git would ship' : 'every file under --dir'})`);
+  console.log(`gate clean: 0 hits across ${files} files (${scan.mode === 'git' ? 'files git would ship, index blobs included' : 'every file under --dir'})`);
 }
 
 main();

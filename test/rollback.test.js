@@ -11,6 +11,10 @@
              -> first restored, second still absent, complete rollback reported, no leftovers
      case E: after a successful commit, deleting a backup throws
              -> targets written, CLEANUP INCOMPLETE names the backup, exit 2
+     case F: chmod of a staged file throws    -> staged file removed, nothing changed, complete rollback reported
+     case G: chmod of a backup throws         -> backup restored/removed, nothing changed
+     case H: first target absent, second commit rename throws, unlink of the created first target throws
+             -> no crash, ROLLBACK INCOMPLETE names "created target not removed", second target unchanged
    Case A also runs under umask 077 and asserts the restored target keeps its 0666 mode.
    usage: node test/rollback.test.js <project-dir-copy-of-the-example>   exit 0 = both cases behaved */
 const fs = require('fs');
@@ -23,8 +27,9 @@ function snapshot(names) { const o = {}; for (const n of names) o[n] = fs.exists
 function same(a, b) { return (a === null && b === null) || (a && b && a.equals(b)); }
 function temps() { return fs.readdirSync(dir).filter(n => /\.agent-personalizer\.(tmp|bak)$/.test(n)); }
 
-function run(faults, unlinkFault) {
-  const realRename = fs.renameSync, realUnlink = fs.unlinkSync, realExit = process.exit, realErr = console.error;
+function run(faults, unlinkFault, chmodFault) {
+  const realRename = fs.renameSync, realUnlink = fs.unlinkSync, realChmod = fs.chmodSync, realExit = process.exit, realErr = console.error;
+  fs.chmodSync = (p, m) => { if (chmodFault && chmodFault(p)) throw new Error('injected: chmod'); return realChmod(p, m); };
   let renames = 0; const errs = [];
   fs.renameSync = (a, b) => { renames++; const which = faults(renames, a, b); if (which) throw new Error(`injected: ${which}`); return realRename(a, b); };
   fs.unlinkSync = (p) => { if (unlinkFault && unlinkFault(p)) throw new Error('injected: unlink'); return realUnlink(p); };
@@ -32,7 +37,7 @@ function run(faults, unlinkFault) {
   console.error = (m) => errs.push(String(m));
   process.argv = ['node', 'render.js', '--dir', dir, '--targets', 'claude,agents'];
   let code = 0;
-  const restore = () => { fs.renameSync = realRename; fs.unlinkSync = realUnlink; process.exit = realExit; console.error = realErr; };
+  const restore = () => { fs.renameSync = realRename; fs.unlinkSync = realUnlink; fs.chmodSync = realChmod; process.exit = realExit; console.error = realErr; };
   try { render.main(); } catch (e) { if (e.message === 'exit') code = e.code; else { restore(); throw e; } }
   restore();
   return { code, errs, renames };
@@ -96,4 +101,30 @@ r = run(() => null, (p) => /CLAUDE\.md\..*\.bak$/.test(p));
 say(r.code === 2, `E: exit 2 (got ${r.code})`);
 say(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8').includes('agent-personalizer:begin'), 'E: targets were written');
 say(r.errs.some(e => /CLEANUP INCOMPLETE/.test(e)) && r.errs.some(e => /backup not removed: \.CLAUDE\.md\./.test(e)), 'E: the leftover backup is named');
+for (const n of temps()) fs.unlinkSync(path.join(dir, n));
+
+// case F: chmod of a staged file fails -> the staged file was already recorded, so it is removed; nothing changed
+fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'HANDWRITTEN CLAUDE\n'); fs.writeFileSync(path.join(dir, 'AGENTS.md'), 'HANDWRITTEN AGENTS\n');
+before = snapshot(names);
+r = run(() => null, null, (p) => /\.agent-personalizer\.tmp$/.test(p));
+after = snapshot(names);
+say(r.code === 2, `F: exit 2 (got ${r.code})`);
+say(same(before['CLAUDE.md'], after['CLAUDE.md']) && same(before['AGENTS.md'], after['AGENTS.md']), 'F: targets unchanged');
+say(temps().length === 0, `F: the staged file created before chmod failed was removed (${temps().join(', ') || 'none'})`);
+say(r.errs.some(e => /Every target was restored/.test(e)), 'F: reported a complete rollback');
+
+// case G: chmod of a backup fails -> the backup was already recorded, so it is restored/removed; nothing changed
+before = snapshot(names);
+r = run(() => null, null, (p) => /\.agent-personalizer\.bak$/.test(p));
+after = snapshot(names);
+say(r.code === 2, `G: exit 2 (got ${r.code})`);
+say(same(before['CLAUDE.md'], after['CLAUDE.md']) && same(before['AGENTS.md'], after['AGENTS.md']), 'G: targets unchanged');
+say(temps().length === 0, `G: no untracked backup left behind (${temps().join(', ') || 'none'})`);
+
+// case H: first target absent, second commit rename fails, unlink of the created first target fails -> no crash, named
+fs.unlinkSync(path.join(dir, 'CLAUDE.md'));
+r = run((n) => n === 2 ? 'second commit rename' : null, (p) => /\/CLAUDE\.md$/.test(p));
+say(r.code === 2, `H: exit 2 (got ${r.code})`);
+say(r.errs.some(e => /ROLLBACK INCOMPLETE/.test(e)) && r.errs.some(e => /CLAUDE\.md: created target not removed/.test(e)), 'H: created target named, no crash');
+say(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8') === 'HANDWRITTEN AGENTS\n', 'H: second target unchanged');
 process.exit(ok ? 0 : 1);

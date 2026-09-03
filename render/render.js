@@ -368,11 +368,14 @@ function main() {
   const undo = (why) => {
     const kept = [];
     for (const c of committed) {
-      try {
-        if (c.bak) fs.renameSync(c.bak, c.file);           // original back in place, mode carried by the backup
-        else if (c.done) fs.unlinkSync(c.file);           // target did not exist before and was created by this run
-        // else: target did not exist before and the rename never happened; nothing to restore
-      } catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak)} (${e.message})`); }
+      if (c.bak) {
+        try { fs.renameSync(c.bak, c.file); }               // original back in place, mode carried by the backup
+        catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak)} (${e.message})`); }
+      } else if (c.done) {
+        try { fs.unlinkSync(c.file); }                      // target did not exist before and was created by this run
+        catch (e) { kept.push(`${c.label}: created target not removed (${e.message})`); }
+      }
+      // else: target did not exist before and the rename never happened; nothing to restore
     }
     for (const s of staged) tryUnlink(s.tmp, kept, 'staged output not removed');
     if (kept.length) {
@@ -387,21 +390,23 @@ function main() {
     for (const p of plan) {
       const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
       fs.writeFileSync(tmp, p.output, { flag: 'wx', mode: p.mode });
+      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });   // recorded before anything else can fail
       fs.chmodSync(tmp, p.mode);
-      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });
     }
   } catch (e) { undo(`could not stage output (${e.message})`); }
   try {
     for (const s of staged) {
       let bak = null;
+      const rec = { file: s.file, bak: null, label: s.label, done: false };
+      committed.push(rec);                                  // recorded before the first artifact exists
       if (fs.existsSync(s.file)) {
         bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`);
         fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL);
-        fs.chmodSync(bak, s.mode);                          // a backup that may become the target again carries the target's mode, whatever the umask
+        rec.bak = bak;                                      // recorded before chmod can fail
+        fs.chmodSync(bak, s.mode);                          // carries the target's mode into a restore, whatever the umask
       }
-      committed.push({ file: s.file, bak, label: s.label, done: false });
       fs.renameSync(s.tmp, s.file);
-      committed[committed.length - 1].done = true;
+      rec.done = true;
     }
   } catch (e) { undo(`could not commit output (${e.message})`); }
   const leftovers = [];
