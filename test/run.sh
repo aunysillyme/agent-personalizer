@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 37 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 40 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -323,5 +323,23 @@ expect 2 "malformed config" node render/render.js --dir "$T" --check
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '{"targets": "claude"}' > "$T/.agent-personalizer.json"
 expect 2 "config targets not a list" node render/render.js --dir "$T" --check
 pass "malformed JSON inputs are refusals, not crashes"
+
+# 38. --check refuses duplicate targets and staging-suffix names too
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+expect 2 "--check duplicate targets" node render/render.js --dir "$T" --targets claude,claude --check
+pass "--check refuses duplicate targets"
+
+# 39. an existing target keeps its mode across a render; a new target gets 0644
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; chmod 600 "$T/CLAUDE.md"; rm -f "$T/AGENTS.md"
+expect 0 "mode render" node render/render.js --dir "$T" --targets claude,agents
+m1="$(stat -f %Lp "$T/CLAUDE.md" 2>/dev/null || stat -c %a "$T/CLAUDE.md")"; m2="$(stat -f %Lp "$T/AGENTS.md" 2>/dev/null || stat -c %a "$T/AGENTS.md")"
+[ "$m1" = "600" ] || fail "existing target mode changed to $m1"
+[ "$m2" = "644" ] || fail "new target mode is $m2, expected 644"
+pass "target modes preserved (600 kept, new file 644)"
+
+# 40. mid-commit failure rolls back; a failed restore keeps the backup and says ROLLBACK INCOMPLETE
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+node test/rollback.test.js "$T" > "$T/rollback.out" 2>&1 || { cat "$T/rollback.out"; fail "rollback fault-injection test"; }
+pass "rollback: complete on a commit failure; backup kept and named when a restore fails"
 
 echo; echo "all checks passed"

@@ -19,8 +19,10 @@
   Rendered text lives between two marker lines inside each target file. Bytes outside the
   markers are preserved exactly (line endings included); a target that is not valid UTF-8 is
   refused rather than re-encoded (sources too). Outputs are staged beside their targets under
-  per-run random names, existing targets are backed up, and a failure at any point restores
-  every target and removes every staged file. The renderer refuses to write when
+  per-run random names with the target's own mode (0644 for new files), existing targets are
+  backed up, and a failure at any point restores every target and removes every staged file.
+  If a restore itself fails, the backup is kept and named, and the exit is 2 with ROLLBACK
+  INCOMPLETE on stderr; a backup is never deleted unless its target was restored or committed. The renderer refuses to write when
   the marker state is anything other than "no block yet" or "exactly one BEGIN followed by
   exactly one END", and it validates every target before writing any.
 
@@ -334,8 +336,15 @@ function main() {
     }
     const current = existing == null ? null : between(existing, target.file);
     const output = check ? null : splice(existing, block, target.file);
-    return { key, target, file, block, current, output };
+    const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
+    return { key, target, file, block, current, output, mode };
   });
+
+  // Every final path must be distinct, and no final path may look like a staging file.
+  // Checked in every mode, before any output.
+  const finals = plan.map(p => p.file);
+  if (new Set(finals).size !== finals.length) die('two targets resolve to the same file. Nothing was written');
+  if (finals.some(f => /\.agent-personalizer\.(tmp|bak)$/.test(f))) die('a target file name uses the staging suffix. Nothing was written');
 
   if (check) {
     let drift = 0;
@@ -347,40 +356,48 @@ function main() {
     console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${root}` : '\nclean: every rendered file matches its source');
     process.exit(drift ? 1 : 0);
   }
-  // Every final path must be distinct, and no final path may look like a staging file.
-  const finals = plan.map(p => p.file);
-  if (new Set(finals).size !== finals.length) die('two targets resolve to the same file. Nothing was written');
-  if (finals.some(f => /\.agent-personalizer\.(tmp|bak)$/.test(f))) die('a target file name uses the staging suffix. Nothing was written');
-
   // Commit: stage every output beside its target under a per-run random name, back up every
   // existing target, rename staged -> final one by one, and on any failure put every backup
   // back and remove every staged file. A stale .tmp/.bak from an earlier crash never blocks a
   // run (names are unique) and is never deleted automatically (it may be the only copy).
   const run = `${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
-  const staged = [], backups = [], committed = [];
+  const staged = [], committed = [];
   const undo = (why) => {
-    for (const c of committed) { try { if (c.bak) fs.renameSync(c.bak, c.file); else fs.unlinkSync(c.file); } catch (_) {} }
+    const kept = [];
+    for (const c of committed) {
+      try { if (c.bak) fs.renameSync(c.bak, c.file); else fs.unlinkSync(c.file); }
+      catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak || '(none: target did not exist before)')} (${e.message})`); }
+    }
     for (const s of staged) { try { fs.unlinkSync(s.tmp); } catch (_) {} }
-    for (const b of backups) { try { fs.unlinkSync(b); } catch (_) {} }
+    if (kept.length) {
+      console.error(`render: ${why}.`);
+      console.error('render: ROLLBACK INCOMPLETE. Restore these by hand; nothing was deleted:');
+      for (const k of kept) console.error(`  ${k}`);
+      process.exit(2);
+    }
     die(`${why}. Every target was restored; nothing changed`);
   };
   try {
     for (const p of plan) {
       const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
-      fs.writeFileSync(tmp, p.output, { flag: 'wx' });
+      fs.writeFileSync(tmp, p.output, { flag: 'wx', mode: p.mode });
+      fs.chmodSync(tmp, p.mode);
       staged.push({ tmp, file: p.file, label: p.target.file });
     }
   } catch (e) { undo(`could not stage output (${e.message})`); }
   try {
     for (const s of staged) {
       let bak = null;
-      if (fs.existsSync(s.file)) { bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`); fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL); backups.push(bak); }
+      if (fs.existsSync(s.file)) { bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`); fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL); }
+      committed.push({ file: s.file, bak, label: s.label, done: false });
       fs.renameSync(s.tmp, s.file);
-      committed.push({ file: s.file, bak });
+      committed[committed.length - 1].done = true;
     }
   } catch (e) { undo(`could not commit output (${e.message})`); }
-  for (const b of backups) { try { fs.unlinkSync(b); } catch (_) {} }
+  for (const c of committed) if (c.bak) { try { fs.unlinkSync(c.bak); } catch (_) {} }
   for (const s of staged) console.log(`wrote  ${s.label}`);
+
 }
 
-main();
+module.exports = { main, fenceMap, markerState, splice, between };
+if (require.main === module) main();
