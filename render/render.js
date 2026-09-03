@@ -7,20 +7,25 @@
     node render/render.js [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check]
     node render/render.js [--dir <project>] --contract [--contract-target claude] [--no-personal]
 
-  --dir               project folder holding USER.md and rules/ (default: cwd)
+  --dir               project folder holding USER.md and rules/ (default: cwd). The folder you
+                      name is followed once (realpath); nothing beneath it may be a symlink.
   --targets           which renders to write; default: <dir>/.agent-personalizer.json, else "claude,agents"
   --check             render to memory, compare with disk; exit 1 on drift, 0 clean
-  --contract          print the inject:true rules for one target to stdout (session-start hooks)
-  --contract-target   which target's surface filter and binding to use (default claude)
-  --no-personal       leave the personal blocks out of the contract
+  --contract          print the inject:true rules for one target to stdout (session-start hooks):
+                      universal, then personal only if that target's policy allows it and
+                      --no-personal is absent, then the target's binding block.
+  --contract-target   which target's surface filter, personal policy and binding to use (default claude)
 
-  Rendered text lives between two marker lines inside each target file. Text outside the
-  markers is yours and is preserved. The renderer refuses to write when the marker state is
-  anything other than "no block yet" or "exactly one BEGIN followed by exactly one END".
+  Rendered text lives between two marker lines inside each target file. Bytes outside the
+  markers are preserved exactly (line endings included). The renderer refuses to write when
+  the marker state is anything other than "no block yet" or "exactly one BEGIN followed by
+  exactly one END", and it validates every target before writing any.
 
-  Safety: target files must resolve inside the project folder; no path component may be a
-  symlink; marker tokens are rejected inside USER.md and rule files. No network. No
-  environment variables read. No secrets written.
+  Safety: sources (USER.md, rules/, each rule file) and targets must be regular files or
+  directories inside the real project folder, never symlinks. Marker tokens are rejected
+  inside sources. Frontmatter keys are whitelisted; unknown, duplicate, malformed or CRLF
+  frontmatter is an error, never a silent default. Unexpected .md files in rules/ are an
+  error. No network. No environment variables read. No secrets written.
 
   exit codes: 0 ok · 1 drift (--check) · 2 refused or invalid input
 */
@@ -32,6 +37,8 @@ const END = '<!-- agent-personalizer:end -->';
 const TARGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'targets.json'), 'utf8'));
 const KNOWN = Object.keys(TARGETS);
 const SECTION_RE = /^(universal|personal|origin|binding:[a-z]+)$/;
+const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces']);
+const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
 function die(msg) { console.error(`render: ${msg}`); process.exit(2); }
 
@@ -39,25 +46,39 @@ function arg(name, dflt) {
   const i = process.argv.indexOf(name);
   if (i === -1) return dflt;
   const v = process.argv[i + 1];
-  if (v === undefined || v.startsWith('--')) die(`${name} needs a value`);
+  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
   return v;
 }
 
+/* lstat helper: the entry must exist as a regular file or directory, not a symlink. */
+function mustBe(p, kind, where) {
+  let st;
+  try { st = fs.lstatSync(p); } catch (_) { return null; }
+  if (st.isSymbolicLink()) die(`${where} is a symlink; refusing to follow it`);
+  if (kind === 'file' && !st.isFile()) die(`${where} is not a regular file`);
+  if (kind === 'dir' && !st.isDirectory()) die(`${where} is not a directory`);
+  return st;
+}
+
 function parseFrontmatter(text, where) {
-  const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
-  if (!m) return { meta: {}, body: text };
+  if (!text.startsWith('---\n')) return { meta: {}, body: text };
+  const close = text.indexOf('\n---\n', 4);
+  if (close === -1) die(`${where}: frontmatter opened with --- but never closed`);
   const meta = {};
-  for (const line of m[1].split('\n')) {
+  for (const line of text.slice(4, close).split('\n')) {
     if (!line.trim()) continue;
     const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (!kv) die(`${where}: unreadable frontmatter line "${line}"`);
+    const key = kv[1];
+    if (!META_KEYS.has(key)) die(`${where}: unknown frontmatter key "${key}" (allowed: ${[...META_KEYS].join(', ')})`);
+    if (key in meta) die(`${where}: duplicate frontmatter key "${key}"`);
     let v = kv[2].trim();
     if (v.startsWith('[')) {
-      if (!v.endsWith(']')) die(`${where}: frontmatter list "${kv[1]}" is not closed`);
+      if (!v.endsWith(']')) die(`${where}: frontmatter list "${key}" is not closed`);
       v = v.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
     } else if (v === 'true') v = true;
     else if (v === 'false') v = false;
-    meta[kv[1]] = v;
+    meta[key] = v;
   }
   if ('surfaces' in meta) {
     if (!Array.isArray(meta.surfaces) || !meta.surfaces.length) die(`${where}: "surfaces" must be a non-empty list`);
@@ -65,7 +86,7 @@ function parseFrontmatter(text, where) {
     if (bad.length) die(`${where}: unknown surface(s) ${bad.join(', ')} (known: ${KNOWN.join(', ')})`);
   }
   if ('inject' in meta && typeof meta.inject !== 'boolean') die(`${where}: "inject" must be true or false`);
-  return { meta, body: text.slice(m[0].length) };
+  return { meta, body: text.slice(close + 5) };
 }
 
 function parseSections(body, where) {
@@ -90,47 +111,49 @@ function rejectMarkers(text, where) {
   if (text.includes(BEGIN) || text.includes(END)) die(`${where}: contains a render marker token; those are reserved for rendered files`);
 }
 
-function loadRules(dir) {
-  const rdir = path.join(dir, 'rules');
-  if (!fs.existsSync(rdir)) return [];
-  return fs.readdirSync(rdir)
-    .filter(f => /^\d{2}-.*\.md$/.test(f))
-    .sort()
-    .map(f => {
-      const where = `rules/${f}`;
-      const text = fs.readFileSync(path.join(rdir, f), 'utf8');
-      rejectMarkers(text, where);
-      const { meta, body } = parseFrontmatter(text, where);
-      const sections = parseSections(body, where);
-      if (!sections.universal) die(`${where}: missing "## universal" block`);
-      return { file: f, meta, sections };
-    });
+function readSource(p, where) {
+  mustBe(p, 'file', where);
+  const text = fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+  rejectMarkers(text, where);
+  return text;
 }
 
-function loadProfile(dir) {
-  const p = path.join(dir, 'USER.md');
-  if (!fs.existsSync(p)) return null;
-  const text = fs.readFileSync(p, 'utf8');
-  rejectMarkers(text, 'USER.md');
+function loadRules(root) {
+  const rdir = path.join(root, 'rules');
+  if (!mustBe(rdir, 'dir', 'rules/')) return [];
+  const out = [];
+  for (const f of fs.readdirSync(rdir).sort()) {
+    if (f === 'README.md' || f.startsWith('.')) continue;
+    if (!f.endsWith('.md')) continue;
+    if (!RULE_FILE_RE.test(f)) die(`rules/${f}: unexpected file name; rule files are NN-name.md (README.md is the one exception)`);
+    const where = `rules/${f}`;
+    const text = readSource(path.join(rdir, f), where);
+    const { meta, body } = parseFrontmatter(text, where);
+    const sections = parseSections(body, where);
+    if (!sections.universal) die(`${where}: missing "## universal" block`);
+    out.push({ file: f, meta, sections });
+  }
+  return out;
+}
+
+function loadProfile(root) {
+  const p = path.join(root, 'USER.md');
+  if (!fs.existsSync(p) && !(() => { try { fs.lstatSync(p); return true; } catch (_) { return false; } })()) return null;
+  const text = readSource(p, 'USER.md');
   return text.replace(/^#\s+USER\.md\s*\n/, '').replace(/\n---\n\*Template from agent-personalizer[^\n]*\n?$/, '').trim();
 }
 
-/* Resolve a target's relative filename to a path that is provably inside the real project
-   root, with no symlink anywhere on the way. Refuses otherwise. */
-function safeTargetPath(dir, rel, key) {
-  if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || /[\\]/.test(rel) || rel.split('/').some(p => p === '..' || p === ''))
+/* Resolve a target's relative filename to a path provably inside the real project root,
+   with no symlink anywhere on the way. */
+function safeTargetPath(root, rel, key) {
+  if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || /[\\]/.test(rel) || rel.split('/').some(p => p === '..' || p === '' || p === '.'))
     die(`target "${key}": file name "${rel}" is not a plain relative path`);
-  const root = fs.realpathSync(dir);
   const parts = rel.split('/');
   let cur = root;
   for (let i = 0; i < parts.length; i++) {
     cur = path.join(cur, parts[i]);
-    let st = null;
-    try { st = fs.lstatSync(cur); } catch (_) { st = null; }
-    if (st && st.isSymbolicLink()) die(`target "${key}": ${path.relative(root, cur)} is a symlink; refusing to write through it`);
-    if (i < parts.length - 1) {
-      if (st && !st.isDirectory()) die(`target "${key}": ${path.relative(root, cur)} is not a directory`);
-    } else if (st && !st.isFile()) die(`target "${key}": ${path.relative(root, cur)} exists and is not a regular file`);
+    const where = `target "${key}": ${path.relative(root, cur)}`;
+    mustBe(cur, i < parts.length - 1 ? 'dir' : 'file', where);
   }
   if (!(cur + path.sep).startsWith(root + path.sep) || cur === root) die(`target "${key}": resolves outside the project folder`);
   return cur;
@@ -165,49 +188,53 @@ function renderTarget(key, target, profile, rules) {
   return lines.join('\n').trimEnd();
 }
 
-/* Marker state of an existing file: markers count only as standalone lines. */
+/* Marker positions as byte ranges of whole lines. Markers count only as standalone lines. */
+function markerRe(tok) { return new RegExp('^[ \\t]*' + tok.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '[ \\t]*\\r?$', 'gm'); }
 function markerState(text) {
-  const lines = text.split('\n');
-  const begins = [], ends = [];
-  lines.forEach((l, i) => { const t = l.trim(); if (t === BEGIN) begins.push(i); else if (t === END) ends.push(i); });
-  if (begins.length === 0 && ends.length === 0) return { kind: 'none', lines };
-  if (begins.length === 1 && ends.length === 1 && begins[0] < ends[0]) return { kind: 'one', lines, b: begins[0], e: ends[0] };
-  return { kind: 'malformed', begins: begins.length, ends: ends.length };
+  const b = [...text.matchAll(markerRe(BEGIN))], e = [...text.matchAll(markerRe(END))];
+  if (!b.length && !e.length) return { kind: 'none' };
+  if (b.length === 1 && e.length === 1 && b[0].index < e[0].index)
+    return { kind: 'one', bStart: b[0].index, bEnd: b[0].index + b[0][0].length, eStart: e[0].index, eEnd: e[0].index + e[0][0].length };
+  return { kind: 'malformed', begins: b.length, ends: e.length };
 }
 
 function splice(existing, block, file) {
-  const body = [BEGIN, block, END];
-  if (existing == null) return body.join('\n') + '\n';
+  const body = `${BEGIN}\n${block}\n${END}`;
+  if (existing == null) return body + '\n';
   const st = markerState(existing);
   if (st.kind === 'malformed') die(`${file}: malformed marker block (${st.begins} begin, ${st.ends} end). Fix it by hand; nothing was written`);
-  if (st.kind === 'none') return existing.replace(/\s*$/, '') + '\n\n' + body.join('\n') + '\n';
-  return [...st.lines.slice(0, st.b), ...body, ...st.lines.slice(st.e + 1)].join('\n');
+  if (st.kind === 'none') return existing + (existing.endsWith('\n') ? '' : '\n') + '\n' + body + '\n';
+  return existing.slice(0, st.bStart) + body + existing.slice(st.eEnd);
 }
 
 function between(existing, file) {
   const st = markerState(existing);
   if (st.kind === 'malformed') die(`${file}: malformed marker block (${st.begins} begin, ${st.ends} end)`);
   if (st.kind === 'none') return null;
-  return st.lines.slice(st.b + 1, st.e).join('\n');
+  return existing.slice(st.bEnd, st.eStart).replace(/\r\n/g, '\n').replace(/^\n/, '').replace(/\n$/, '');
 }
 
 function main() {
-  const dir = path.resolve(arg('--dir', process.cwd()));
-  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) die(`--dir ${dir} is not a directory`);
+  const requested = path.resolve(arg('--dir', process.cwd()));
+  let root;
+  try { root = fs.realpathSync(requested); } catch (_) { die(`--dir ${requested} does not exist`); }
+  if (!fs.statSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
   const check = process.argv.includes('--check');
   const contract = process.argv.includes('--contract');
-  const rules = loadRules(dir);
-  const profile = loadProfile(dir);
+  const rules = loadRules(root);
+  const profile = loadProfile(root);
 
   if (contract) {
     const key = arg('--contract-target', 'claude');
     if (!KNOWN.includes(key)) die(`unknown contract target "${key}"`);
-    const withPersonal = !process.argv.includes('--no-personal');
+    const target = TARGETS[key];
+    const withPersonal = target.personal && !process.argv.includes('--no-personal');
     const inject = rulesFor(rules, key).filter(r => r.meta.inject === true);
     const out = [`[agent-personalizer] Session-start contract for ${key}. These rules win at the moment of decision; they are injected in full, every session.`, ''];
     for (const r of inject) {
       out.push(`## ${r.meta.title || r.meta.id}`, '', r.sections.universal);
       if (withPersonal && r.sections.personal) out.push('', r.sections.personal);
+      if (target.binding && r.sections[`binding:${target.binding}`]) out.push('', r.sections[`binding:${target.binding}`]);
       out.push('');
     }
     process.stdout.write(out.join('\n'));
@@ -215,38 +242,36 @@ function main() {
   }
 
   let targets;
-  const cfgPath = path.join(dir, '.agent-personalizer.json');
+  const cfgPath = path.join(root, '.agent-personalizer.json');
   const explicit = arg('--targets', null);
   if (explicit) targets = explicit.split(',').map(s => s.trim()).filter(Boolean);
-  else if (fs.existsSync(cfgPath)) targets = JSON.parse(fs.readFileSync(cfgPath, 'utf8')).targets || ['claude', 'agents'];
+  else if (mustBe(cfgPath, 'file', '.agent-personalizer.json')) targets = JSON.parse(fs.readFileSync(cfgPath, 'utf8')).targets || ['claude', 'agents'];
   else targets = ['claude', 'agents'];
   if (!targets.length) die('no targets');
 
-  // Validate every target path BEFORE writing any, so a refused target leaves nothing half-done.
+  // Preflight everything: paths, existing content, marker state, final bytes. Then write.
   const plan = targets.map(key => {
     const target = TARGETS[key];
     if (!target) die(`unknown target "${key}" (known: ${KNOWN.join(', ')})`);
-    const file = safeTargetPath(dir, target.file, key);
-    return { key, target, file, block: renderTarget(key, target, profile, rules) };
+    const file = safeTargetPath(root, target.file, key);
+    const block = renderTarget(key, target, profile, rules);
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+    const current = existing == null ? null : between(existing, target.file);
+    const output = check ? null : splice(existing, block, target.file);
+    return { key, target, file, block, current, output };
   });
 
-  let drift = 0;
-  for (const { key, target, file, block } of plan) {
-    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-    if (check) {
-      const current = existing == null ? null : between(existing, target.file);
-      if (current === null) { console.log(`DRIFT  ${target.file}: missing or no marker block`); drift++; }
-      else if (current !== block) { console.log(`DRIFT  ${target.file}: rendered block differs from source`); drift++; }
-      else console.log(`ok     ${target.file}`);
-      continue;
-    }
-    fs.writeFileSync(file, splice(existing, block, target.file));
-    console.log(`wrote  ${target.file}`);
-  }
   if (check) {
-    console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${dir}` : '\nclean: every rendered file matches its source');
+    let drift = 0;
+    for (const p of plan) {
+      if (p.current === null) { console.log(`DRIFT  ${p.target.file}: missing or no marker block`); drift++; }
+      else if (p.current !== p.block) { console.log(`DRIFT  ${p.target.file}: rendered block differs from source`); drift++; }
+      else console.log(`ok     ${p.target.file}`);
+    }
+    console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${root}` : '\nclean: every rendered file matches its source');
     process.exit(drift ? 1 : 0);
   }
+  for (const p of plan) { fs.writeFileSync(p.file, p.output); console.log(`wrote  ${p.target.file}`); }
 }
 
 main();

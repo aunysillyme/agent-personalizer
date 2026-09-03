@@ -8,7 +8,8 @@
   Interactive when flags are missing and stdin is a terminal. Non-interactive with flags.
   Writes only the files for the chosen AIs and level. Never overwrites a file that exists
   (except the marker block inside rendered files it owns). Refuses to write through any
-  symlink or outside the install folder. Reads no environment variables. Writes no secrets.
+  symlink or outside the install folder (the folder you name is followed once, via realpath;
+  nothing beneath it may be a symlink). Reads no environment variables. Writes no secrets.
 
   exit codes: 0 ok · 1 unexpected error · 2 refused or invalid input
 */
@@ -27,7 +28,7 @@ function arg(name, dflt) {
   const i = process.argv.indexOf(name);
   if (i === -1) return dflt;
   const v = process.argv[i + 1];
-  if (v === undefined || v.startsWith('--')) die(`${name} needs a value`);
+  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
   return v;
 }
 
@@ -92,9 +93,16 @@ async function main() {
   if (bad.length) die(`unknown AI: ${bad.join(', ')} (known: ${AIS.join(', ')})`);
   if (!targets.length) die('no AIs chosen');
 
+  // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
+  // missing tail is created one level at a time, so nothing is ever created through a
+  // symlink that did not exist when you ran the command. Everything beneath root is then
+  // symlink-free by construction (safeDest refuses any).
   const requested = path.resolve(String(dir));
-  fs.mkdirSync(requested, { recursive: true });
-  const root = fs.realpathSync(requested);
+  let existing = requested; const missing = [];
+  while (!fs.existsSync(existing)) { missing.unshift(path.basename(existing)); const parent = path.dirname(existing); if (parent === existing) die(`cannot create ${requested}`); existing = parent; }
+  let root = fs.realpathSync(existing);
+  for (const part of missing) { root = path.join(root, part); fs.mkdirSync(root); }
+  if (!fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
   console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\n`);
 
   // Level 1: profile, home files, the rule source they render from.

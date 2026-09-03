@@ -12,10 +12,12 @@
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
   Fail-closed: a missing or empty list is exit 2, never a pass.
-  Coverage: inside a git repo, exactly the files git would ship (tracked plus untracked
-  and not ignored: `git ls-files --cached --others --exclude-standard`), so a gitignored
-  scratch file cannot fail the gate and a forgotten new file cannot dodge it. Outside a
-  repo, or with --all, every regular file under --dir. Any extension. Binary files (a NUL
+  Coverage: anywhere inside a git work tree (a subfolder included), exactly the files git
+  would ship from --dir down (tracked plus untracked and not ignored:
+  `git ls-files --cached --others --exclude-standard`), so a gitignored scratch file cannot
+  fail the gate and a forgotten new file cannot dodge it. Git enumeration failing inside a
+  repo is a setup error (exit 2), never a silent fallback. Outside a repo, or with --all,
+  every regular file under --dir. Any extension. Binary files (a NUL
   byte in the first 8 KB) are skipped. Symlinks are never followed.
   Matching: case-insensitive substring. Lines "allow:<exact text>" whitelist that exact
   string (attribution you keep on purpose); a forbidden term inside an allowed string
@@ -34,7 +36,7 @@ function arg(name, dflt) {
   const i = process.argv.indexOf(name);
   if (i === -1) return dflt;
   const v = process.argv[i + 1];
-  if (v === undefined || v.startsWith('--')) die(`${name} needs a value`);
+  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
   return v;
 }
 
@@ -95,9 +97,17 @@ function* gitFiles(root) {
   }
 }
 
+function insideGitRepo(root) {
+  try { return execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true'; }
+  catch (_) { return false; }
+}
+
 function fileSet(root, all) {
-  if (!all && fs.existsSync(path.join(root, '.git'))) {
-    try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return { files: gitFiles(root), mode: 'git' }; } catch (_) { /* fall through */ }
+  if (all) return { files: walk(root), mode: 'walk' };
+  if (insideGitRepo(root)) {
+    let files;
+    try { files = [...gitFiles(root)]; } catch (e) { die(`git enumeration failed inside a repository: ${e.message}`); }
+    return { files, mode: 'git' };
   }
   return { files: walk(root), mode: 'walk' };
 }
@@ -132,6 +142,7 @@ function scan(root, list, listFile, all) {
 
 function selfTest() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-selftest-'));
+  let ok = false;
   try {
     const listFile = path.join(tmp, 'forbidden.txt');
     fs.writeFileSync(listFile, 'Seeded Secret Name\nallow:Copyright Seeded Secret Name Ltd\n');
@@ -141,12 +152,12 @@ function selfTest() {
     fs.writeFileSync(path.join(tmp, 'blob.bin'), Buffer.from([0x73, 0x65, 0x00, 0x65, 0x64]));
     const { hits } = scan(tmp, loadList(listFile), listFile, true);
     const files = hits.map(h => h.file).sort().join(',');
-    const ok = hits.length === 2 && files === 'Dockerfile,dirty.md';
+    ok = hits.length === 2 && files === 'Dockerfile,dirty.md';
     console.log(ok ? 'self-test: gate went red on the seeded hits (dirty.md, Dockerfile), green on the allowed string, skipped the binary' : `self-test FAILED: expected hits in Dockerfile and dirty.md only, got ${JSON.stringify(hits)}`);
-    process.exit(ok ? 0 : 1);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+  process.exitCode = ok ? 0 : 1;
 }
 
 function main() {
