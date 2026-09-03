@@ -1,0 +1,6 @@
+node_modules/
+check/forbidden.local.txt
+AUDIT_BRIEF.md
+audit/
+.DS_Store
+*.log

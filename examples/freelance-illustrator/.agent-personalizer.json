@@ -1,0 +1,4 @@
+{
+  "targets": ["claude", "agents"],
+  "level": 3
+}

@@ -1,0 +1,7 @@
+{
+  "claude":  { "file": "CLAUDE.md",  "binding": "claude",  "personal": true,  "origin": true,  "profile": true,  "header": "Rendered instructions for Claude" },
+  "agents":  { "file": "AGENTS.md",  "binding": "agents",  "personal": true,  "origin": true,  "profile": true,  "header": "Rendered instructions for coding agents (Codex, Cursor, others that read AGENTS.md)" },
+  "gemini":  { "file": "GEMINI.md",  "binding": "gemini",  "personal": true,  "origin": true,  "profile": true,  "header": "Rendered instructions for Gemini" },
+  "chatgpt": { "file": "chatgpt-custom-instructions.md", "binding": "chatgpt", "personal": true, "origin": false, "profile": true, "boxes": true, "limit": 1500, "header": "ChatGPT custom instructions (two boxes)" },
+  "prompt":  { "file": "system-prompt.md", "binding": null, "personal": false, "origin": false, "profile": false, "header": "Shareable system prompt (universal rules only, no profile)" }
+}

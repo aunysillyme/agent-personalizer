@@ -1,0 +1,31 @@
+# Copy this file to check/forbidden.local.txt and fill it in. The local file is
+# gitignored on purpose: a list of your own identifiers must never ship in a
+# public repo. The gate refuses to pass when the local file is missing.
+#
+# One term per line. Matching is case-insensitive substring. Blank lines and
+# lines starting with # are ignored.
+#
+# allow:<exact text>  whitelists that exact string wherever it appears. Use it
+# only for attribution lines you have decided to keep (a licence copyright, a
+# repo URL). Everything else about you stays forbidden.
+
+# your names, handles, legal entities
+Your Name
+yourhandle
+Your Company LLC
+
+# your domains and emails
+yourdomain.com
+you@yourdomain.com
+
+# clients, partners, private projects, private folder names
+Client One
+Project Codename
+
+# infrastructure that identifies you
+your-server-hostname
+10.0.0.1
+
+# attribution you keep on purpose
+allow:Copyright (c) 2026 yourhandle
+allow:https://github.com/yourhandle/your-repo
