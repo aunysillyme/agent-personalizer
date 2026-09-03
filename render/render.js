@@ -22,7 +22,9 @@
   per-run random names with the target's own mode (0644 for new files), existing targets are
   backed up, and a failure at any point restores every target and removes every staged file.
   If a restore itself fails, the backup is kept and named, and the exit is 2 with ROLLBACK
-  INCOMPLETE on stderr; a backup is never deleted unless its target was restored or committed. The renderer refuses to write when
+  INCOMPLETE on stderr; a backup is never deleted unless its target was restored or committed.
+  A cleanup that fails (a staged file or a backup that cannot be removed) is named on stderr
+  with exit 2, never silently ignored. Backups carry the target's mode regardless of umask. The renderer refuses to write when
   the marker state is anything other than "no block yet" or "exactly one BEGIN followed by
   exactly one END", and it validates every target before writing any.
 
@@ -362,16 +364,20 @@ function main() {
   // run (names are unique) and is never deleted automatically (it may be the only copy).
   const run = `${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
   const staged = [], committed = [];
+  const tryUnlink = (p, kept, what) => { try { fs.unlinkSync(p); } catch (e) { if (e.code !== 'ENOENT') kept.push(`${what}: ${path.basename(p)} (${e.message})`); } };
   const undo = (why) => {
     const kept = [];
     for (const c of committed) {
-      try { if (c.bak) fs.renameSync(c.bak, c.file); else fs.unlinkSync(c.file); }
-      catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak || '(none: target did not exist before)')} (${e.message})`); }
+      try {
+        if (c.bak) fs.renameSync(c.bak, c.file);           // original back in place, mode carried by the backup
+        else if (c.done) fs.unlinkSync(c.file);           // target did not exist before and was created by this run
+        // else: target did not exist before and the rename never happened; nothing to restore
+      } catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak)} (${e.message})`); }
     }
-    for (const s of staged) { try { fs.unlinkSync(s.tmp); } catch (_) {} }
+    for (const s of staged) tryUnlink(s.tmp, kept, 'staged output not removed');
     if (kept.length) {
       console.error(`render: ${why}.`);
-      console.error('render: ROLLBACK INCOMPLETE. Restore these by hand; nothing was deleted:');
+      console.error('render: ROLLBACK INCOMPLETE. Handle these by hand; nothing else was deleted:');
       for (const k of kept) console.error(`  ${k}`);
       process.exit(2);
     }
@@ -382,20 +388,30 @@ function main() {
       const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
       fs.writeFileSync(tmp, p.output, { flag: 'wx', mode: p.mode });
       fs.chmodSync(tmp, p.mode);
-      staged.push({ tmp, file: p.file, label: p.target.file });
+      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });
     }
   } catch (e) { undo(`could not stage output (${e.message})`); }
   try {
     for (const s of staged) {
       let bak = null;
-      if (fs.existsSync(s.file)) { bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`); fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL); }
+      if (fs.existsSync(s.file)) {
+        bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`);
+        fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL);
+        fs.chmodSync(bak, s.mode);                          // a backup that may become the target again carries the target's mode, whatever the umask
+      }
       committed.push({ file: s.file, bak, label: s.label, done: false });
       fs.renameSync(s.tmp, s.file);
       committed[committed.length - 1].done = true;
     }
   } catch (e) { undo(`could not commit output (${e.message})`); }
-  for (const c of committed) if (c.bak) { try { fs.unlinkSync(c.bak); } catch (_) {} }
+  const leftovers = [];
+  for (const c of committed) if (c.bak) tryUnlink(c.bak, leftovers, 'backup not removed');
   for (const s of staged) console.log(`wrote  ${s.label}`);
+  if (leftovers.length) {
+    console.error('render: every target was written, but CLEANUP INCOMPLETE. Remove these by hand (they hold copies of the previous targets):');
+    for (const l of leftovers) console.error(`  ${l}`);
+    process.exit(2);
+  }
 
 }
 
