@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 33 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 37 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -12,7 +12,8 @@ pass() { echo "pass: $1"; }
 # trap can clean it; a failed mktemp stops the harness. Use: mk; T="$MK"
 TMPS=""
 cleanup() { for d in $TMPS; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done; }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'cleanup; trap - EXIT; echo "interrupted"; exit 130' HUP INT TERM
 mk() { MK="$(mktemp -d)" || fail "mktemp -d failed"; [ -n "$MK" ] && [ -d "$MK" ] || fail "mktemp gave no directory"; case "$MK" in *[!A-Za-z0-9/._-]*) fail "mktemp path has unexpected characters: $MK";; esac; TMPS="$TMPS $MK"; }
 # run <expected-exit> <label> cmd... ; asserts the exact exit code
 expect() { want="$1"; label="$2"; shift 2; "$@" >/dev/null 2>&1; got=$?; [ "$got" -eq "$want" ] || fail "$label: expected exit $want, got $got"; }
@@ -288,5 +289,39 @@ expect 0 "fenced heading render" node render/render.js --dir "$T" --targets prom
 grep -q AFTERFENCE "$T/system-prompt.md" || fail "text after a fenced heading was reclassified out of universal"
 grep -q REALPERSONAL "$T/system-prompt.md" && fail "real personal block leaked into the prompt render"
 pass "a heading inside a fenced example is not a section boundary"
+
+# 34. staging cannot collide with a target: two targets on one file, or a target named with the staging suffix, are refused before any write
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+printf 'HANDWRITTEN\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
+node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
+expect 2 "two targets one file" node "$T/render/render.js" --dir "$T" --targets claude,agents
+cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "colliding targets modified the file"
+node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='.AGENTS.md.agent-personalizer.tmp';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
+expect 2 "staging-suffix target name" node "$T/render/render.js" --dir "$T" --targets claude,agents
+cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "staging-suffix target modified the file"
+pass "staging collisions refused, nothing written"
+
+# 35. a stale staging file from a crash does not block the next run, and is not deleted
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'stale\n' > "$T/.AGENTS.md.1-deadbeef.agent-personalizer.tmp"
+expect 0 "render with stale tmp present" node render/render.js --dir "$T" --targets agents
+[ -f "$T/.AGENTS.md.1-deadbeef.agent-personalizer.tmp" ] || fail "renderer deleted a stale staging file it did not create"
+[ "$(ls -A "$T" | grep -c 'agent-personalizer\.\(tmp\|bak\)$')" = "1" ] || fail "renderer left its own temp or backup files behind"
+pass "stale staging file: run proceeds, file kept, own temps cleaned"
+
+# 36. invalid UTF-8 in a SOURCE is refused (rule file, then USER.md)
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\nbad \377 byte\n' >> "$T/rules/40-sign-every-edit.md"
+expect 2 "invalid utf-8 rule" node render/render.js --dir "$T" --targets claude
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\nbad \377 byte\n' >> "$T/USER.md"
+expect 2 "invalid utf-8 USER.md" node render/render.js --dir "$T" --targets claude
+pass "non-UTF-8 sources refused"
+
+# 37. malformed targets.json and malformed .agent-personalizer.json are refusals (exit 2), not crashes
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"; printf '{ not json' > "$T/render/targets.json"
+expect 2 "malformed targets.json" node "$T/render/render.js" --dir "$T" --targets claude
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '{ not json' > "$T/.agent-personalizer.json"
+expect 2 "malformed config" node render/render.js --dir "$T" --check
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '{"targets": "claude"}' > "$T/.agent-personalizer.json"
+expect 2 "config targets not a list" node render/render.js --dir "$T" --check
+pass "malformed JSON inputs are refusals, not crashes"
 
 echo; echo "all checks passed"

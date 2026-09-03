@@ -18,8 +18,9 @@
 
   Rendered text lives between two marker lines inside each target file. Bytes outside the
   markers are preserved exactly (line endings included); a target that is not valid UTF-8 is
-  refused rather than re-encoded. Outputs are staged beside their targets and renamed into
-  place only after every one has been staged. The renderer refuses to write when
+  refused rather than re-encoded (sources too). Outputs are staged beside their targets under
+  per-run random names, existing targets are backed up, and a failure at any point restores
+  every target and removes every staged file. The renderer refuses to write when
   the marker state is anything other than "no block yet" or "exactly one BEGIN followed by
   exactly one END", and it validates every target before writing any.
 
@@ -34,17 +35,27 @@
 */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+function die(msg) { console.error(`render: ${msg}`); process.exit(2); }
+
 
 const BEGIN = '<!-- agent-personalizer:begin -->';
 const END = '<!-- agent-personalizer:end -->';
-const TARGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'targets.json'), 'utf8'));
+function readJson(file, what) {
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { die(`${what}: cannot read ${file} (${e.code || e.message})`); }
+  try { return JSON.parse(text); } catch (e) { die(`${what}: ${file} is not valid JSON (${e.message})`); }
+}
+const TARGETS = readJson(path.join(__dirname, 'targets.json'), 'targets');
+if (!TARGETS || typeof TARGETS !== 'object' || Array.isArray(TARGETS) || !Object.keys(TARGETS).length) die('targets: targets.json must be a non-empty object');
+for (const [k, t] of Object.entries(TARGETS)) if (!t || typeof t !== 'object' || typeof t.file !== 'string') die(`targets: target "${k}" needs a string "file"`);
 const KNOWN = Object.keys(TARGETS);
 const BINDINGS = new Set(Object.values(TARGETS).map(t => t.binding).filter(Boolean));
 const SECTION_RE = /^(universal|personal|origin|binding:[a-z]+)$/;
 const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces']);
 const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
-function die(msg) { console.error(`render: ${msg}`); process.exit(2); }
 
 function arg(name, dflt) {
   const i = process.argv.indexOf(name);
@@ -141,9 +152,14 @@ function rejectMarkers(text, where) {
   if (text.includes(BEGIN) || text.includes(END)) die(`${where}: contains a render marker token; those are reserved for rendered files`);
 }
 
+function decodeUtf8(bytes, where) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch (_) { die(`${where}: not valid UTF-8. Nothing was written`); }
+}
+
 function readSource(p, where) {
   mustBe(p, 'file', where);
-  const text = fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+  const text = decodeUtf8(fs.readFileSync(p), where).replace(/\r\n/g, '\n');
   rejectMarkers(text, where);
   return text;
 }
@@ -293,7 +309,12 @@ function main() {
   const cfgPath = path.join(root, '.agent-personalizer.json');
   const explicit = arg('--targets', null);
   if (explicit) targets = explicit.split(',').map(s => s.trim()).filter(Boolean);
-  else if (mustBe(cfgPath, 'file', '.agent-personalizer.json')) targets = JSON.parse(fs.readFileSync(cfgPath, 'utf8')).targets || ['claude', 'agents'];
+  else if (mustBe(cfgPath, 'file', '.agent-personalizer.json')) {
+    const cfg = readJson(cfgPath, 'config');
+    if (cfg && Array.isArray(cfg.targets)) targets = cfg.targets;
+    else if (cfg && cfg.targets === undefined) targets = ['claude', 'agents'];
+    else die('config: .agent-personalizer.json "targets" must be a list');
+  }
   else targets = ['claude', 'agents'];
   if (!targets.length) die('no targets');
 
@@ -305,9 +326,7 @@ function main() {
     const block = renderTarget(key, target, profile, rules);
     let existing = null;
     if (fs.existsSync(file)) {
-      const bytes = fs.readFileSync(file);
-      try { existing = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
-      catch (_) { die(`${target.file}: not valid UTF-8; the renderer only edits text files it can reproduce byte for byte. Nothing was written`); }
+      existing = decodeUtf8(fs.readFileSync(file), target.file);
     }
     if (!check) {
       try { fs.accessSync(existing == null ? path.dirname(file) : file, fs.constants.W_OK); }
@@ -328,20 +347,40 @@ function main() {
     console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${root}` : '\nclean: every rendered file matches its source');
     process.exit(drift ? 1 : 0);
   }
-  // Stage every output beside its target, then rename all. A failure while staging removes
-  // the staged files and leaves every target untouched.
-  const staged = [];
+  // Every final path must be distinct, and no final path may look like a staging file.
+  const finals = plan.map(p => p.file);
+  if (new Set(finals).size !== finals.length) die('two targets resolve to the same file. Nothing was written');
+  if (finals.some(f => /\.agent-personalizer\.(tmp|bak)$/.test(f))) die('a target file name uses the staging suffix. Nothing was written');
+
+  // Commit: stage every output beside its target under a per-run random name, back up every
+  // existing target, rename staged -> final one by one, and on any failure put every backup
+  // back and remove every staged file. A stale .tmp/.bak from an earlier crash never blocks a
+  // run (names are unique) and is never deleted automatically (it may be the only copy).
+  const run = `${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
+  const staged = [], backups = [], committed = [];
+  const undo = (why) => {
+    for (const c of committed) { try { if (c.bak) fs.renameSync(c.bak, c.file); else fs.unlinkSync(c.file); } catch (_) {} }
+    for (const s of staged) { try { fs.unlinkSync(s.tmp); } catch (_) {} }
+    for (const b of backups) { try { fs.unlinkSync(b); } catch (_) {} }
+    die(`${why}. Every target was restored; nothing changed`);
+  };
   try {
     for (const p of plan) {
-      const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.agent-personalizer.tmp`);
+      const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
       fs.writeFileSync(tmp, p.output, { flag: 'wx' });
       staged.push({ tmp, file: p.file, label: p.target.file });
     }
-  } catch (e) {
-    for (const s of staged) { try { fs.unlinkSync(s.tmp); } catch (_) {} }
-    die(`could not stage output (${e.message}). Nothing was written`);
-  }
-  for (const s of staged) { fs.renameSync(s.tmp, s.file); console.log(`wrote  ${s.label}`); }
+  } catch (e) { undo(`could not stage output (${e.message})`); }
+  try {
+    for (const s of staged) {
+      let bak = null;
+      if (fs.existsSync(s.file)) { bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`); fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL); backups.push(bak); }
+      fs.renameSync(s.tmp, s.file);
+      committed.push({ file: s.file, bak });
+    }
+  } catch (e) { undo(`could not commit output (${e.message})`); }
+  for (const b of backups) { try { fs.unlinkSync(b); } catch (_) {} }
+  for (const s of staged) console.log(`wrote  ${s.label}`);
 }
 
 main();
