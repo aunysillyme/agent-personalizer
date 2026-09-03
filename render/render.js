@@ -17,7 +17,9 @@
   --contract-target   which target's surface filter, personal policy and binding to use (default claude)
 
   Rendered text lives between two marker lines inside each target file. Bytes outside the
-  markers are preserved exactly (line endings included). The renderer refuses to write when
+  markers are preserved exactly (line endings included); a target that is not valid UTF-8 is
+  refused rather than re-encoded. Outputs are staged beside their targets and renamed into
+  place only after every one has been staged. The renderer refuses to write when
   the marker state is anything other than "no block yet" or "exactly one BEGIN followed by
   exactly one END", and it validates every target before writing any.
 
@@ -94,8 +96,11 @@ function parseFrontmatter(text, where) {
 function parseSections(body, where) {
   const sections = {};
   let current = null;
-  for (const line of body.split('\n')) {
-    const h = line.match(/^##\s+(.+?)\s*$/);
+  const lines = body.split('\n');
+  const fenced = fenceMap(lines, where);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const h = fenced[i] ? null : line.match(/^##\s+(.+?)\s*$/);
     if (h) {
       const name = h[1].trim();
       if (!SECTION_RE.test(name)) die(`${where}: unknown section "## ${name}" (allowed: universal, personal, origin, binding:<ai>)`);
@@ -108,6 +113,28 @@ function parseSections(body, where) {
   }
   for (const k of Object.keys(sections)) sections[k] = sections[k].join('\n').trim();
   return sections;
+}
+
+/* CommonMark-style fence tracking over LF-split lines: an opening fence is 3+ backticks or
+   tildes after at most 3 spaces; it closes only on the same character, at least the opening
+   length, with nothing but whitespace after. Returns one boolean per line: inside a fence?
+   An unterminated fence is an error, never a guess. */
+function fenceMap(lines, where) {
+  const inside = new Array(lines.length).fill(false);
+  let open = null; // { ch, len, line }
+  lines.forEach((raw, i) => {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const m = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (open) {
+      inside[i] = true;
+      if (m && m[1][0] === open.ch && m[1].length >= open.len && m[2].trim() === '') open = null;
+    } else if (m && !(m[1][0] === '`' && m[2].includes('`'))) {
+      open = { ch: m[1][0], len: m[1].length, line: i + 1 };
+      inside[i] = true;
+    }
+  });
+  if (open) die(`${where}: code fence opened on line ${open.line} is never closed; fix it by hand`);
+  return inside;
 }
 
 function rejectMarkers(text, where) {
@@ -198,24 +225,21 @@ function renderTarget(key, target, profile, rules) {
 }
 
 /* Marker positions as byte ranges of whole lines. Markers count only as standalone lines
-   OUTSIDE fenced code blocks (``` or ~~~), so a quoted example in the target is never
-   mistaken for the owned block. */
-function markerState(text) {
+   OUTSIDE fenced code blocks, so a quoted example in the target is never mistaken for the
+   owned block. */
+function markerState(text, where) {
+  const lines = text.split('\n');
+  const fenced = fenceMap(lines, where);
   const b = [], e = [];
-  let fence = null, pos = 0;
-  for (const raw of text.split('\n')) {
-    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-    const t = line.trim();
-    const f = t.match(/^(`{3,}|~{3,})/);
-    if (f) {
-      if (!fence) fence = f[1][0].repeat(3);
-      else if (t.startsWith(fence)) fence = null;
-    } else if (!fence) {
+  let pos = 0;
+  lines.forEach((raw, i) => {
+    if (!fenced[i]) {
+      const t = (raw.endsWith('\r') ? raw.slice(0, -1) : raw).trim();
       if (t === BEGIN) b.push([pos, pos + raw.length]);
       else if (t === END) e.push([pos, pos + raw.length]);
     }
     pos += raw.length + 1;
-  }
+  });
   if (!b.length && !e.length) return { kind: 'none' };
   if (b.length === 1 && e.length === 1 && b[0][0] < e[0][0])
     return { kind: 'one', bStart: b[0][0], bEnd: b[0][1], eStart: e[0][0], eEnd: e[0][1] };
@@ -225,14 +249,14 @@ function markerState(text) {
 function splice(existing, block, file) {
   const body = `${BEGIN}\n${block}\n${END}`;
   if (existing == null) return body + '\n';
-  const st = markerState(existing);
+  const st = markerState(existing, file);
   if (st.kind === 'malformed') die(`${file}: malformed marker block (${st.begins} begin, ${st.ends} end). Fix it by hand; nothing was written`);
   if (st.kind === 'none') return existing + (existing.endsWith('\n') ? '' : '\n') + '\n' + body + '\n';
   return existing.slice(0, st.bStart) + body + existing.slice(st.eEnd);
 }
 
 function between(existing, file) {
-  const st = markerState(existing);
+  const st = markerState(existing, file);
   if (st.kind === 'malformed') die(`${file}: malformed marker block (${st.begins} begin, ${st.ends} end)`);
   if (st.kind === 'none') return null;
   return existing.slice(st.bEnd, st.eStart).replace(/\r\n/g, '\n').replace(/^\n/, '').replace(/\n$/, '');
@@ -279,7 +303,16 @@ function main() {
     if (!target) die(`unknown target "${key}" (known: ${KNOWN.join(', ')})`);
     const file = safeTargetPath(root, target.file, key);
     const block = renderTarget(key, target, profile, rules);
-    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+    let existing = null;
+    if (fs.existsSync(file)) {
+      const bytes = fs.readFileSync(file);
+      try { existing = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+      catch (_) { die(`${target.file}: not valid UTF-8; the renderer only edits text files it can reproduce byte for byte. Nothing was written`); }
+    }
+    if (!check) {
+      try { fs.accessSync(existing == null ? path.dirname(file) : file, fs.constants.W_OK); }
+      catch (_) { die(`${target.file}: not writable. Nothing was written`); }
+    }
     const current = existing == null ? null : between(existing, target.file);
     const output = check ? null : splice(existing, block, target.file);
     return { key, target, file, block, current, output };
@@ -295,7 +328,20 @@ function main() {
     console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${root}` : '\nclean: every rendered file matches its source');
     process.exit(drift ? 1 : 0);
   }
-  for (const p of plan) { fs.writeFileSync(p.file, p.output); console.log(`wrote  ${p.target.file}`); }
+  // Stage every output beside its target, then rename all. A failure while staging removes
+  // the staged files and leaves every target untouched.
+  const staged = [];
+  try {
+    for (const p of plan) {
+      const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.agent-personalizer.tmp`);
+      fs.writeFileSync(tmp, p.output, { flag: 'wx' });
+      staged.push({ tmp, file: p.file, label: p.target.file });
+    }
+  } catch (e) {
+    for (const s of staged) { try { fs.unlinkSync(s.tmp); } catch (_) {} }
+    die(`could not stage output (${e.message}). Nothing was written`);
+  }
+  for (const s of staged) { fs.renameSync(s.tmp, s.file); console.log(`wrote  ${s.label}`); }
 }
 
 main();

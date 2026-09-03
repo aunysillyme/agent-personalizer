@@ -88,6 +88,12 @@ function allowedSpans(lineLower, allow) {
 }
 
 function* gitFiles(root) {
+  // A tracked submodule is a gitlink (mode 160000): its files are not in this index, so a
+  // scan of the parent would silently skip them. Refuse rather than report clean.
+  const stage = execFileSync('git', ['-C', root, 'ls-files', '-z', '--stage'], { encoding: 'utf8' });
+  for (const rec of stage.split('\0')) {
+    if (rec.startsWith('160000 ')) die(`tracked submodule at ${rec.split('\t')[1]}: the gate does not descend into submodules. Run it inside the submodule, or pass --all to walk every file under --dir.`);
+  }
   const out = execFileSync('git', ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' });
   for (const rel of out.split('\0')) {
     if (!rel) continue;
@@ -117,8 +123,8 @@ function insideGitRepo(root) {
     return execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() === 'true';
   } catch (e) {
     const err = String(e.stderr || e.message || '');
-    if (e.status === 128 && /not a git repository/i.test(err)) return false;
     if (!hasGitMetadata(root)) return false;
+    if (e.status === 128 && /not a git repository/i.test(err)) die(`${root} carries .git metadata that git rejects as not a repository (${err.trim().split('\n')[0]}). Repair it, or pass --all to scan every file under --dir.`);
     die(`${root} carries git metadata but git could not run (${err.trim().split('\n')[0] || e.code || 'unknown error'}). Fix git, or pass --all to scan every file under --dir.`);
   }
 }

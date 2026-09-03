@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 30 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 33 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -140,7 +140,9 @@ pass "contract respects surfaces, target personal policy, --no-personal, and emi
 
 # 18. hook exits non-zero when node is absent, zero when present
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
-expect 0 "hook with node" /bin/sh "$T/hooks/claude-code/session-start.sh"
+/bin/sh "$T/hooks/claude-code/session-start.sh" > "$T/hook.out" || fail "hook failed with node present"
+grep -q 'Session-start contract for claude' "$T/hook.out" || fail "hook printed no contract"
+grep -q 'Read the profile first' "$T/hook.out" || fail "hook contract missing an inject:true rule"
 # a PATH holding only the utilities the hook needs (dirname, pwd) and no node, whatever this machine has
 mk; B="$MK"; ln -s "$(command -v dirname)" "$B/dirname"; ln -s "$(command -v pwd)" "$B/pwd"
 # a fresh shell, so the parent's command hash table cannot answer for a PATH it never saw
@@ -217,21 +219,33 @@ expect 2 "missing parent dir" node "$T/render/render.js" --dir "$T" --targets cl
 cmp -s "$T/CLAUDE.md" "$T/CLAUDE.expected" || fail "first target written although the second target's directory was missing"
 pass "renderer refuses a target whose directory is missing, writes nothing"
 
-# 27. markers inside a fenced block in the target are not the owned block
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
-printf 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\nafter\n' > "$T/AGENTS.md"
-expect 0 "fenced markers" node render/render.js --dir "$T" --targets agents
-grep -q '^EXAMPLE$' "$T/AGENTS.md" || fail "renderer replaced a quoted example inside a code fence"
-[ "$(grep -c 'agent-personalizer:begin' "$T/AGENTS.md")" = "2" ] || fail "expected the fenced example plus one real block"
-expect 0 "fenced markers check" node render/render.js --dir "$T" --targets agents --check
-pass "markers inside a code fence are ignored; real block appended after"
+# 27. markers inside a fenced block in the target are not the owned block: three-backtick, four-backtick
+#     with a three-backtick line inside, tilde fence, a close line with trailing text (not a close),
+#     and an unterminated fence (refused, file unchanged)
+fence_case() { # $1 label, $2 file body (printf format)
+  mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf "$2" > "$T/AGENTS.md"
+  expect 0 "fence: $1" node render/render.js --dir "$T" --targets agents
+  grep -q '^EXAMPLE$' "$T/AGENTS.md" || fail "fence: $1: quoted example inside the fence was replaced"
+  [ "$(grep -c 'agent-personalizer:begin' "$T/AGENTS.md")" = "2" ] || fail "fence: $1: expected the fenced example plus one real block"
+  expect 0 "fence: $1 check" node render/render.js --dir "$T" --targets agents --check
+}
+fence_case "three backticks" 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\nafter\n'
+fence_case "four backticks with a three-backtick line inside" 'doc\n````md\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\n````\nafter\n'
+fence_case "tildes" 'doc\n~~~\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n~~~\nafter\n'
+fence_case "close line with trailing text is not a close" 'doc\n```\n``` not a close\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\nafter\n'
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
+expect 2 "unterminated fence" node render/render.js --dir "$T" --targets agents
+cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "unterminated fence: file was modified"
+pass "fences: three/four backticks, tildes, false close, unterminated (refused)"
 
 # 28. gate exits 2 (not walk) when git cannot run inside a repo; walk mode still works outside a repo
 mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
 expect 2 "gate with git unavailable in a repo" env PATH=/nonexistent "$(command -v node)" check/gate.js --dir "$ROOT/templates" --list "$T/list.txt"
-mk; O="$MK"; echo hello > "$O/a.md"
-expect 0 "gate walk outside a repo" env PATH=/nonexistent "$(command -v node)" check/gate.js --dir "$O" --list "$T/list.txt"
-pass "gate: git failure inside a repo is exit 2; plain folders still walk"
+mk; O="$MK"; echo "zzqqxx-no-such-term here" > "$O/a.md"
+expect 1 "gate walk outside a repo finds the seeded hit" env PATH=/nonexistent "$(command -v node)" check/gate.js --dir "$O" --list "$T/list.txt"
+mk; O="$MK"; printf 'gitdir: /nonexistent\n' > "$O/.git"; echo clean > "$O/a.md"
+expect 2 "gate with malformed .git metadata" node check/gate.js --dir "$O" --list "$T/list.txt"
+pass "gate: git failure with metadata is exit 2 (malformed .git file included); plain folders walk and still catch hits"
 
 # 29. missing rules/, unknown binding, hidden stray rule file all refused
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; rm -rf "$T/rules"
@@ -244,9 +258,35 @@ pass "missing rules/, unknown binding, hidden stray rule file all refused"
 
 # 30. ChatGPT box 2 carries the chatgpt binding block, same composition as the contract
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
-expect 0 "chatgpt render" node render/render.js --dir "$T" --targets chatgpt
+printf -- '---\nid: 97-gpt-binding\ntitle: GPT binding\ninject: false\nsurfaces: [claude, chatgpt]\n---\n\n## universal\nGPTUNIVERSAL\n\n## binding:chatgpt\nGPTBINDINGSENTINEL\n' > "$T/rules/97-gpt-binding.md"
+expect 0 "chatgpt render" node render/render.js --dir "$T" --targets chatgpt,claude
 grep -q 'How would you like ChatGPT to respond' "$T/chatgpt-custom-instructions.md" || fail "chatgpt render missing box 2"
-grep -q 'Paste the universal block into' "$T/chatgpt-custom-instructions.md" || fail "chatgpt box 2 missing its binding:chatgpt block"
-pass "chatgpt box 2 includes the target binding"
+grep -q GPTBINDINGSENTINEL "$T/chatgpt-custom-instructions.md" || fail "chatgpt box 2 missing its binding:chatgpt block"
+grep -q GPTBINDINGSENTINEL "$T/CLAUDE.md" && fail "chatgpt binding leaked into the claude render"
+pass "chatgpt box 2 includes the chatgpt binding and nothing else does"
+
+# 31. a target that is not valid UTF-8 is refused, byte for byte unchanged
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+printf 'a\377b\n<!-- agent-personalizer:begin -->\nold\n<!-- agent-personalizer:end -->\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
+expect 2 "invalid utf-8 target" node render/render.js --dir "$T" --targets agents
+cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "renderer rewrote a non-UTF-8 target"
+pass "non-UTF-8 target refused, unchanged"
+
+# 32. an unwritable second target means the first is not written either (preflight + staged writes)
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"; chmod 444 "$T/AGENTS.md"
+expect 2 "unwritable second target" node render/render.js --dir "$T" --targets claude,agents
+cmp -s "$T/CLAUDE.md" "$T/CLAUDE.expected" || fail "first target written although the second was unwritable"
+chmod 644 "$T/AGENTS.md"
+[ -z "$(ls -A "$T" | grep '\.agent-personalizer\.tmp$')" ] || fail "staged temp files left behind"
+pass "unwritable target: nothing written, no temp files left"
+
+# 33. a section heading inside a fenced example in a rule is not a section
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+printf -- '---\nid: 96-fenced-heading\ntitle: Fenced heading\ninject: false\nsurfaces: [claude, prompt]\n---\n\n## universal\nBEFOREFENCE\n```\n## personal\nFENCEDTEXT\n```\nAFTERFENCE\n\n## personal\nREALPERSONAL\n' > "$T/rules/96-fenced-heading.md"
+expect 0 "fenced heading render" node render/render.js --dir "$T" --targets prompt
+grep -q AFTERFENCE "$T/system-prompt.md" || fail "text after a fenced heading was reclassified out of universal"
+grep -q REALPERSONAL "$T/system-prompt.md" && fail "real personal block leaked into the prompt render"
+pass "a heading inside a fenced example is not a section boundary"
 
 echo; echo "all checks passed"
