@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 46 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 47 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -407,6 +407,18 @@ expect 0 "untracked list at the standard path" node check/gate.js --dir "$R" --l
 git -C "$R" add -f check/forbidden.local.txt || fail "tracked-list fixture: force add"
 node check/gate.js --dir "$R" --list "$R/check/forbidden.local.txt" > "$T/tl.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list: expected exit 2, got $got"
 grep -q 'forbidden list itself is tracked' "$T/tl.out" || fail "tracked list: wrong diagnostic"
-pass "a git-tracked forbidden list is refused, an untracked one is excluded"
+mkdir -p "$R/sub"; echo clean > "$R/sub/b.md"; git -C "$R" add sub/b.md
+node check/gate.js --dir "$R/sub" --list "$R/check/forbidden.local.txt" > "$T/tl2.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list with nested --dir: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$T/tl2.out" || fail "tracked list nested: wrong diagnostic"
+node check/gate.js --dir "$R" --list "$R/check/forbidden.local.txt" --all > "$T/tl3.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list with --all: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$T/tl3.out" || fail "tracked list --all: wrong diagnostic"
+pass "a git-tracked forbidden list is refused from the root, from a nested --dir, and with --all"
+
+# 47. --all scans node_modules too; only .git is skipped
+mk; T="$MK"; mkdir -p "$T/node_modules" "$T/.git"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"; echo "zzqqxx-no-such-term" > "$T/node_modules/leak.txt"; echo "zzqqxx-no-such-term" > "$T/.git/config"
+node check/gate.js --dir "$T" --list "$T/list.txt" --all > "$T/all.out" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "--all missed node_modules (exit $got)"
+grep -q 'node_modules/leak.txt' "$T/all.out" || fail "--all hit not attributed to node_modules"
+grep -q '\.git/config' "$T/all.out" && fail "--all scanned .git"
+pass "--all scans node_modules, skips only .git"
 
 echo; echo "all checks passed"
