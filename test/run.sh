@@ -23,7 +23,7 @@ expect 0 "example render --check" node render/render.js --dir examples/freelance
 pass "example render --check is clean"
 
 # 2. render --check exits exactly 1 on seeded drift
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf '\nseeded drift line\n' >> "$T/rules/50-output-style.md"
 expect 1 "render --check on drift" node render/render.js --dir "$T" --check
 pass "render --check exits 1 on drift"
@@ -86,14 +86,14 @@ expect 2 "installer dangling symlink" node bin/agent-personalizer.js --dir "$T" 
 pass "installer refuses a dangling symlink"
 
 # 12. renderer refuses a symlinked target file; the outside file is untouched
-mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'SENTINEL\n' > "$O/victim.md"; cp "$O/victim.md" "$O/victim.expected"
+mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf 'SENTINEL\n' > "$O/victim.md"; cp "$O/victim.md" "$O/victim.expected"
 rm -f "$T/CLAUDE.md"; ln -s "$O/victim.md" "$T/CLAUDE.md"
 expect 2 "render through symlink" node render/render.js --dir "$T" --targets claude
 cmp -s "$O/victim.md" "$O/victim.expected" || fail "renderer wrote through a symlink"
 pass "renderer refuses a symlinked target, outside file unchanged"
 
 # 13. renderer refuses a traversal target name from a tampered targets.json
-mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
 printf 'SENTINEL\n' > "$O/victim.md"; cp "$O/victim.md" "$O/victim.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='../'+process.argv[1]+'/victim.md';fs.writeFileSync(process.argv[2]+'/render/targets.json',JSON.stringify(t));" "$(basename "$O")" "$T"
 expect 2 "render traversal" node "$T/render/render.js" --dir "$T" --targets claude
@@ -101,30 +101,30 @@ cmp -s "$O/victim.md" "$O/victim.expected" || fail "renderer wrote outside --dir
 pass "renderer refuses a traversal target name, outside file unchanged"
 
 # 14. renderer refuses to touch a file with a malformed marker block (BEGIN without END); file unchanged
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf 'top\n<!-- agent-personalizer:begin -->\nold\nHANDWRITTEN\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
 expect 2 "render malformed markers" node render/render.js --dir "$T" --targets agents
 cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "renderer modified a file with malformed markers"
 pass "renderer refuses malformed markers, file unchanged"
 
 # 15. renderer refuses marker tokens inside USER.md and rule files
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n<!-- agent-personalizer:end -->\n' >> "$T/USER.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n<!-- agent-personalizer:end -->\n' >> "$T/USER.md"
 expect 2 "marker in USER.md" node render/render.js --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n<!-- agent-personalizer:begin -->\n' >> "$T/rules/40-sign-every-edit.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n<!-- agent-personalizer:begin -->\n' >> "$T/rules/40-sign-every-edit.md"
 expect 2 "marker in rule file" node render/render.js --dir "$T" --targets claude
 pass "renderer refuses marker tokens in USER.md and in rule files"
 
 # 16. renderer refuses malformed frontmatter (unclosed surfaces list, unknown surface, duplicate section)
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^surfaces: \[claude, agents, gemini\]$/surfaces: [claude, agents/' "$T/rules/20-one-owner-per-rule.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^surfaces: \[claude, agents, gemini\]$/surfaces: [claude, agents/' "$T/rules/20-one-owner-per-rule.md"; rm -f "$T/rules/"*.bak
 expect 2 "unclosed surfaces" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^surfaces: \[claude, agents, gemini\]$/surfaces: [claude, nowhere]/' "$T/rules/20-one-owner-per-rule.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^surfaces: \[claude, agents, gemini\]$/surfaces: [claude, nowhere]/' "$T/rules/20-one-owner-per-rule.md"; rm -f "$T/rules/"*.bak
 expect 2 "unknown surface" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n## universal\nsecond copy\n' >> "$T/rules/40-sign-every-edit.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n## universal\nsecond copy\n' >> "$T/rules/40-sign-every-edit.md"
 expect 2 "duplicate section" node render/render.js --dir "$T" --check
 pass "renderer refuses malformed frontmatter and duplicate sections"
 
 # 17. contract is target-aware: a prompt-only rule does not reach the claude contract; --no-personal drops personal
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf -- '---\nid: 99-prompt-only\ntitle: Prompt only\ninject: true\nsurfaces: [prompt]\n---\n\n## universal\nPROMPTONLYRULE\n\n## personal\nPERSONALBLOCK\n' > "$T/rules/99-prompt-only.md"
 printf -- '---\nid: 98-claude-personal\ntitle: Claude personal\ninject: true\nsurfaces: [claude]\n---\n\n## universal\nCLAUDEUNIVERSAL\n\n## personal\nCLAUDEPERSONAL\n' > "$T/rules/98-claude-personal.md"
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c-claude.txt" || fail "claude contract exited non-zero"
@@ -140,7 +140,7 @@ grep -q "sits next to \`CLAUDE.md\`" "$T/c-claude.txt" || fail "claude contract 
 pass "contract respects surfaces, target personal policy, --no-personal, and emits the binding"
 
 # 18. hook exits non-zero when node is absent, zero when present
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
 /bin/sh "$T/hooks/claude-code/session-start.sh" > "$T/hook.out" || fail "hook failed with node present"
 grep -q 'Session-start contract for claude' "$T/hook.out" || fail "hook printed no contract"
 grep -q 'Read the profile first' "$T/hook.out" || fail "hook contract missing an inject:true rule"
@@ -152,17 +152,17 @@ expect 1 "hook without node" env PATH="$B" /bin/sh "$T/hooks/claude-code/session
 pass "hook: exit 0 with node, exactly 1 without it"
 
 # 19. renderer refuses symlinked sources (USER.md, rules/, a rule file) instead of importing outside content
-mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'OUTSIDE\n' > "$O/outside.md"
+mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf 'OUTSIDE\n' > "$O/outside.md"
 rm -f "$T/USER.md"; ln -s "$O/outside.md" "$T/USER.md"
 expect 2 "symlinked USER.md" node render/render.js --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; rm -rf "$T/rules"; ln -s "$O" "$T/rules"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; rm -rf "$T/rules"; ln -s "$O" "$T/rules"
 expect 2 "symlinked rules/" node render/render.js --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; rm -f "$T/rules/40-sign-every-edit.md"; ln -s "$O/outside.md" "$T/rules/40-sign-every-edit.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; rm -f "$T/rules/40-sign-every-edit.md"; ln -s "$O/outside.md" "$T/rules/40-sign-every-edit.md"
 expect 2 "symlinked rule file" node render/render.js --dir "$T" --targets claude
 pass "renderer refuses symlinked sources"
 
 # 20. no partial render: a malformed second target means the first target is not written either
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"
 printf 'top\n<!-- agent-personalizer:begin -->\nold\n' > "$T/AGENTS.md"
 expect 2 "partial render" node render/render.js --dir "$T" --targets claude,agents
@@ -170,7 +170,7 @@ cmp -s "$T/CLAUDE.md" "$T/CLAUDE.expected" || fail "first target was written bef
 pass "renderer writes nothing when any target is refused"
 
 # 21. bytes outside the marker block are preserved exactly, CRLF included
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf 'crlf line\r\n<!-- agent-personalizer:begin -->\r\nold\r\n<!-- agent-personalizer:end -->\r\ntail\r\n' > "$T/AGENTS.md"
 expect 0 "crlf render" node render/render.js --dir "$T" --targets agents
 printf 'crlf line\r\n' > "$T/prefix.expected"; printf 'tail\r\n' > "$T/suffix.expected"
@@ -181,15 +181,15 @@ expect 0 "crlf check" node render/render.js --dir "$T" --targets agents --check
 pass "bytes outside the marker block are preserved (CRLF)"
 
 # 22. frontmatter: CRLF is normalized, unclosed envelope / unknown key / duplicate key / stray rule file all exit 2
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/$/\r/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/$/\r/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 0 "crlf rule file" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak '6d' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak '6d' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "unclosed frontmatter" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^surfaces:/surface:/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^surfaces:/surface:/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "misspelled key" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^inject: false$/inject: false\ninject: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^inject: false$/inject: false\ninject: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "duplicate key" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/stray.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/stray.md"
 expect 2 "stray rule file" node render/render.js --dir "$T" --check
 pass "frontmatter: CRLF ok; unclosed, misspelled, duplicate, stray file all refused"
 
@@ -213,7 +213,7 @@ after="$(ls -d "${TMPDIR:-/tmp}"/gate-selftest-* 2>/dev/null | wc -l | tr -d ' '
 pass "gate self-test cleans up"
 
 # 26. no partial render when a target's parent directory is missing (tampered targets.json)
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
 printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.agents.file='missing/AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
 expect 2 "missing parent dir" node "$T/render/render.js" --dir "$T" --targets claude,agents
@@ -224,7 +224,7 @@ pass "renderer refuses a target whose directory is missing, writes nothing"
 #     with a three-backtick line inside, tilde fence, a close line with trailing text (not a close),
 #     and an unterminated fence (refused, file unchanged)
 fence_case() { # $1 label, $2 file body (printf format)
-  mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf "$2" > "$T/AGENTS.md"
+  mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf "$2" > "$T/AGENTS.md"
   expect 0 "fence: $1" node render/render.js --dir "$T" --targets agents
   grep -q '^EXAMPLE$' "$T/AGENTS.md" || fail "fence: $1: quoted example inside the fence was replaced"
   [ "$(grep -c 'agent-personalizer:begin' "$T/AGENTS.md")" = "2" ] || fail "fence: $1: expected the fenced example plus one real block"
@@ -234,7 +234,7 @@ fence_case "three backticks" 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMP
 fence_case "four backticks with a three-backtick line inside" 'doc\n````md\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\n````\nafter\n'
 fence_case "tildes" 'doc\n~~~\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n~~~\nafter\n'
 fence_case "close line with trailing text is not a close" 'doc\n```\n``` not a close\n<!-- agent-personalizer:begin -->\nEXAMPLE\n<!-- agent-personalizer:end -->\n```\nafter\n'
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf 'doc\n```\n<!-- agent-personalizer:begin -->\nEXAMPLE\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
 expect 2 "unterminated fence" node render/render.js --dir "$T" --targets agents
 cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "unterminated fence: file was modified"
 pass "fences: three/four backticks, tildes, false close, unterminated (refused)"
@@ -249,16 +249,16 @@ expect 2 "gate with malformed .git metadata" node check/gate.js --dir "$O" --lis
 pass "gate: git failure with metadata is exit 2 (malformed .git file included); plain folders walk and still catch hits"
 
 # 29. missing rules/, unknown binding, hidden stray rule file all refused
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; rm -rf "$T/rules"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; rm -rf "$T/rules"
 expect 2 "missing rules/" node render/render.js --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n## binding:nowhere\nx\n' >> "$T/rules/40-sign-every-edit.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n## binding:nowhere\nx\n' >> "$T/rules/40-sign-every-edit.md"
 expect 2 "unknown binding" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/.99-hidden.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/.99-hidden.md"
 expect 2 "hidden stray rule" node render/render.js --dir "$T" --check
 pass "missing rules/, unknown binding, hidden stray rule file all refused"
 
 # 30. ChatGPT box 2 carries the chatgpt binding block, same composition as the contract
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf -- '---\nid: 97-gpt-binding\ntitle: GPT binding\ninject: false\nsurfaces: [claude, chatgpt]\n---\n\n## universal\nGPTUNIVERSAL\n\n## binding:chatgpt\nGPTBINDINGSENTINEL\n' > "$T/rules/97-gpt-binding.md"
 expect 0 "chatgpt render" node render/render.js --dir "$T" --targets chatgpt,claude
 grep -q 'How would you like ChatGPT to respond' "$T/chatgpt-custom-instructions.md" || fail "chatgpt render missing box 2"
@@ -267,14 +267,14 @@ grep -q GPTBINDINGSENTINEL "$T/CLAUDE.md" && fail "chatgpt binding leaked into t
 pass "chatgpt box 2 includes the chatgpt binding and nothing else does"
 
 # 31. a target that is not valid UTF-8 is refused, byte for byte unchanged
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf 'a\377b\n<!-- agent-personalizer:begin -->\nold\n<!-- agent-personalizer:end -->\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
 expect 2 "invalid utf-8 target" node render/render.js --dir "$T" --targets agents
 cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "renderer rewrote a non-UTF-8 target"
 pass "non-UTF-8 target refused, unchanged"
 
 # 32. an unwritable second target means the first is not written either (preflight + staged writes)
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"; chmod 444 "$T/AGENTS.md"
 expect 2 "unwritable second target" node render/render.js --dir "$T" --targets claude,agents
 cmp -s "$T/CLAUDE.md" "$T/CLAUDE.expected" || fail "first target written although the second was unwritable"
@@ -283,7 +283,7 @@ chmod 644 "$T/AGENTS.md"
 pass "unwritable target: nothing written, no temp files left"
 
 # 33. a section heading inside a fenced example in a rule is not a section
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf -- '---\nid: 96-fenced-heading\ntitle: Fenced heading\ninject: false\nsurfaces: [claude, prompt]\n---\n\n## universal\nBEFOREFENCE\n```\n## personal\nFENCEDTEXT\n```\nAFTERFENCE\n\n## personal\nREALPERSONAL\n' > "$T/rules/96-fenced-heading.md"
 expect 0 "fenced heading render" node render/render.js --dir "$T" --targets prompt
 grep -q AFTERFENCE "$T/system-prompt.md" || fail "text after a fenced heading was reclassified out of universal"
@@ -291,7 +291,7 @@ grep -q REALPERSONAL "$T/system-prompt.md" && fail "real personal block leaked i
 pass "a heading inside a fenced example is not a section boundary"
 
 # 34. staging cannot collide with a target: two targets on one file, or a target named with the staging suffix, are refused before any write
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
 printf 'HANDWRITTEN\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
 expect 2 "two targets one file" node "$T/render/render.js" --dir "$T" --targets claude,agents
@@ -302,35 +302,35 @@ cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "staging-suffix target modifi
 pass "staging collisions refused, nothing written"
 
 # 35. a stale staging file from a crash does not block the next run, and is not deleted
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf 'stale\n' > "$T/.AGENTS.md.1-deadbeef.agent-personalizer.tmp"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf 'stale\n' > "$T/.AGENTS.md.1-deadbeef.agent-personalizer.tmp"
 expect 0 "render with stale tmp present" node render/render.js --dir "$T" --targets agents
 [ -f "$T/.AGENTS.md.1-deadbeef.agent-personalizer.tmp" ] || fail "renderer deleted a stale staging file it did not create"
 [ "$(ls -A "$T" | grep -c 'agent-personalizer\.\(tmp\|bak\)$')" = "1" ] || fail "renderer left its own temp or backup files behind"
 pass "stale staging file: run proceeds, file kept, own temps cleaned"
 
 # 36. invalid UTF-8 in a SOURCE is refused (rule file, then USER.md)
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\nbad \377 byte\n' >> "$T/rules/40-sign-every-edit.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\nbad \377 byte\n' >> "$T/rules/40-sign-every-edit.md"
 expect 2 "invalid utf-8 rule" node render/render.js --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\nbad \377 byte\n' >> "$T/USER.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\nbad \377 byte\n' >> "$T/USER.md"
 expect 2 "invalid utf-8 USER.md" node render/render.js --dir "$T" --targets claude
 pass "non-UTF-8 sources refused"
 
 # 37. malformed targets.json and malformed .agent-personalizer.json are refusals (exit 2), not crashes
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; mkdir -p "$T/render"; cp render/render.js "$T/render/"; printf '{ not json' > "$T/render/targets.json"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"; printf '{ not json' > "$T/render/targets.json"
 expect 2 "malformed targets.json" node "$T/render/render.js" --dir "$T" --targets claude
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '{ not json' > "$T/.agent-personalizer.json"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{ not json' > "$T/.agent-personalizer.json"
 expect 2 "malformed config" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '{"targets": "claude"}' > "$T/.agent-personalizer.json"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": "claude"}' > "$T/.agent-personalizer.json"
 expect 2 "config targets not a list" node render/render.js --dir "$T" --check
 pass "malformed JSON inputs are refusals, not crashes"
 
 # 38. --check refuses duplicate targets and staging-suffix names too
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 expect 2 "--check duplicate targets" node render/render.js --dir "$T" --targets claude,claude --check
 pass "--check refuses duplicate targets"
 
 # 39. an existing target keeps its mode across a render; a new target gets 0644
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; chmod 600 "$T/CLAUDE.md"; rm -f "$T/AGENTS.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; chmod 600 "$T/CLAUDE.md"; rm -f "$T/AGENTS.md"
 expect 0 "mode render" node render/render.js --dir "$T" --targets claude,agents
 m1="$(stat -f %Lp "$T/CLAUDE.md" 2>/dev/null || stat -c %a "$T/CLAUDE.md")"; m2="$(stat -f %Lp "$T/AGENTS.md" 2>/dev/null || stat -c %a "$T/AGENTS.md")"
 [ "$m1" = "600" ] || fail "existing target mode changed to $m1"
@@ -338,7 +338,7 @@ m1="$(stat -f %Lp "$T/CLAUDE.md" 2>/dev/null || stat -c %a "$T/CLAUDE.md")"; m2=
 pass "target modes preserved (600 kept, new file 644)"
 
 # 40. mid-commit failure rolls back; a failed restore keeps the backup and says ROLLBACK INCOMPLETE
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 node test/rollback.test.js "$T" > "$T/rollback.out" 2>&1 || { cat "$T/rollback.out"; fail "rollback fault-injection test"; }
 pass "rollback: complete on a commit failure; backup kept and named when a restore fails"
 
@@ -364,7 +364,7 @@ expect 1 "gate walk mode symlink target" node check/gate.js --dir "$W" --list "$
 pass "gate scans index blobs, differing working-tree copies, and symlink target text"
 
 # 42. ChatGPT target rerenders and checks clean when USER.md and a rule carry fenced examples
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf '\n## Example\n\n```js\nexample()\n```\n\n````md\n```\nnested\n```\n````\n' >> "$T/USER.md"
 printf -- '---\nid: 95-fenced-rule\ntitle: Fenced rule\ninject: false\nsurfaces: [claude, chatgpt]\n---\n\n## universal\nA rule with an example:\n```\ncode in a rule\n```\n' > "$T/rules/95-fenced-rule.md"
 expect 0 "chatgpt first render" node render/render.js --dir "$T" --targets chatgpt,claude
@@ -377,7 +377,7 @@ done
 grep -q '^`````$' "$T/chatgpt-custom-instructions.md" || fail "chatgpt wrapper fence is not longer than the content's longest run"
 expect 0 "chatgpt rerender" node render/render.js --dir "$T" --targets chatgpt,claude
 expect 0 "chatgpt check" node render/render.js --dir "$T" --targets chatgpt,claude --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n```js\nunterminated\n' >> "$T/USER.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n```js\nunterminated\n' >> "$T/USER.md"
 expect 2 "unterminated fence in USER.md" node render/render.js --dir "$T" --targets claude
 pass "fenced examples in sources survive rerender and --check; an unterminated one is refused"
 
@@ -395,9 +395,9 @@ grep -q 'is a bare repository' "$T/bare.out" || fail "bare repository: wrong dia
 pass "bare repository refused with the right diagnostic"
 
 # 45. id and title must be non-empty text
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^title: .*$/title: []/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^title: .*$/title: []/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "title as list" node render/render.js --dir "$T" --check
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^id: .*$/id: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; sed -i.bak 's/^id: .*$/id: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "id as boolean" node render/render.js --dir "$T" --check
 pass "id and title validated as text"
 
@@ -439,7 +439,7 @@ expect 2 "duplicate --ai" node bin/agent-personalizer.js --dir "$T" --ai claude,
 pass "duplicate --ai refused, nothing created"
 
 # 50. contract heading falls back to the filename when a rule has neither id nor title
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf -- '---\ninject: true\n---\n\n## universal\nNOTITLERULE\n' > "$T/rules/94-no-title.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf -- '---\ninject: true\n---\n\n## universal\nNOTITLERULE\n' > "$T/rules/94-no-title.md"
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract exited non-zero"
 grep -q '^## 94-no-title.md$' "$T/c.txt" || fail "contract heading did not fall back to the filename"
 grep -q 'undefined' "$T/c.txt" && fail "contract printed undefined"
@@ -468,7 +468,7 @@ expect 2 "gate repeated flag" node check/gate.js --self-test --self-test
 pass "repeated or unknown options refused by installer, renderer and gate"
 
 # 53. rule text before the first section heading is refused, never dropped
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf -- '---\nid: 93-preamble\ntitle: Preamble\n---\n\nMUST-PRESERVE-THIS\n\n## universal\ntext\n' > "$T/rules/93-preamble.md"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf -- '---\nid: 93-preamble\ntitle: Preamble\n---\n\nMUST-PRESERVE-THIS\n\n## universal\ntext\n' > "$T/rules/93-preamble.md"
 expect 2 "preamble text" node render/render.js --dir "$T" --targets claude
 pass "text before the first section is refused"
 
