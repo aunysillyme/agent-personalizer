@@ -11,7 +11,7 @@
     node check/gate.js [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
-  Fail-closed: a missing or empty list is exit 2, never a pass.
+  Fail-closed: a missing or empty list is exit 2, never a pass; a list that git tracks is exit 2.
   Coverage: anywhere inside a git work tree (a subfolder included), exactly what git would
   ship from --dir down: for every cached path the INDEX blob (what a commit publishes) plus
   the working-tree copy when it differs (what the next `git add` publishes); for every
@@ -197,9 +197,13 @@ function scan(root, list, listFile, all) {
   const skipPath = listFile ? path.resolve(listFile) : null;
   const set = fileSet(root, all);
   scan.mode = set.mode;
-  // the list file is excluded by its exact resolved path, never by its display label
+  // The list file is excluded by its exact resolved path, never by its display label, and
+  // only as a working-tree copy: if git has it in the INDEX it would ship, so that is exit 2.
   for (const item of set.items) {
-    if (skipPath && path.resolve(root, item.rel) === skipPath) continue;
+    if (skipPath && path.resolve(root, item.rel) === skipPath) {
+      if (/\(index/.test(item.label)) die(`the forbidden list itself is tracked by git (${item.rel}). It must never ship: run \`git rm --cached ${item.rel}\` and add it to .gitignore.`);
+      continue;
+    }
     if (isBinary(item.bytes)) continue;
     files++;
     const lines = item.bytes.toString('utf8').split('\n');

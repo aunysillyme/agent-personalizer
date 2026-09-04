@@ -95,7 +95,7 @@ check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md
-test/        run.sh: 45 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+test/        run.sh: 46 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Contributing

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 45 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 46 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -387,10 +387,12 @@ expect 1 "list-name impersonation" node check/gate.js --dir "$T" --list "$T/chec
 pass "gate excludes the list by exact path, not by name prefix"
 
 # 44. a bare repository is refused (exit 2), never walked
-mk; R="$MK"; git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.name t; echo x > "$R/a.md"; git -C "$R" add a.md; git -C "$R" commit -q -m x
-mk; B="$MK"; git clone -q --bare "$R" "$B/bare.git"; mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
-expect 2 "bare repository" node check/gate.js --dir "$B/bare.git" --list "$T/list.txt"
-pass "bare repository refused"
+mk; R="$MK"; { git -C "$R" init -q && git -C "$R" config user.email t@t && git -C "$R" config user.name t && echo x > "$R/a.md" && git -C "$R" add a.md && git -C "$R" commit -q -m x; } || fail "bare fixture: repo setup"
+mk; B="$MK"; git clone -q --bare "$R" "$B/bare.git" || fail "bare fixture: clone"; [ -d "$B/bare.git" ] || fail "bare fixture: no bare.git"
+mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
+node check/gate.js --dir "$B/bare.git" --list "$T/list.txt" > "$T/bare.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "bare repository: expected exit 2, got $got"
+grep -q 'is a bare repository' "$T/bare.out" || fail "bare repository: wrong diagnostic"
+pass "bare repository refused with the right diagnostic"
 
 # 45. id and title must be non-empty text
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^title: .*$/title: []/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
@@ -398,5 +400,13 @@ expect 2 "title as list" node render/render.js --dir "$T" --check
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^id: .*$/id: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
 expect 2 "id as boolean" node render/render.js --dir "$T" --check
 pass "id and title validated as text"
+
+# 46. a tracked forbidden list is exit 2 (it would ship); an untracked one at the same path is fine
+mk; R="$MK"; { git -C "$R" init -q && git -C "$R" config user.email t@t && git -C "$R" config user.name t && mkdir -p "$R/check" && printf 'zzqqxx-no-such-term\n' > "$R/check/forbidden.local.txt" && printf 'check/forbidden.local.txt\n' > "$R/.gitignore" && echo clean > "$R/a.md" && git -C "$R" add a.md .gitignore; } || fail "tracked-list fixture"
+expect 0 "untracked list at the standard path" node check/gate.js --dir "$R" --list "$R/check/forbidden.local.txt"
+git -C "$R" add -f check/forbidden.local.txt || fail "tracked-list fixture: force add"
+node check/gate.js --dir "$R" --list "$R/check/forbidden.local.txt" > "$T/tl.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$T/tl.out" || fail "tracked list: wrong diagnostic"
+pass "a git-tracked forbidden list is refused, an untracked one is excluded"
 
 echo; echo "all checks passed"
