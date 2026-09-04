@@ -105,6 +105,7 @@ function parseFrontmatter(text, where) {
     if (bad.length) die(`${where}: unknown surface(s) ${bad.join(', ')} (known: ${KNOWN.join(', ')})`);
   }
   if ('inject' in meta && typeof meta.inject !== 'boolean') die(`${where}: "inject" must be true or false`);
+  for (const k of ['id', 'title']) if (k in meta && (typeof meta[k] !== 'string' || !meta[k].trim())) die(`${where}: "${k}" must be non-empty text`);
   return { meta, body: text.slice(close + 5) };
 }
 

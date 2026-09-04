@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 42 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 45 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -366,12 +366,37 @@ pass "gate scans index blobs, differing working-tree copies, and symlink target 
 # 42. ChatGPT target rerenders and checks clean when USER.md and a rule carry fenced examples
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
 printf '\n## Example\n\n```js\nexample()\n```\n\n````md\n```\nnested\n```\n````\n' >> "$T/USER.md"
-printf '\n```\ncode in a rule\n```\n' >> "$T/rules/40-sign-every-edit.md"
+printf -- '---\nid: 95-fenced-rule\ntitle: Fenced rule\ninject: false\nsurfaces: [claude, chatgpt]\n---\n\n## universal\nA rule with an example:\n```\ncode in a rule\n```\n' > "$T/rules/95-fenced-rule.md"
 expect 0 "chatgpt first render" node render/render.js --dir "$T" --targets chatgpt,claude
+for f in chatgpt-custom-instructions.md CLAUDE.md; do
+  grep -q 'example()' "$T/$f" || fail "fenced profile content missing from $f"
+  grep -q '^nested$' "$T/$f" || fail "nested fenced profile content missing from $f"
+  grep -q 'code in a rule' "$T/$f" || fail "fenced rule content missing from $f"
+  grep -q '^````md$' "$T/$f" || fail "four-backtick fence not preserved in $f"
+done
+grep -q '^`````$' "$T/chatgpt-custom-instructions.md" || fail "chatgpt wrapper fence is not longer than the content's longest run"
 expect 0 "chatgpt rerender" node render/render.js --dir "$T" --targets chatgpt,claude
 expect 0 "chatgpt check" node render/render.js --dir "$T" --targets chatgpt,claude --check
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n```js\nunterminated\n' >> "$T/USER.md"
 expect 2 "unterminated fence in USER.md" node render/render.js --dir "$T" --targets claude
 pass "fenced examples in sources survive rerender and --check; an unterminated one is refused"
+
+# 43. the list file is excluded by exact path only: a shippable file whose name starts with the list's name is still scanned
+mk; T="$MK"; mkdir -p "$T/check"; printf 'zzqqxx-no-such-term\n' > "$T/check/forbidden.local.txt"; echo "zzqqxx-no-such-term inside" > "$T/check/forbidden.local.txt (payload).md"
+expect 1 "list-name impersonation" node check/gate.js --dir "$T" --list "$T/check/forbidden.local.txt" --all
+pass "gate excludes the list by exact path, not by name prefix"
+
+# 44. a bare repository is refused (exit 2), never walked
+mk; R="$MK"; git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.name t; echo x > "$R/a.md"; git -C "$R" add a.md; git -C "$R" commit -q -m x
+mk; B="$MK"; git clone -q --bare "$R" "$B/bare.git"; mk; T="$MK"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"
+expect 2 "bare repository" node check/gate.js --dir "$B/bare.git" --list "$T/list.txt"
+pass "bare repository refused"
+
+# 45. id and title must be non-empty text
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^title: .*$/title: []/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+expect 2 "title as list" node render/render.js --dir "$T" --check
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; sed -i.bak 's/^id: .*$/id: true/' "$T/rules/40-sign-every-edit.md"; rm -f "$T/rules/"*.bak
+expect 2 "id as boolean" node render/render.js --dir "$T" --check
+pass "id and title validated as text"
 
 echo; echo "all checks passed"

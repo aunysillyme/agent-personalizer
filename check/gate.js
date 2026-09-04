@@ -115,7 +115,7 @@ function* gitItems(root) {
       const size = Number(hm[3]);
       const body = out.subarray(nl + 1, nl + 1 + size);
       pos = nl + 1 + size + 1;
-      yield { label: c.link ? `${c.rel} (index, symlink target)` : `${c.rel} (index)`, bytes: body };
+      yield { rel: c.rel, label: c.link ? `${c.rel} (index, symlink target)` : `${c.rel} (index)`, bytes: body };
     }
   }
   // working-tree copies that differ from the index
@@ -138,16 +138,17 @@ function* gitItems(root) {
 function treeItem(root, rel, suffix) {
   const p = path.join(root, rel);
   let st; try { st = fs.lstatSync(p); } catch (_) { return null; }
-  if (st.isSymbolicLink()) return { label: `${rel}${suffix || ' (working tree)'} symlink target`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
-  if (st.isFile()) return { label: `${rel}${suffix}`, bytes: fs.readFileSync(p) };
+  if (st.isSymbolicLink()) return { rel, label: `${rel}${suffix || ' (working tree)'} symlink target`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
+  if (st.isFile()) return { rel, label: `${rel}${suffix}`, bytes: fs.readFileSync(p) };
   return null;
 }
 
 function* walkItems(root) {
   for (const p of walk(root)) {
     const st = fs.lstatSync(p);
-    if (st.isSymbolicLink()) yield { label: `${path.relative(root, p)} (symlink target)`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
-    else yield { label: path.relative(root, p), bytes: fs.readFileSync(p) };
+    const rel = path.relative(root, p);
+    if (st.isSymbolicLink()) yield { rel, label: `${rel} (symlink target)`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
+    else yield { rel, label: rel, bytes: fs.readFileSync(p) };
   }
 }
 
@@ -168,8 +169,11 @@ function hasGitMetadata(root) {
    directories, so the gate refuses rather than degrades. */
 function insideGitRepo(root) {
   try {
+    const bare = execFileSync('git', ['-C', root, 'rev-parse', '--is-bare-repository'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    if (bare === 'true') die(`${root} is a bare repository: there is no working tree to ship and this gate does not read packed objects. Run it in a checkout.`);
     return execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() === 'true';
   } catch (e) {
+    if (e && e.message && /is a bare repository/.test(e.message)) throw e;
     const err = String(e.stderr || e.message || '');
     if (!hasGitMetadata(root)) return false;
     if (e.status === 128 && /not a git repository/i.test(err)) die(`${root} carries .git metadata that git rejects as not a repository (${err.trim().split('\n')[0]}). Repair it, or pass --all to scan every file under --dir.`);
@@ -193,9 +197,9 @@ function scan(root, list, listFile, all) {
   const skipPath = listFile ? path.resolve(listFile) : null;
   const set = fileSet(root, all);
   scan.mode = set.mode;
-  const skipRel = skipPath && (skipPath + '').startsWith(root + path.sep) ? path.relative(root, skipPath) : null;
+  // the list file is excluded by its exact resolved path, never by its display label
   for (const item of set.items) {
-    if (skipRel && (item.label === skipRel || item.label.startsWith(skipRel + ' ('))) continue;
+    if (skipPath && path.resolve(root, item.rel) === skipPath) continue;
     if (isBinary(item.bytes)) continue;
     files++;
     const lines = item.bytes.toString('utf8').split('\n');
