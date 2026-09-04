@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 41 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 42 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -353,6 +353,25 @@ node check/gate.js --dir "$R" --list "$T/list.txt" > "$T/g2.txt" 2>&1; got=$?; [
 grep -q 'leak.md (working tree)' "$T/g2.txt" || fail "gate did not attribute the hit to the working tree"
 echo "clean" > "$R/leak.md"; git -C "$R" add leak.md
 expect 0 "gate clean index and tree" node check/gate.js --dir "$R" --list "$T/list.txt"
-pass "gate scans index blobs and differing working-tree copies"
+# symlinks: their target text ships as a blob, so it is scanned; staged, then untracked, then in walk mode
+ln -s "/tmp/zzqqxx-no-such-term/private" "$R/link"; git -C "$R" add link
+node check/gate.js --dir "$R" --list "$T/list.txt" > "$T/g3.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "gate missed a forbidden term in a staged symlink target (exit $got)"
+grep -q 'link (index, symlink target)' "$T/g3.txt" || fail "staged symlink hit not attributed"
+git -C "$R" rm -q --cached link
+node check/gate.js --dir "$R" --list "$T/list.txt" > "$T/g4.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "gate missed a forbidden term in an untracked symlink target (exit $got)"
+mk; W="$MK"; ln -s "/tmp/zzqqxx-no-such-term/private" "$W/link"
+expect 1 "gate walk mode symlink target" node check/gate.js --dir "$W" --list "$T/list.txt"
+pass "gate scans index blobs, differing working-tree copies, and symlink target text"
+
+# 42. ChatGPT target rerenders and checks clean when USER.md and a rule carry fenced examples
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"
+printf '\n## Example\n\n```js\nexample()\n```\n\n````md\n```\nnested\n```\n````\n' >> "$T/USER.md"
+printf '\n```\ncode in a rule\n```\n' >> "$T/rules/40-sign-every-edit.md"
+expect 0 "chatgpt first render" node render/render.js --dir "$T" --targets chatgpt,claude
+expect 0 "chatgpt rerender" node render/render.js --dir "$T" --targets chatgpt,claude
+expect 0 "chatgpt check" node render/render.js --dir "$T" --targets chatgpt,claude --check
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf '\n```js\nunterminated\n' >> "$T/USER.md"
+expect 2 "unterminated fence in USER.md" node render/render.js --dir "$T" --targets claude
+pass "fenced examples in sources survive rerender and --check; an unterminated one is refused"
 
 echo; echo "all checks passed"

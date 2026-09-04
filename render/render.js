@@ -190,6 +190,7 @@ function loadProfile(root) {
   const p = path.join(root, 'USER.md');
   if (!fs.existsSync(p) && !(() => { try { fs.lstatSync(p); return true; } catch (_) { return false; } })()) return null;
   const text = readSource(p, 'USER.md');
+  fenceMap(text.split('\n'), 'USER.md');                    // an unterminated fence in the profile is an error, not a surprise later
   return text.replace(/^#\s+USER\.md\s*\n/, '').replace(/\n---\n\*Template from agent-personalizer[^\n]*\n?$/, '').trim();
 }
 
@@ -234,8 +235,11 @@ function renderTarget(key, target, profile, rules) {
       return parts.join('\n\n');
     }).join('\n\n');
     const warn = (label, text) => text.length > target.limit ? `\n> ${label} is ${text.length} characters; the box allows about ${target.limit}. Trim before pasting.` : `\n> ${label}: ${text.length} characters.`;
-    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', '```', box1, '```', warn('Box 1', box1), '');
-    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', '```', box2, '```', warn('Box 2', box2));
+    // a wrapping fence longer than any backtick or tilde run inside the content, so content fences can never close it
+    const fenceFor = (text) => { let n = 3; for (const m of text.matchAll(/(`{3,}|~{3,})/g)) n = Math.max(n, m[1].length + 1); return '`'.repeat(n); };
+    const f1 = fenceFor(box1), f2 = fenceFor(box2);
+    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', f1, box1, f1, warn('Box 1', box1), '');
+    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', f2, box2, f2, warn('Box 2', box2));
     return lines.join('\n');
   }
   if (target.profile && profile) lines.push('## Profile', '', profile, '');
@@ -338,6 +342,8 @@ function main() {
     }
     const current = existing == null ? null : between(existing, target.file);
     const output = check ? null : splice(existing, block, target.file);
+    // the generated file must itself re-parse to exactly one block, or the next render would refuse it
+    if (output != null) { const st = markerState(output, `${target.file} (generated)`); if (st.kind !== 'one' || between(output, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
     const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
     return { key, target, file, block, current, output, mode };
   });
@@ -368,9 +374,11 @@ function main() {
   const undo = (why) => {
     const kept = [];
     for (const c of committed) {
-      if (c.bak) {
-        try { fs.renameSync(c.bak, c.file); }               // original back in place, mode carried by the backup
+      if (c.bak && c.done) {
+        try { fs.renameSync(c.bak, c.file); }               // target was replaced: original back in place, mode carried by the backup
         catch (e) { kept.push(`${c.label}: original kept at ${path.basename(c.bak)} (${e.message})`); }
+      } else if (c.bak) {
+        tryUnlink(c.bak, kept, `${c.label}: stale backup not removed`);   // target was never replaced: the original is still in place, drop the copy
       } else if (c.done) {
         try { fs.unlinkSync(c.file); }                      // target did not exist before and was created by this run
         catch (e) { kept.push(`${c.label}: created target not removed (${e.message})`); }
@@ -389,8 +397,8 @@ function main() {
   try {
     for (const p of plan) {
       const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
+      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });   // recorded BEFORE the file can exist; cleanup tolerates ENOENT
       fs.writeFileSync(tmp, p.output, { flag: 'wx', mode: p.mode });
-      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });   // recorded before anything else can fail
       fs.chmodSync(tmp, p.mode);
     }
   } catch (e) { undo(`could not stage output (${e.message})`); }
@@ -401,8 +409,8 @@ function main() {
       committed.push(rec);                                  // recorded before the first artifact exists
       if (fs.existsSync(s.file)) {
         bak = path.join(path.dirname(s.file), `.${path.basename(s.file)}.${run}.agent-personalizer.bak`);
+        rec.bak = bak;                                      // recorded BEFORE the copy can exist
         fs.copyFileSync(s.file, bak, fs.constants.COPYFILE_EXCL);
-        rec.bak = bak;                                      // recorded before chmod can fail
         fs.chmodSync(bak, s.mode);                          // carries the target's mode into a restore, whatever the umask
       }
       fs.renameSync(s.tmp, s.file);

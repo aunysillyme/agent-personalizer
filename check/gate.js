@@ -17,7 +17,7 @@
   the working-tree copy when it differs (what the next `git add` publishes); for every
   untracked, not-ignored path the working-tree copy. A gitignored scratch file cannot fail
   the gate, a forgotten new file cannot dodge it, and a leak staged then cleaned on disk is
-  still caught. Git enumeration failing inside a
+  still caught. A symlink is never followed, but its target text is scanned (git ships it). Git enumeration failing inside a
   repo is a setup error (exit 2), never a silent fallback. Outside a repo, or with --all,
   every regular file under --dir. Any extension. Binary files (a NUL
   byte in the first 8 KB) are skipped. Symlinks are never followed.
@@ -65,7 +65,7 @@ function* walk(root) {
     if (SKIP_DIRS.has(name)) continue;
     const p = path.join(root, name);
     const st = fs.lstatSync(p);
-    if (st.isSymbolicLink()) continue;
+    if (st.isSymbolicLink()) { yield p; continue; }        // yielded so its TARGET TEXT gets scanned; never followed
     if (st.isDirectory()) yield* walk(p);
     else if (st.isFile()) yield p;
   }
@@ -100,8 +100,7 @@ function* gitItems(root) {
     if (!m) die(`unreadable index record: ${rec.slice(0, 80)}`);
     const [, mode, oid, , rel] = m;
     if (mode === '160000') die(`tracked submodule at ${rel}: the gate does not descend into submodules. Run it inside the submodule, or pass --all to walk every file under --dir.`);
-    if (mode === '120000') continue; // a symlink entry; never followed
-    cached.push({ oid, rel });
+    cached.push({ oid, rel, link: mode === '120000' });   // a symlink entry ships its TARGET TEXT as the blob; scanned, never followed
   }
   // index blobs, in one batch
   if (cached.length) {
@@ -116,28 +115,40 @@ function* gitItems(root) {
       const size = Number(hm[3]);
       const body = out.subarray(nl + 1, nl + 1 + size);
       pos = nl + 1 + size + 1;
-      yield { label: `${c.rel} (index)`, bytes: body };
+      yield { label: c.link ? `${c.rel} (index, symlink target)` : `${c.rel} (index)`, bytes: body };
     }
   }
   // working-tree copies that differ from the index
   const changed = new Set(git(root, ['diff', '--name-only', '-z']).toString('utf8').split('\0').filter(Boolean));
   for (const c of cached) {
     if (!changed.has(c.rel)) continue;
-    const p = path.join(root, c.rel);
-    let st; try { st = fs.lstatSync(p); } catch (_) { continue; }
-    if (st.isFile() && !st.isSymbolicLink()) yield { label: `${c.rel} (working tree)`, bytes: fs.readFileSync(p) };
+    const item = treeItem(root, c.rel, ' (working tree)');
+    if (item) yield item;
   }
   // untracked, not ignored
   const others = git(root, ['ls-files', '-z', '--others', '--exclude-standard']).toString('utf8').split('\0').filter(Boolean);
   for (const rel of others) {
-    const p = path.join(root, rel);
-    let st; try { st = fs.lstatSync(p); } catch (_) { continue; }
-    if (st.isFile() && !st.isSymbolicLink()) yield { label: rel, bytes: fs.readFileSync(p) };
+    const item = treeItem(root, rel, '');
+    if (item) yield item;
   }
 }
 
+/* A working-tree entry as scan bytes: a regular file's content, or a symlink's TARGET TEXT
+   (readlink, never followed). Anything else is skipped. */
+function treeItem(root, rel, suffix) {
+  const p = path.join(root, rel);
+  let st; try { st = fs.lstatSync(p); } catch (_) { return null; }
+  if (st.isSymbolicLink()) return { label: `${rel}${suffix || ' (working tree)'} symlink target`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
+  if (st.isFile()) return { label: `${rel}${suffix}`, bytes: fs.readFileSync(p) };
+  return null;
+}
+
 function* walkItems(root) {
-  for (const p of walk(root)) yield { label: path.relative(root, p), bytes: fs.readFileSync(p) };
+  for (const p of walk(root)) {
+    const st = fs.lstatSync(p);
+    if (st.isSymbolicLink()) yield { label: `${path.relative(root, p)} (symlink target)`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
+    else yield { label: path.relative(root, p), bytes: fs.readFileSync(p) };
+  }
 }
 
 /* Does any ancestor (root included) carry .git metadata? Checked without git. */
