@@ -158,7 +158,9 @@ async function main() {
 
   console.log('\nNext:');
   console.log('  1. Open USER.md and replace every line in parentheses.');
-  console.log(`  2. Re-render after editing: node ${level >= 3 ? 'render/render.js' : path.relative(root, path.join(PKG, 'render', 'render.js'))} --dir .`);
+  console.log(level >= 3
+    ? '  2. Re-render after editing: node render/render.js --dir .'
+    : `  2. Re-render after editing by running this installer again (it keeps your files and only refreshes the rendered blocks):\n     npx github:aunysillyme/agent-personalizer --dir . --ai ${targets.join(',')} --level ${level} --yes`);
   if (level >= 2) console.log('  3. Read notes/README.md before letting an AI write into notes/.');
   if (level >= 3) console.log('  4. Register hooks/claude-code/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
   if (level >= 4) console.log('  5. Level 4 is pointers only for now: routing, task bundles and verified CLI runs live in the multi-agent layer, linked from the README when it ships.');
