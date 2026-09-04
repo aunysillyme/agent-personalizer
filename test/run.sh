@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 50 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 53 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -444,5 +444,32 @@ node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt
 grep -q '^## 94-no-title.md$' "$T/c.txt" || fail "contract heading did not fall back to the filename"
 grep -q 'undefined' "$T/c.txt" && fail "contract printed undefined"
 pass "contract heading falls back to the filename"
+
+# 51. a list reached through a symlinked directory alias is checked at its REAL path; a dangling .git beside it is metadata
+mk; B="$MK"; { mkdir -p "$B/repo/check" "$B/clean" && git -C "$B/repo" init -q && git -C "$B/repo" config user.email t@t && git -C "$B/repo" config user.name t && printf 'zzqqxx-no-such-term\n' > "$B/repo/check/list.txt" && git -C "$B/repo" add -f check/list.txt && ln -s "$B/repo/check" "$B/list-alias" && echo clean > "$B/clean/a.txt"; } || fail "alias fixture"
+node check/gate.js --dir "$B/clean" --list "$B/list-alias/list.txt" --all > "$B/o1.txt" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list via symlinked alias: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$B/o1.txt" || fail "alias: wrong diagnostic"
+mk; D="$MK"; mkdir -p "$D/site" "$D/clean"; ln -s /nonexistent "$D/site/.git"; printf 'zzqqxx-no-such-term\n' > "$D/site/list.txt"; echo clean > "$D/clean/a.txt"
+expect 2 "dangling .git beside the list" node check/gate.js --dir "$D/clean" --list "$D/site/list.txt" --all
+mk; L="$MK"; printf 'zzqqxx-no-such-term\n' > "$L/real.txt"; ln -s "$L/real.txt" "$L/link.txt"
+expect 2 "symlinked list file" node check/gate.js --dir "$D/clean" --list "$L/link.txt" --all
+mk; Q="$MK"; mkdir "$Q/list"
+expect 2 "list is a directory" node check/gate.js --dir "$D/clean" --list "$Q/list" --all
+pass "list checked at its real path; dangling .git, symlinked list, directory list all refused"
+
+# 52. strict options everywhere: a repeated value option, an unknown option, a repeated flag are exit 2; the installer creates nothing
+mk; T="$MK"
+expect 2 "installer repeated --ai" node bin/agent-personalizer.js --dir "$T/x" --ai claude --ai agents --level 1 --yes
+expect 2 "installer unknown option" node bin/agent-personalizer.js --dir "$T/x" --ai claude --level 1 --yes --bogus
+[ ! -e "$T/x" ] || fail "installer created the folder before refusing bad options"
+expect 2 "render repeated --dir" node render/render.js --dir examples/freelance-illustrator --dir examples/freelance-illustrator --check
+expect 2 "render unknown option" node render/render.js --dir examples/freelance-illustrator --check --nope
+expect 2 "gate repeated flag" node check/gate.js --self-test --self-test
+pass "repeated or unknown options refused by installer, renderer and gate"
+
+# 53. rule text before the first section heading is refused, never dropped
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf -- '---\nid: 93-preamble\ntitle: Preamble\n---\n\nMUST-PRESERVE-THIS\n\n## universal\ntext\n' > "$T/rules/93-preamble.md"
+expect 2 "preamble text" node render/render.js --dir "$T" --targets claude
+pass "text before the first section is refused"
 
 echo; echo "all checks passed"

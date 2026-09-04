@@ -12,8 +12,9 @@
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
   Fail-closed: a missing or empty list is exit 2, never a pass; a list that git tracks is exit 2.
-  The list file may never be tracked by git; every repository enclosing it is asked, with a
-  literal pathspec, before anything is scanned, whatever --dir or --all say.
+  The list file may never be tracked by git; every repository enclosing its REAL path is
+  asked, with a literal pathspec, before anything is scanned, whatever --dir or --all say.
+  The list must be a regular file, not a symlink.
   Coverage: anywhere inside a git work tree (a subfolder included), exactly what git would
   ship from --dir down: for every cached path the INDEX blob (what a commit publishes) plus
   the working-tree copy when it differs (what the next `git add` publishes); for every
@@ -37,23 +38,43 @@ const SKIP_DIRS = new Set(['.git']);   // --all means every file; git mode lets 
 
 function die(msg) { console.error(`GATE SETUP ERROR: ${msg}`); process.exit(2); }
 
-function arg(name, dflt) {
-  const i = process.argv.indexOf(name);
-  if (i === -1) return dflt;
-  const v = process.argv[i + 1];
-  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
-  return v;
+const VALUE_OPTS = ['--dir', '--list'];
+const FLAG_OPTS = ['--self-test', '--all'];
+/* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
+function parseArgs() {
+  const out = {};
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (VALUE_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      const v = argv[i + 1];
+      if (v === undefined || v === '' || v.startsWith('--')) die(`${a} needs a non-empty value`);
+      out[a] = v; i++;
+    } else if (FLAG_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      out[a] = true;
+    } else die(`unknown option "${a}" (known: ${[...VALUE_OPTS, ...FLAG_OPTS].join(', ')})`);
+  }
+  return out;
 }
+let ARGS = null;
+function arg(name, dflt) { if (!ARGS) ARGS = parseArgs(); return name in ARGS ? ARGS[name] : dflt; }
 
 /* If ANY enclosing git repository tracks the list file, it would ship. Every ancestor
    directory that carries .git metadata is asked, with a literal pathspec (so a name with
    `*`, `?`, `[` or a leading `:` cannot be misread), for an index entry at the list's
    repo-relative path. Independent of --dir and --all. Git failing while metadata exists is
    a setup error; a "not a repository" answer is trusted only when no metadata exists. */
+function hasDotGit(dir) {
+  // lstat, not existsSync: a dangling .git symlink or any odd entry is still metadata
+  try { fs.lstatSync(path.join(dir, '.git')); return true; } catch (e) { return e.code !== 'ENOENT'; }
+}
+
 function refuseTrackedList(file) {
   let dir = path.dirname(file);
   for (;;) {
-    if (fs.existsSync(path.join(dir, '.git'))) {
+    if (hasDotGit(dir)) {
       const rel = path.relative(dir, file);
       let out;
       try {
@@ -71,10 +92,17 @@ function refuseTrackedList(file) {
 }
 
 function loadList(file) {
-  if (!fs.existsSync(file)) die(`${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
-  refuseTrackedList(file);
+  let st = null;
+  try { st = fs.lstatSync(file); } catch (_) { st = null; }
+  if (!st) die(`${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
+  if (st.isSymbolicLink()) die(`${file} is a symlink; the list must be a regular file (a link can point at a tracked copy)`);
+  if (!st.isFile()) die(`${file} is not a regular file`);
+  const real = fs.realpathSync(file);                   // the REAL path: an alias through a symlinked directory must not hide the repository that tracks it
+  refuseTrackedList(real);
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { die(`cannot read ${file} (${e.code || e.message})`); }
   const terms = [], allow = [];
-  fs.readFileSync(file, 'utf8').split('\n').forEach((raw, n) => {
+  text.split('\n').forEach((raw, n) => {
     const line = raw.trim();
     if (!line || line.startsWith('#')) return;
     if (line.startsWith('allow:')) {
@@ -84,7 +112,7 @@ function loadList(file) {
     } else terms.push(line);
   });
   if (!terms.length) die('forbidden list has no terms.');
-  return { terms, allow };
+  return { terms, allow, real };
 }
 
 function isBinary(bytes) { return bytes.subarray(0, 8192).includes(0); }
@@ -185,7 +213,7 @@ function* walkItems(root) {
 function hasGitMetadata(root) {
   let dir = root;
   for (;;) {
-    if (fs.existsSync(path.join(dir, '.git'))) return true;
+    if (hasDotGit(dir)) return true;
     const parent = path.dirname(dir);
     if (parent === dir) return false;
     dir = parent;
@@ -221,9 +249,10 @@ function fileSet(root, all) {
 }
 
 function scan(root, list, listFile, all) {
+  root = fs.realpathSync(root);                         // every caller, self-test included, compares real paths
   const hits = [];
   let files = 0;
-  const skipPath = listFile ? path.resolve(listFile) : null;
+  const skipPath = list.real || (listFile ? path.resolve(listFile) : null);
   const set = fileSet(root, all);
   scan.mode = set.mode;
   // The list file is excluded by its exact resolved path, never by its display label, and
@@ -274,11 +303,12 @@ function selfTest() {
 }
 
 function main() {
-  if (process.argv.includes('--self-test')) return selfTest();
-  const root = path.resolve(arg('--dir', path.join(__dirname, '..')));
+  if (!!arg('--self-test', false)) return selfTest();
+  let root = path.resolve(arg('--dir', path.join(__dirname, '..')));
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) die(`--dir ${root} is not a directory`);
+  root = fs.realpathSync(root);                         // same canonical form as the list path, so the exclusion compares like with like
   const listFile = path.resolve(arg('--list', path.join(__dirname, 'forbidden.local.txt')));
-  const all = process.argv.includes('--all');
+  const all = !!arg('--all', false);
   const { hits, files } = scan(root, loadList(listFile), listFile, all);
   if (hits.length) {
     console.log(`GATE FAILED: ${hits.length} hit(s)`);

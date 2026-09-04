@@ -61,13 +61,28 @@ const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces']);
 const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
 
-function arg(name, dflt) {
-  const i = process.argv.indexOf(name);
-  if (i === -1) return dflt;
-  const v = process.argv[i + 1];
-  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
-  return v;
+const VALUE_OPTS = ['--dir', '--targets', '--contract-target'];
+const FLAG_OPTS = ['--check', '--contract', '--no-personal'];
+/* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
+function parseArgs() {
+  const out = {};
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (VALUE_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      const v = argv[i + 1];
+      if (v === undefined || v === '' || v.startsWith('--')) die(`${a} needs a non-empty value`);
+      out[a] = v; i++;
+    } else if (FLAG_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      out[a] = true;
+    } else die(`unknown option "${a}" (known: ${[...VALUE_OPTS, ...FLAG_OPTS].join(', ')})`);
+  }
+  return out;
 }
+let ARGS = null;
+function arg(name, dflt) { if (!ARGS) ARGS = parseArgs(); return name in ARGS ? ARGS[name] : dflt; }
 
 /* lstat helper: the entry must exist as a regular file or directory, not a symlink. */
 function mustBe(p, kind, where) {
@@ -126,6 +141,7 @@ function parseSections(body, where) {
       continue;
     }
     if (current) sections[current].push(line);
+    else if (line.trim()) die(`${where}: text before the first "## " section heading would be dropped ("${line.trim().slice(0, 40)}"); move it into a section`);
   }
   for (const k of Object.keys(sections)) sections[k] = sections[k].join('\n').trim();
   return sections;
@@ -288,12 +304,13 @@ function between(existing, file) {
 }
 
 function main() {
+  ARGS = parseArgs();
   const requested = path.resolve(arg('--dir', process.cwd()));
   let root;
   try { root = fs.realpathSync(requested); } catch (_) { die(`--dir ${requested} does not exist`); }
   if (!fs.statSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
-  const check = process.argv.includes('--check');
-  const contract = process.argv.includes('--contract');
+  const check = !!arg('--check', false);
+  const contract = !!arg('--contract', false);
   const rules = loadRules(root);
   const profile = loadProfile(root);
 
@@ -301,7 +318,7 @@ function main() {
     const key = arg('--contract-target', 'claude');
     if (!KNOWN.includes(key)) die(`unknown contract target "${key}"`);
     const target = TARGETS[key];
-    const withPersonal = target.personal && !process.argv.includes('--no-personal');
+    const withPersonal = target.personal && !!!arg('--no-personal', false);
     const inject = rulesFor(rules, key).filter(r => r.meta.inject === true);
     const out = [`[agent-personalizer] Session-start contract for ${key}. These rules win at the moment of decision; they are injected in full, every session.`, ''];
     for (const r of inject) {

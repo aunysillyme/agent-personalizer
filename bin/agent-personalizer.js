@@ -24,13 +24,28 @@ const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex /
 
 function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
-function arg(name, dflt) {
-  const i = process.argv.indexOf(name);
-  if (i === -1) return dflt;
-  const v = process.argv[i + 1];
-  if (v === undefined || v === '' || v.startsWith('--')) die(`${name} needs a non-empty value`);
-  return v;
+const VALUE_OPTS = ['--dir', '--ai', '--level'];
+const FLAG_OPTS = ['--yes'];
+/* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
+function parseArgs() {
+  const out = {};
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (VALUE_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      const v = argv[i + 1];
+      if (v === undefined || v === '' || v.startsWith('--')) die(`${a} needs a non-empty value`);
+      out[a] = v; i++;
+    } else if (FLAG_OPTS.includes(a)) {
+      if (a in out) die(`${a} given more than once`);
+      out[a] = true;
+    } else die(`unknown option "${a}" (known: ${[...VALUE_OPTS, ...FLAG_OPTS].join(', ')})`);
+  }
+  return out;
 }
+const ARGS = parseArgs();
+function arg(name, dflt) { return name in ARGS ? ARGS[name] : dflt; }
 
 async function ask(q, dflt) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -71,7 +86,7 @@ function copyIfAbsent(src, root, rel) {
 }
 
 async function main() {
-  const interactive = process.stdin.isTTY && !process.argv.includes('--yes');
+  const interactive = process.stdin.isTTY && !!!ARGS['--yes'];
   let dir = arg('--dir', null);
   let ais = arg('--ai', null);
   let level = arg('--level', null);
