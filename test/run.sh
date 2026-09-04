@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 53 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 54 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -471,5 +471,12 @@ pass "repeated or unknown options refused by installer, renderer and gate"
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf -- '---\nid: 93-preamble\ntitle: Preamble\n---\n\nMUST-PRESERVE-THIS\n\n## universal\ntext\n' > "$T/rules/93-preamble.md"
 expect 2 "preamble text" node render/render.js --dir "$T" --targets claude
 pass "text before the first section is refused"
+
+# 54. from a nested --dir, a modified tracked file's working-tree copy is scanned (diff paths in the same coordinates as ls-files)
+mk; R="$MK"; { mkdir -p "$R/sub" && git -C "$R" init -q && git -C "$R" config user.email t@t && git -C "$R" config user.name t && echo clean > "$R/sub/a.txt" && git -C "$R" add sub/a.txt && git -C "$R" commit -qm i; } || fail "nested wt fixture"
+mk; L="$MK"; printf 'zzqqxx-no-such-term\n' > "$L/list.txt"; echo "zzqqxx-no-such-term now on disk" > "$R/sub/a.txt"
+node check/gate.js --dir "$R/sub" --list "$L/list.txt" > "$L/o.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "nested --dir missed a modified tracked file (exit $got)"
+grep -q 'a.txt (working tree)' "$L/o.txt" || fail "nested --dir hit not attributed to the working tree"
+pass "nested --dir scans modified tracked files' working-tree copies"
 
 echo; echo "all checks passed"

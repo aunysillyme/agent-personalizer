@@ -176,7 +176,8 @@ function* gitItems(root) {
     }
   }
   // working-tree copies that differ from the index
-  const changed = new Set(git(root, ['diff', '--name-only', '-z']).toString('utf8').split('\0').filter(Boolean));
+  // --relative: paths relative to --dir, the same coordinate system ls-files uses from there
+  const changed = new Set(git(root, ['diff', '--name-only', '-z', '--relative']).toString('utf8').split('\0').filter(Boolean));
   for (const c of cached) {
     if (!changed.has(c.rel)) continue;
     const item = treeItem(root, c.rel, ' (working tree)');
