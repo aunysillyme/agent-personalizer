@@ -305,7 +305,7 @@ function main() {
     const inject = rulesFor(rules, key).filter(r => r.meta.inject === true);
     const out = [`[agent-personalizer] Session-start contract for ${key}. These rules win at the moment of decision; they are injected in full, every session.`, ''];
     for (const r of inject) {
-      out.push(`## ${r.meta.title || r.meta.id}`, '', r.sections.universal);
+      out.push(`## ${r.meta.title || r.meta.id || r.file}`, '', r.sections.universal);
       if (withPersonal && r.sections.personal) out.push('', r.sections.personal);
       if (target.binding && r.sections[`binding:${target.binding}`]) out.push('', r.sections[`binding:${target.binding}`]);
       out.push('');

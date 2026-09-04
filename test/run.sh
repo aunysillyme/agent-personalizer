@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 47 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 50 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -415,10 +415,34 @@ grep -q 'forbidden list itself is tracked' "$T/tl3.out" || fail "tracked list --
 pass "a git-tracked forbidden list is refused from the root, from a nested --dir, and with --all"
 
 # 47. --all scans node_modules too; only .git is skipped
-mk; T="$MK"; mkdir -p "$T/node_modules" "$T/.git"; printf 'zzqqxx-no-such-term\n' > "$T/list.txt"; echo "zzqqxx-no-such-term" > "$T/node_modules/leak.txt"; echo "zzqqxx-no-such-term" > "$T/.git/config"
-node check/gate.js --dir "$T" --list "$T/list.txt" --all > "$T/all.out" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "--all missed node_modules (exit $got)"
+mk; T="$MK"; mk; L="$MK"; mkdir -p "$T/node_modules" "$T/.git"; printf 'zzqqxx-no-such-term\n' > "$L/list.txt"; echo "zzqqxx-no-such-term" > "$T/node_modules/leak.txt"; echo "zzqqxx-no-such-term" > "$T/.git/config"
+node check/gate.js --dir "$T" --list "$L/list.txt" --all > "$T/all.out" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "--all missed node_modules (exit $got)"
 grep -q 'node_modules/leak.txt' "$T/all.out" || fail "--all hit not attributed to node_modules"
 grep -q '\.git/config' "$T/all.out" && fail "--all scanned .git"
 pass "--all scans node_modules, skips only .git"
+
+# 48. tracked-list refusal survives pathspec metacharacters in the list name, an OUTER repository tracking it, and malformed .git metadata beside it
+mk; R="$MK"; { git -C "$R" init -q && git -C "$R" config user.email t@t && git -C "$R" config user.name t && mkdir -p "$R/check" && printf 'zzqqxx-no-such-term\n' > "$R/check/forbid*den.txt" && echo clean > "$R/a.md" && git -C "$R" add a.md && git -C "$R" add -f -- ':(literal)check/forbid*den.txt'; } || fail "metachar fixture"
+node check/gate.js --dir "$R" --list "$R/check/forbid*den.txt" > "$T/m1.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "tracked list with metacharacters: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$T/m1.out" || fail "metachar: wrong diagnostic"
+mk; O="$MK"; { git -C "$O" init -q && git -C "$O" config user.email t@t && git -C "$O" config user.name t && mkdir -p "$O/inner/check" && printf 'zzqqxx-no-such-term\n' > "$O/inner/check/forbidden.txt" && git -C "$O" add -f inner/check/forbidden.txt && git -C "$O/inner" init -q && echo clean > "$O/inner/a.md" && git -C "$O/inner" add a.md; } || fail "nested fixture"
+node check/gate.js --dir "$O/inner" --list "$O/inner/check/forbidden.txt" > "$T/m2.out" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "list tracked by an OUTER repo: expected exit 2, got $got"
+grep -q 'forbidden list itself is tracked' "$T/m2.out" || fail "outer repo: wrong diagnostic"
+mk; M="$MK"; printf 'gitdir: /nonexistent\n' > "$M/.git"; printf 'zzqqxx-no-such-term\n' > "$M/list.txt"; mk; C="$MK"; echo clean > "$C/a.md"
+expect 2 "malformed .git beside the list" node check/gate.js --dir "$C" --list "$M/list.txt" --all
+pass "tracked-list refusal: metacharacters, outer repository, malformed metadata beside the list"
+
+# 49. installer refuses a duplicated --ai before creating anything
+mk; T="$MK"
+expect 2 "duplicate --ai" node bin/agent-personalizer.js --dir "$T" --ai claude,claude --level 3 --yes
+[ -z "$(ls -A "$T")" ] || fail "installer created files before refusing a duplicate --ai"
+pass "duplicate --ai refused, nothing created"
+
+# 50. contract heading falls back to the filename when a rule has neither id nor title
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/"; printf -- '---\ninject: true\n---\n\n## universal\nNOTITLERULE\n' > "$T/rules/94-no-title.md"
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract exited non-zero"
+grep -q '^## 94-no-title.md$' "$T/c.txt" || fail "contract heading did not fall back to the filename"
+grep -q 'undefined' "$T/c.txt" && fail "contract printed undefined"
+pass "contract heading falls back to the filename"
 
 echo; echo "all checks passed"

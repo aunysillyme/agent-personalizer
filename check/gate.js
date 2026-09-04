@@ -12,8 +12,8 @@
     node check/gate.js --self-test                        prove the gate can go red on a seeded hit
 
   Fail-closed: a missing or empty list is exit 2, never a pass; a list that git tracks is exit 2.
-  The list file may never be tracked by git; that is checked on the list's own path, whatever
-  --dir or --all say, before anything is scanned.
+  The list file may never be tracked by git; every repository enclosing it is asked, with a
+  literal pathspec, before anything is scanned, whatever --dir or --all say.
   Coverage: anywhere inside a git work tree (a subfolder included), exactly what git would
   ship from --dir down: for every cached path the INDEX blob (what a commit publishes) plus
   the working-tree copy when it differs (what the next `git add` publishes); for every
@@ -45,21 +45,29 @@ function arg(name, dflt) {
   return v;
 }
 
-/* If git tracks the list file anywhere, it would ship. Checked from the list's OWN directory,
-   so it holds whatever --dir points at and whether or not --all is in effect. Git not being
-   runnable while .git metadata exists above the list is a setup error, like everywhere else. */
+/* If ANY enclosing git repository tracks the list file, it would ship. Every ancestor
+   directory that carries .git metadata is asked, with a literal pathspec (so a name with
+   `*`, `?`, `[` or a leading `:` cannot be misread), for an index entry at the list's
+   repo-relative path. Independent of --dir and --all. Git failing while metadata exists is
+   a setup error; a "not a repository" answer is trusted only when no metadata exists. */
 function refuseTrackedList(file) {
-  const dir = path.dirname(file), base = path.basename(file);
-  let out;
-  try {
-    out = execFileSync('git', ['-C', dir, 'ls-files', '-z', '--cached', '--', base], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (e) {
-    const err = String(e.stderr || e.message || '');
-    if (e.status === 128 && /not a git repository/i.test(err)) return;
-    if (!hasGitMetadata(dir)) return;
-    die(`cannot tell whether ${file} is tracked by git (${err.trim().split('\n')[0] || e.code || 'unknown error'}). Fix git first.`);
+  let dir = path.dirname(file);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, '.git'))) {
+      const rel = path.relative(dir, file);
+      let out;
+      try {
+        out = execFileSync('git', ['-C', dir, 'ls-files', '-z', '--cached', '--full-name', '--', `:(literal)${rel}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        const err = String(e.stderr || e.message || '');
+        die(`${dir} carries .git metadata but git could not answer whether it tracks ${rel} (${err.trim().split('\n')[0] || e.code || 'unknown error'}). Fix git first.`);
+      }
+      if (out.split('\0').filter(Boolean).length) die(`the forbidden list itself is tracked by git (${file}, repository ${dir}). It must never ship: run \`git rm --cached -- ":(literal)${rel}"\` in ${dir} and add it to .gitignore.`);
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return;
+    dir = parent;
   }
-  if (out.split('\0').filter(Boolean).length) die(`the forbidden list itself is tracked by git (${file}). It must never ship: run \`git rm --cached ${base}\` in ${dir} and add it to .gitignore.`);
 }
 
 function loadList(file) {

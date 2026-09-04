@@ -92,6 +92,7 @@ async function main() {
   const bad = targets.filter(t => !AIS.includes(t));
   if (bad.length) die(`unknown AI: ${bad.join(', ')} (known: ${AIS.join(', ')})`);
   if (!targets.length) die('no AIs chosen');
+  if (new Set(targets).size !== targets.length) die(`an AI is listed twice in --ai (${targets.join(',')}); list each once`);
 
   // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
   // missing tail is created one level at a time, so nothing is ever created through a
