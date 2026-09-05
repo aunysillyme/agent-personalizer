@@ -1,0 +1,48 @@
+name: Bug report
+description: Something wrote, refused, or rendered wrongly. Steps and exit code please.
+labels: [bug]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: The exact command
+      description: The full installer or renderer command, as you ran it.
+      placeholder: npx github:aunysillyme/agent-personalizer --dir . --ai claude --level 1 --yes
+    validations:
+      required: true
+  - type: input
+    id: exit
+    attributes:
+      label: Exit code
+      description: 0 ok, 1 drift, 2 refused. Run `echo $?` right after.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+      description: Quote the output. If a file changed that should not have, say which and paste the diff.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction in a fresh temp directory
+      description: The harness reproduces every bug in a `mktemp -d` folder. If you can, do the same.
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: OS and Node version
+      placeholder: macOS 15 / Node 22.12
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched open and closed issues.
+          required: true
+        - label: This report contains none of my own private identifiers (names, paths, off-limits topics).
+          required: true

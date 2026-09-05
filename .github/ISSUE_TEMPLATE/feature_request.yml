@@ -1,0 +1,28 @@
+name: Feature request
+description: A rule, a notes tool, an AI target, or a behaviour you need. Lead with the failure.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: failure
+    attributes:
+      label: The failure this would prevent
+      description: Rules here come from failures. What went wrong, for whom, and how often?
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change
+      options:
+        - A new rule (rules/)
+        - A new notes tool (render/onboarding.js TOOL map + docs/companions.md)
+        - A new AI target (render/targets.json + docs/paste-guide.md)
+        - Installer or renderer behaviour
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The smallest change that prevents the failure. If it is a rule, draft the universal block here.
