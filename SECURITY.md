@@ -14,4 +14,4 @@ In scope: `bin/agent-personalizer.js`, `render/`, `check/gate.cjs`, `hooks/`, th
 
 ## What is already done
 
-Every release passes an adversarial read-only audit (see `CHANGELOG.md`, each entry names its round) and a 82-check harness with exact exit codes, on Linux and macOS in CI. The deferred residuals are stated in the code headers: TOCTOU between check and write, unicode look-alikes in the gate, the named `--dir` being followed once via realpath, and a hard process kill between two renames.
+Every release passes an adversarial read-only audit (see `CHANGELOG.md`, each entry names its round) and a 83-check harness with exact exit codes, on Linux and macOS in CI. The deferred residuals are stated in the code headers: TOCTOU between check and write, unicode look-alikes in the gate, the named `--dir` being followed once via realpath, and a hard process kill between two renames.

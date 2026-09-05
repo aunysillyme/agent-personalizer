@@ -133,7 +133,7 @@ examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
 CHANGELOG.md keyed on audit rounds
 .github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm publish with provenance, dispatched per tag
-test/        run.sh: 82 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+test/        run.sh: 83 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Changelog
