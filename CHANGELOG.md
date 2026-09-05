@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-05
+
 ### Added
 - `--help`/`-h` and `--version`/`-v` on all three entry points, the gate included (#16, #17).
 
@@ -108,7 +110,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.2.0...v0.3.0
