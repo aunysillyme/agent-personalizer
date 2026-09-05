@@ -1,0 +1,46 @@
+# Runs the harness (test/run.sh) on every push and pull request, on Linux and macOS.
+# What it proves: the renderer, installer, gate logic, hook and rollback paths behave exactly as
+# the 60 checks assert, with exact exit codes, on a clean machine that is not the author's.
+# What it does NOT run: the privacy gate against the real forbidden list (check 6). That list is
+# gitignored on purpose and never reaches CI, so the harness prints that check as a skip. The gate's
+# own logic is still exercised (self-test, fail-closed, symlink, index-blob and tracked-list cases).
+name: harness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: git identity for the fixtures that create repositories
+        run: |
+          git config --global user.email "harness@example.invalid"
+          git config --global user.name "harness"
+      - name: syntax
+        run: |
+          node --check render/render.js
+          node --check render/onboarding.js
+          node --check bin/agent-personalizer.js
+          node --check check/gate.js
+          sh -n test/run.sh
+      - name: harness (60 checks, exact exit codes)
+        run: sh test/run.sh
+      - name: rollback fault injection (cases A-K)
+        run: |
+          T="$(mktemp -d)"
+          cp -R examples/freelance-illustrator/. "$T/"
+          node test/rollback.test.js "$T"

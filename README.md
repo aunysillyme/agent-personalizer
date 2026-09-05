@@ -43,6 +43,10 @@ Your instructions live in five places, each with one job and one failure it prev
 
 ---
 
+## Where each rendered file goes
+
+[docs/paste-guide.md](docs/paste-guide.md): which file each AI reads and how (Claude Code and Codex, Cursor and Gemini read theirs from the folder automatically; claude.ai and ChatGPT take a paste), and what to re-paste when you change an answer.
+
 ## The agent onboarding file
 
 The installer asks you how an AI should work with you, then writes the answers to `AGENT_ONBOARDING.md`: how to talk to you, how to shape output, what to read first and in what order, where it may write, how to save a file, and what it must always ask before doing. It is generated from your answers in `.agent-personalizer.json`, so every AI you point at the folder gets the same manual, and re-running the installer changes it everywhere at once.
@@ -112,13 +116,14 @@ hooks/       Claude Code session-start contract, plain-prompt fallback
 check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
-docs/        tiers.md, companions.md
+docs/        tiers.md, companions.md, paste-guide.md
+.github/     harness.yml: the 60 checks on every push and PR, Ubuntu and macOS
 test/        run.sh: 60 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Contributing
 
-Open an issue with the failure you hit, not the feature you want. Rules come from failures.
+Open an issue with the failure you hit, not the feature you want. Rules come from failures. Every push and pull request runs the harness on Ubuntu and macOS ([.github/workflows/harness.yml](.github/workflows/harness.yml)); the privacy gate against a real forbidden list stays local by design, so CI shows that one check as a skip.
 
 ---
 
