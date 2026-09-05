@@ -182,12 +182,20 @@ function decodeUtf8(bytes, where) {
   catch (_) { die(`${where}: not valid UTF-8. Nothing was written`); }
 }
 
-/* .agent-personalizer.json, validated: targets (list) and onboarding (answer set) when present. */
+/* .agent-personalizer.json, fully validated on EVERY load (render, --check and --contract alike):
+   targets a unique list of known targets, level an integer 1-4, onboarding a valid answer set. */
 function readConfig(root) {
   const cfgPath = path.join(root, '.agent-personalizer.json');
   if (!mustBe(cfgPath, 'file', '.agent-personalizer.json')) return null;
   const cfg = readJson(cfgPath, 'config');
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('config: .agent-personalizer.json must be an object');
+  if ('targets' in cfg) {
+    if (!Array.isArray(cfg.targets)) die('config: .agent-personalizer.json "targets" must be a list');
+    const bad = cfg.targets.filter(t => !KNOWN.includes(t));
+    if (bad.length) die(`config: .agent-personalizer.json lists unknown target(s): ${bad.join(', ')} (known: ${KNOWN.join(', ')})`);
+    if (new Set(cfg.targets).size !== cfg.targets.length) die('config: .agent-personalizer.json lists a target twice');
+  }
+  if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`config: .agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
   if ('onboarding' in cfg) {
     try { cfg.onboarding = onboarding.validate(cfg.onboarding); } catch (e) { die(`config: onboarding answers: ${e.message}`); }
   }
