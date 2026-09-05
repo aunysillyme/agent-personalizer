@@ -824,7 +824,18 @@ cmp -s "$T/AGENTS.md" "$T/AGENTS.expected" || fail "the malformed target was mod
 mk; T="$MK"; printf 'a\377b\n' > "$T/CLAUDE.md"
 expect 2 "non-utf8 preexisting target" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes
 [ ! -e "$T/USER.md" ] || fail "USER.md written before the UTF-8 refusal"
-pass "(#11) preflight refuses a malformed or non-UTF-8 target with nothing written"
+# sources already in the folder: a malformed kept rule, a stray rule file, an unterminated fence in a kept USER.md (Codex round 23)
+mk; T="$MK"; mkdir -p "$T/rules"; printf -- '---\nid: 99-bad\nbroken frontmatter\n' > "$T/rules/99-bad.md"
+node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --yes > "$T/out.txt" 2>&1; got=$?; [ "$got" -eq 2 ] || fail "malformed kept rule: expected exit 2, got $got"
+grep -q 'nothing was written' "$T/out.txt" || fail "malformed kept rule: refusal did not say nothing was written"
+[ "$(ls -A "$T" | grep -v -e '^rules$' -e '^out\.txt$' | wc -l | tr -d ' ')" = "0" ] && [ "$(ls "$T/rules" | wc -l | tr -d ' ')" = "1" ] || { ls -AR "$T"; fail "installer wrote files before refusing a malformed kept rule"; }
+mk; T="$MK"; mkdir -p "$T/rules"; printf 'x\n' > "$T/rules/stray.md"
+expect 2 "stray kept rule" node bin/agent-personalizer.js --dir "$T" --ai agents --level 1 --yes
+[ ! -e "$T/USER.md" ] || fail "USER.md written before refusing a stray rule file"
+mk; T="$MK"; printf 'mine\n```\nunterminated\n' > "$T/USER.md"; cp "$T/USER.md" "$T/USER.expected"
+expect 2 "unterminated fence in kept USER.md" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes
+cmp -s "$T/USER.md" "$T/USER.expected" && [ ! -e "$T/rules" ] || fail "installer wrote before refusing a kept USER.md with an unterminated fence"
+pass "(#11) preflight refuses a malformed or non-UTF-8 target, a malformed or stray kept rule, and a bad kept USER.md, with nothing written"
 
 # 70. (#12) installed files reference nothing the destination lacks: no repo-relative docs/ links, no npm scripts; the public doc URL is used instead
 mk; T="$MK"; mk; F="$MK"; printf '{"notes_tool":"obsidian","notes_path":"Vault"}' > "$F/o.json"
