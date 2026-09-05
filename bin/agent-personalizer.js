@@ -225,6 +225,10 @@ async function main() {
   if (level >= 2) console.log('  3. Read notes/README.md before letting an AI write into notes/.');
   if (level >= 3) console.log('  4. Register hooks/claude-code/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
   if (level >= 4) console.log('  5. Level 4 is pointers only for now: routing, task bundles and verified CLI runs live in the multi-agent layer, linked from the README when it ships.');
+  if (answers.notes_tool === 'obsidian') console.log('\nCompanion: your notes are an Obsidian vault. obsidian-tc gives the AI governed access (folder ACLs, human-in-the-loop, audit log): `npx obsidian-tc /path/to/vault`. See docs/companions.md.');
+  else if (['notion', 'google-docs', 'apple-notes'].includes(answers.notes_tool)) console.log(`\nCompanion: connect ${answers.notes_tool} in your AI's own settings; the onboarding file already names the door and the write posture. See docs/companions.md.`);
+  else if (['onenote', 'evernote'].includes(answers.notes_tool)) console.log(`\nNote: ${answers.notes_tool} has no first-class agent door today; the onboarding file treats it as read-only. See docs/companions.md.`);
+  console.log('Several agents? Read docs/companions.md on the Context Layer: purpose-bound bundles and receipts for every delegation.');
   console.log('\nNothing here read an environment variable or wrote a secret.');
 }
 

@@ -82,6 +82,13 @@ Three pieces, all in this repo, no dependencies beyond Node.
 - **Drift check.** `npm run check` in CI or a pre-commit hook. A rule stated in five places drifts in five places; this is how you find out the same day.
 - **Zero-personal-data gate.** [`check/gate.js`](check/gate.js) scans every file git would ship (or every file under a folder, with `--all`) for terms in a gitignored list, never follows symlinks, and fails closed when the list is missing. This repo runs it on itself before every push. Copy `check/forbidden.example.txt` to `check/forbidden.local.txt` and fill it in.
 
+## Companion tools
+
+Two companions turn the onboarding answers from advice into enforcement. Neither is required. [docs/companions.md](docs/companions.md) has the detail and a table of how each note tool is reached.
+
+- **[obsidian-tc](https://github.com/The-40-Thieves/obsidian-tc)** for Obsidian vaults: governed MCP access. Your **off-limits** answer becomes a folder ACL, your **always-ask** answer becomes its human-in-the-loop list, and destructive tools fail closed until you confirm. `npx obsidian-tc /path/to/vault`.
+- **[The Context Layer](https://sierracatalina.com/context-layer)** by Sierra Catalina: purpose-bound context with receipts. Capture → normalize → vault → decide → bundle → act; memory writes remain proposals. Your **write policy** and **off-limits** answers are its decide and vault stages in miniature. Read the essay first, then run the starter.
+
 ## Level 4: hand-off
 
 Once you run several AIs, personalization is not the problem any more; routing is. That is a separate layer: which model handles which task, task bundles for every delegation, and CLI runs that only count as success when a deliverable exists. It is being built as its own repo and will link from here when it ships. This repo stays the beginner tier of that stack.
@@ -105,8 +112,8 @@ hooks/       Claude Code session-start contract, plain-prompt fallback
 check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
-docs/        tiers.md
-test/        run.sh: 59 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+docs/        tiers.md, companions.md
+test/        run.sh: 60 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Contributing
