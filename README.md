@@ -117,9 +117,14 @@ check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
+CHANGELOG.md keyed on audit rounds
 .github/     harness.yml: the 60 checks on every push and PR, Ubuntu and macOS
 test/        run.sh: 60 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
+
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md). Every entry names the audit round that produced it.
 
 ## Contributing
 
