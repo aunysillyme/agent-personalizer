@@ -565,9 +565,9 @@ node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.wri
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" 2>"$T/e.txt"; got=$?; [ "$got" -eq 2 ] || fail "contract accepted a malformed config (exit $got)"
 [ ! -s "$T/c.txt" ] || fail "contract emitted output on a malformed config"
 node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:["claude","claude"],onboarding:o.defaults()}));' "$T"
-expect 2 "contract duplicate targets" node render/render.js --dir "$T" --contract --contract-target claude
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c2.txt" 2>/dev/null; got=$?; [ "$got" -eq 2 ] || fail "contract duplicate targets: expected exit 2, got $got"; [ ! -s "$T/c2.txt" ] || fail "contract emitted output on duplicate targets"
 node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:["claude"],level:9,onboarding:o.defaults()}));' "$T"
-expect 2 "contract level out of range" node render/render.js --dir "$T" --contract --contract-target claude
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c3.txt" 2>/dev/null; got=$?; [ "$got" -eq 2 ] || fail "contract level out of range: expected exit 2, got $got"; [ ! -s "$T/c3.txt" ] || fail "contract emitted output on a bad level"
 pass "--contract refuses malformed stored config with no output"
 
 echo; echo "all checks passed"
