@@ -10,13 +10,34 @@
   "lead_with": "verdict",
   "structure": "tables-when-comparing",
   "evidence": "inline",
-  "never": ["em dashes", "start a reply with Great question", "client names outside their folder"],
-  "read_first": ["USER.md", "AGENT_ONBOARDING.md", "notes/README.md", "rules/", "notes/decisions.md"],
+  "never": [
+    "em dashes",
+    "start a reply with Great question",
+    "client names outside their folder"
+  ],
+  "read_first": [
+    "USER.md",
+    "AGENT_ONBOARDING.md",
+    "notes/README.md",
+    "rules/",
+    "notes/decisions.md"
+  ],
   "notes_path": "notes",
   "tracker": "a kanban board the AI reads and I move",
   "write_policy": "notes-freely",
   "file_naming": "kebab-case",
   "signature": "yes",
-  "off_limits": ["health notes", "the journal folder", "signed contracts"],
-  "always_ask": ["delete", "publish", "send", "spend", "standing-rules"]
+  "off_limits": [
+    "health notes",
+    "the journal folder",
+    "signed contracts"
+  ],
+  "always_ask": [
+    "delete",
+    "publish",
+    "send",
+    "spend",
+    "standing-rules"
+  ],
+  "notes_tool": "obsidian"
 }

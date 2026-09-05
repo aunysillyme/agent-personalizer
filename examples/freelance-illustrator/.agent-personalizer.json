@@ -45,6 +45,7 @@
       "send",
       "spend",
       "standing-rules"
-    ]
+    ],
+    "notes_tool": "obsidian"
   }
 }

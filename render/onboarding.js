@@ -34,7 +34,9 @@ const QUESTIONS = [
     options: [['inline', 'in the reply: paths, counts, dates'], ['linked', 'a link to where it lives'], ['none', 'not needed']] },
   { id: 'never', ask: 'Words, punctuation or habits the AI must never use (comma-separated, blank for none)', type: 'list', default: [] },
   { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'notes/README.md', 'rules/'] },
-  { id: 'notes_path', ask: 'Folder the AI may write notes into', type: 'text', default: 'notes' },
+  { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
+    options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see docs/companions.md)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
+  { id: 'notes_path', ask: 'The folder path (Obsidian, Logseq, plain folder), or the workspace / page name (Notion, Google Docs, others)', type: 'text', default: 'notes' },
   { id: 'tracker', ask: 'Your task tracker, if the AI should read it ("none" to skip)', type: 'text', default: 'none' },
   { id: 'write_policy', ask: 'How freely may the AI write into your notes?', type: 'choice', default: 'notes-freely',
     options: [['notes-freely', 'anywhere under the notes folder, under the folder rules'], ['logs-and-inbox-only', 'only the session log, decisions log and inbox'], ['ask-before-every-write', 'ask before every write']] },
@@ -152,13 +154,26 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 
 ## Where things live
 
-- **My notes:** \`${esc(a.notes_path)}/\`
+- **My notes:** ${md(TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path)).name)}, \`${esc(a.notes_path)}\`
 - **My task tracker:** ${md(a.tracker)}
 - **Rules the AI must read before writing anything to my notes:** \`${esc(a.notes_path)}/README.md\`
 `;
 }
 
+const TOOL = {
+  'obsidian': (p) => ({ name: 'Obsidian', reach: `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`, posture: null }),
+  'logseq': (p) => ({ name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
+  'folder': (p) => ({ name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
+  'notion': (p, q) => ({ name: 'Notion', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
+  'google-docs': (p, q) => ({ name: 'Google Docs', reach: `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' }),
+  'apple-notes': (p, q) => ({ name: 'Apple Notes', reach: `the "${q}" folder through a local Apple Notes MCP`, posture: 'Read, and create new notes. Never edit or delete an existing note.' }),
+  'onenote': (p, q) => ({ name: 'Microsoft OneNote', reach: `"${q}" as a read-only source (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the notes folder below and say what to paste.' }),
+  'evernote': (p, q) => ({ name: 'Evernote', reach: `"${q}" as a read-only source (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the notes folder below and say what to paste.' }),
+  'other': (p, q) => ({ name: 'the notes tool named below', reach: `"${q}"`, posture: null }),
+};
+
 function renderOnboarding(a) {
+  const tool = TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path));   // p for code spans, q for prose
   const writeLine = {
     'notes-freely': `You may create and edit files anywhere under \`${esc(a.notes_path)}/\`, under that folder's rules. Nowhere else without being asked.`,
     'logs-and-inbox-only': `You may write only to the session log (\`${esc(a.notes_path)}/sessions/\`), the decisions log (\`${esc(a.notes_path)}/decisions.md\`) and the inbox (\`${esc(a.notes_path)}/inbox/\`). Anything else: propose it, do not write it.`,
@@ -166,6 +181,7 @@ function renderOnboarding(a) {
   }[a.write_policy];
   const naming = { 'kebab-case': 'kebab-case: `my-note-title.md`', 'snake_case': 'snake_case: `my_note_title.md`', 'any': 'no naming rule; match the folder you are writing into' }[a.file_naming];
   const askList = a.always_ask.map(v => `- **${v}**: ${label(Q.always_ask, v)}`).join('\n') || '- nothing declared; use your judgement and say what you did';
+  const toolLine = `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}.${tool.posture ? ` ${tool.posture}` : ''}`;
   return `## Agent onboarding
 
 _Generated by agent-personalizer from ${md(a.name)}'s own answers (stored in \`.agent-personalizer.json\`). Re-run the installer to change an answer. Read this after \`USER.md\`, before your first substantive reply._
@@ -196,6 +212,7 @@ ${bullets(a.read_first.map(md), 'USER.md')}
 ${a.tracker !== 'none' ? `- The task tracker (${md(a.tracker)}): what is open and what is already decided, before proposing work.\n` : ''}
 ### Where you may write
 
+${toolLine}
 - ${writeLine}
 - **Every folder you write into has a README.** Any write, edit or delete means that README is corrected in the same pass: the file's one-line description, the folder's status, settled decisions, next steps. A stale index is worse than none, because the next agent believes it.
 - **Session log:** append a dated section to this week's note in \`${esc(a.notes_path)}/sessions/\`. **Decisions:** one line each in \`${esc(a.notes_path)}/decisions.md\`. **Inbox:** one file per item in \`${esc(a.notes_path)}/inbox/\`; finished items are deleted, not marked done.
@@ -235,6 +252,7 @@ function contractBlock(a) {
     `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
     `Read first: ${a.read_first.map(md).join(' → ')}.`,
+    `Notes: ${md(TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path)).name)} at ${md(a.notes_path)}${a.notes_tool === 'obsidian' ? ', through obsidian-tc' : ''}.`,
   ].filter(Boolean).join('\n');
 }
 

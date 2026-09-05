@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 59 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 60 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -569,5 +569,33 @@ node render/render.js --dir "$T" --contract --contract-target claude > "$T/c2.tx
 node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:["claude"],level:9,onboarding:o.defaults()}));' "$T"
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c3.txt" 2>/dev/null; got=$?; [ "$got" -eq 2 ] || fail "contract level out of range: expected exit 2, got $got"; [ ! -s "$T/c3.txt" ] || fail "contract emitted output on a bad level"
 pass "--contract refuses malformed stored config with no output"
+
+# 60. notes_tool: obsidian names obsidian-tc, notion names its connector with the write posture, an unknown tool is refused; companions doc ships
+[ -f docs/companions.md ] || fail "docs/companions.md missing"
+grep -q 'obsidian-tc' docs/companions.md && grep -q 'sierracatalina.com/context-layer' docs/companions.md || fail "companions doc missing a companion"
+mk; T="$MK"; mk; F="$MK"
+printf '{"notes_tool": "obsidian", "notes_path": "MyVault"}' > "$F/ob.json"
+expect 0 "obsidian answers" node bin/agent-personalizer.js --dir "$T/o" --ai claude --level 1 --answers "$F/ob.json" --yes
+grep -q 'obsidian-tc' "$T/o/AGENT_ONBOARDING.md" || fail "obsidian answer did not name obsidian-tc"
+grep -q 'MyVault' "$T/o/AGENT_ONBOARDING.md" || fail "vault path missing"
+node render/render.js --dir "$T/o" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
+printf '{"notes_tool": "notion", "notes_path": "Studio Wiki"}' > "$F/no.json"
+expect 0 "notion answers" node bin/agent-personalizer.js --dir "$T/n" --ai claude --level 1 --answers "$F/no.json" --yes
+grep -q "Notion's own MCP connector" "$T/n/AGENT_ONBOARDING.md" || fail "notion answer did not name the connector"
+grep -q 'never create one unasked' "$T/n/AGENT_ONBOARDING.md" || fail "notion write posture missing"
+grep -q 'obsidian-tc' "$T/n/AGENT_ONBOARDING.md" && fail "notion render mentions obsidian-tc"
+printf '{"notes_tool": "onenote"}' > "$F/one.json"
+expect 0 "onenote answers" node bin/agent-personalizer.js --dir "$T/e" --ai claude --level 1 --answers "$F/one.json" --yes
+grep -q 'read-only source' "$T/e/AGENT_ONBOARDING.md" || fail "onenote not rendered as read-only"
+printf '{"notes_tool": "roam"}' > "$F/bad.json"
+expect 2 "unknown notes tool" node bin/agent-personalizer.js --dir "$T/x" --ai claude --level 1 --answers "$F/bad.json" --yes
+[ ! -e "$T/x" ] || fail "unknown notes tool created a folder"
+expect 0 "obsidian check" node render/render.js --dir "$T/o" --check
+printf '{"notes_tool": "notion", "notes_path": "~~~ <!-- x"}' > "$F/adv.json"
+expect 0 "adversarial notes_path in prose" node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --answers "$F/adv.json" --yes
+grep -c '^~~~' "$T/p/AGENT_ONBOARDING.md" | grep -q '^0$' || fail "notes_path reached prose unescaped"
+grep -q '\\~\\~\\~ \\<!-- x' "$T/p/AGENT_ONBOARDING.md" || fail "notes_path not escaped in prose"
+expect 0 "adversarial notes_path check" node render/render.js --dir "$T/p" --check
+pass "notes_tool: obsidian → obsidian-tc, notion → connector + posture, onenote → read-only, unknown refused, companions doc present"
 
 echo; echo "all checks passed"
