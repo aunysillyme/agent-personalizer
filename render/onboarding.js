@@ -36,7 +36,8 @@ const QUESTIONS = [
   { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'notes/README.md', 'rules/'] },
   { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
     options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see docs/companions.md)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
-  { id: 'notes_path', ask: 'The folder path (Obsidian, Logseq, plain folder), or the workspace / page name (Notion, Google Docs, others)', type: 'text', default: 'notes' },
+  { id: 'notes_tool_name', ask: 'If "other": the name of the tool (blank otherwise)', type: 'text', default: '' },
+  { id: 'notes_path', ask: 'Where inside it: the folder path (Obsidian, Logseq, plain folder), or the workspace / notebook / folder name (Notion, Google Docs, Apple Notes, others)', type: 'text', default: 'notes' },
   { id: 'tracker', ask: 'Your task tracker, if the AI should read it ("none" to skip)', type: 'text', default: 'none' },
   { id: 'write_policy', ask: 'How freely may the AI write into your notes?', type: 'choice', default: 'notes-freely',
     options: [['notes-freely', 'anywhere under the notes folder, under the folder rules'], ['logs-and-inbox-only', 'only the session log, decisions log and inbox'], ['ask-before-every-write', 'ask before every write']] },
@@ -154,34 +155,72 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 
 ## Where things live
 
-- **My notes:** ${md(TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path)).name)}, \`${esc(a.notes_path)}\`
+- **My notes:** ${md(toolFor(a).name)}, ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/\`` : `"${md(a.notes_path)}"`}
 - **My task tracker:** ${md(a.tracker)}
-- **Rules the AI must read before writing anything to my notes:** \`${esc(a.notes_path)}/README.md\`
+- **Rules the AI must read before writing anything to my notes:** ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/README.md\`` : `the index ${toolFor(a).unit || 'page'} of "${md(a.notes_path)}", and \`AGENT_ONBOARDING.md\` § Where you may write`}
 `;
 }
 
+/* kind: disk = files the AI edits directly; cloud = reached through a connector, no filesystem;
+   readonly = no agent door today, so writes fall back to a local folder; other = named by the user,
+   conservative posture. p = location escaped for a code span, q = location escaped for prose. */
 const TOOL = {
-  'obsidian': (p) => ({ name: 'Obsidian', reach: `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`, posture: null }),
-  'logseq': (p) => ({ name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
-  'folder': (p) => ({ name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
-  'notion': (p, q) => ({ name: 'Notion', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
-  'google-docs': (p, q) => ({ name: 'Google Docs', reach: `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' }),
-  'apple-notes': (p, q) => ({ name: 'Apple Notes', reach: `the "${q}" folder through a local Apple Notes MCP`, posture: 'Read, and create new notes. Never edit or delete an existing note.' }),
-  'onenote': (p, q) => ({ name: 'Microsoft OneNote', reach: `"${q}" as a read-only source (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the notes folder below and say what to paste.' }),
-  'evernote': (p, q) => ({ name: 'Evernote', reach: `"${q}" as a read-only source (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the notes folder below and say what to paste.' }),
-  'other': (p, q) => ({ name: 'the notes tool named below', reach: `"${q}"`, posture: null }),
+  'obsidian':    (p, q) => ({ kind: 'disk', name: 'Obsidian', reach: `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`, posture: null }),
+  'logseq':      (p, q) => ({ kind: 'disk', name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
+  'folder':      (p, q) => ({ kind: 'disk', name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
+  'notion':      (p, q) => ({ kind: 'cloud', name: 'Notion', unit: 'page', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
+  'google-docs': (p, q) => ({ kind: 'cloud', name: 'Google Docs', unit: 'doc', reach: `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' }),
+  'apple-notes': (p, q) => ({ kind: 'cloud', name: 'Apple Notes', unit: 'note', reach: `the "${q}" folder through a separately installed local Apple Notes MCP (not built into any AI app; the user installs and connects it)`, posture: 'Read, and create new notes. Never edit or delete an existing note.' }),
+  'onenote':     (p, q) => ({ kind: 'readonly', name: 'Microsoft OneNote', reach: `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' }),
+  'evernote':    (p, q) => ({ kind: 'readonly', name: 'Evernote', reach: `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' }),
+  'other':       (p, q, n) => ({ kind: 'other', name: n || 'an unnamed notes tool', reach: `"${q}"`, posture: 'Ask before the first write into it, and say which tool and location you mean. Until told otherwise, write only to the local fallback folder below.' }),
 };
+const toolFor = (a) => TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path), a.notes_tool_name ? md(a.notes_tool_name) : '');
+const FALLBACK = 'notes';
 
 function renderOnboarding(a) {
-  const tool = TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path));   // p for code spans, q for prose
-  const writeLine = {
-    'notes-freely': `You may create and edit files anywhere under \`${esc(a.notes_path)}/\`, under that folder's rules. Nowhere else without being asked.`,
-    'logs-and-inbox-only': `You may write only to the session log (\`${esc(a.notes_path)}/sessions/\`), the decisions log (\`${esc(a.notes_path)}/decisions.md\`) and the inbox (\`${esc(a.notes_path)}/inbox/\`). Anything else: propose it, do not write it.`,
-    'ask-before-every-write': 'Ask before every write, every time. Show what you would write and where.',
-  }[a.write_policy];
+  const tool = toolFor(a);
+  const disk = tool.kind === 'disk';
+  const base = disk ? esc(a.notes_path) : FALLBACK;           // where filesystem writes go, if any
+  const unit = tool.unit || 'page';
   const naming = { 'kebab-case': 'kebab-case: `my-note-title.md`', 'snake_case': 'snake_case: `my_note_title.md`', 'any': 'no naming rule; match the folder you are writing into' }[a.file_naming];
   const askList = a.always_ask.map(v => `- **${v}**: ${label(Q.always_ask, v)}`).join('\n') || '- nothing declared; use your judgement and say what you did';
-  const toolLine = `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}.${tool.posture ? ` ${tool.posture}` : ''}`;
+
+  let writeSection;
+  if (disk) {
+    const writeLine = {
+      'notes-freely': `You may create and edit files anywhere under \`${base}/\`, under that folder's rules. Nowhere else without being asked.`,
+      'logs-and-inbox-only': `You may write only to the session log (\`${base}/sessions/\`), the decisions log (\`${base}/decisions.md\`) and the inbox (\`${base}/inbox/\`). Anything else: propose it, do not write it.`,
+      'ask-before-every-write': 'Ask before every write, every time. Show what you would write and where.',
+    }[a.write_policy];
+    writeSection = `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}.
+- ${writeLine}
+- **Every folder you write into has a README.** Any write, edit or delete means that README is corrected in the same pass: the file's one-line description, the folder's status, settled decisions, next steps. A stale index is worse than none, because the next agent believes it.
+- **Session log:** append a dated section to this week's note in \`${base}/sessions/\`. **Decisions:** one line each in \`${base}/decisions.md\`. **Inbox:** one file per item in \`${base}/inbox/\`; finished items are deleted, not marked done.`;
+  } else if (tool.kind === 'cloud') {
+    const writeLine = {
+      'notes-freely': `You may create and edit ${unit}s inside the location named above, under the posture above. Nowhere else without being asked.`,
+      'logs-and-inbox-only': `You may write only to a "Session log" ${unit} and a "Decisions" ${unit} inside the location named above. Anything else: propose it, do not write it.`,
+      'ask-before-every-write': 'Ask before every write, every time. Show what you would write and where.',
+    }[a.write_policy];
+    writeSection = `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}. ${tool.posture}
+- ${writeLine}
+- **No filesystem writes.** Nothing about this person's notes is a local file; if a task needs a scratch file, say so and use the folder they give you.
+- **Every section has an index ${unit}.** When you add or change a ${unit}, update the index ${unit} that lists it in the same pass. A stale index is worse than none, because the next agent believes it.
+- **Session log:** a dated entry at the top of the "Session log" ${unit}. **Decisions:** one line each in the "Decisions" ${unit}. **Open items:** one block each in an "Inbox" ${unit}; finished items are removed, not marked done.`;
+  } else {
+    // readonly and other: the tool itself is read-only or unknown; writes fall back to a local folder
+    const writeLine = {
+      'notes-freely': `You may create and edit files anywhere under the local fallback folder \`${base}/\`, under that folder's rules.`,
+      'logs-and-inbox-only': `You may write only to the session log (\`${base}/sessions/\`), the decisions log (\`${base}/decisions.md\`) and the inbox (\`${base}/inbox/\`) in the local fallback folder. Anything else: propose it, do not write it.`,
+      'ask-before-every-write': 'Ask before every write, every time. Show what you would write and where.',
+    }[a.write_policy];
+    writeSection = `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}. ${tool.posture}
+- **Local fallback folder:** \`${base}/\`. ${writeLine}
+- **Every folder you write into has a README.** Any write, edit or delete means that README is corrected in the same pass. A stale index is worse than none, because the next agent believes it.
+- **Session log:** append a dated section to this week's note in \`${base}/sessions/\`. **Decisions:** one line each in \`${base}/decisions.md\`. **Inbox:** one file per item in \`${base}/inbox/\`; finished items are deleted, not marked done.`;
+  }
+
   return `## Agent onboarding
 
 _Generated by agent-personalizer from ${md(a.name)}'s own answers (stored in \`.agent-personalizer.json\`). Re-run the installer to change an answer. Read this after \`USER.md\`, before your first substantive reply._
@@ -212,10 +251,7 @@ ${bullets(a.read_first.map(md), 'USER.md')}
 ${a.tracker !== 'none' ? `- The task tracker (${md(a.tracker)}): what is open and what is already decided, before proposing work.\n` : ''}
 ### Where you may write
 
-${toolLine}
-- ${writeLine}
-- **Every folder you write into has a README.** Any write, edit or delete means that README is corrected in the same pass: the file's one-line description, the folder's status, settled decisions, next steps. A stale index is worse than none, because the next agent believes it.
-- **Session log:** append a dated section to this week's note in \`${esc(a.notes_path)}/sessions/\`. **Decisions:** one line each in \`${esc(a.notes_path)}/decisions.md\`. **Inbox:** one file per item in \`${esc(a.notes_path)}/inbox/\`; finished items are deleted, not marked done.
+${writeSection}
 
 ### How to save a file
 
@@ -252,7 +288,7 @@ function contractBlock(a) {
     `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
     `Read first: ${a.read_first.map(md).join(' → ')}.`,
-    `Notes: ${md(TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path)).name)} at ${md(a.notes_path)}${a.notes_tool === 'obsidian' ? ', through obsidian-tc' : ''}.`,
+    `Notes: ${md(toolFor(a).name)} at ${md(a.notes_path)}${a.notes_tool === 'obsidian' ? ', through obsidian-tc' : toolFor(a).kind === 'cloud' ? ', through its connector, no filesystem writes' : toolFor(a).kind !== 'disk' ? `, read-only; local fallback folder ${FALLBACK}/` : ''}.`,
   ].filter(Boolean).join('\n');
 }
 
