@@ -17,6 +17,8 @@ This repo is the fix, in four levels. Stop at the level you need.
 
 Everything here is the generalized shape of a system that runs in production every day. The examples are invented. The failures the rules prevent are real.
 
+**Privacy:** this tool runs entirely on your machine. It makes no network calls, sends no telemetry, reads no environment variables, and writes only into the folder you name.
+
 ---
 
 ## Quick start

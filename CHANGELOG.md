@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this repo. Format after [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/). Dates are the day the change was pushed.
+All notable changes to this repo. Format after [Keep a Changelog](https://keepachangelog.com/en/2.0.0/) 2.0.0; versions follow [SemVer](https://semver.org/). Dates are the day the change was pushed.
 
 Every entry names the adversarial audit round that produced it where one did. The audits are Codex read-only passes against `AUDIT_BRIEF.md`; every finding was reproduced before its fix.
 
