@@ -1,6 +1,6 @@
 {
   "name": "agent-personalizer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Personalize any AI with dynamic instructions. One profile, one rule source, rendered for Claude, Codex, Cursor, Gemini and ChatGPT.",
   "license": "MIT",
   "repository": "github:aunysillyme/agent-personalizer",
@@ -25,9 +25,9 @@
     "agent-personalizer": "bin/agent-personalizer.js"
   },
   "scripts": {
-    "render": "node render/render.js",
-    "check": "node render/render.js --check",
-    "gate": "node check/gate.js",
+    "render": "node render/render.cjs",
+    "check": "node render/render.cjs --check",
+    "gate": "node check/gate.cjs",
     "test": "sh test/run.sh"
   },
   "engines": {
@@ -39,7 +39,7 @@
     "rules",
     "templates",
     "hooks",
-    "check/gate.js",
+    "check/gate.cjs",
     "check/forbidden.example.txt",
     "docs",
     "examples",

@@ -11,4 +11,4 @@ if ! command -v node >/dev/null 2>&1; then
   echo "[agent-personalizer] node not found; session-start contract NOT injected. Rules remain reachable through CLAUDE.md pointers." >&2
   exit 1
 fi
-exec node "$ROOT/render/render.js" --dir "$ROOT" --contract --contract-target claude
+exec node "$ROOT/render/render.cjs" --dir "$ROOT" --contract --contract-target claude

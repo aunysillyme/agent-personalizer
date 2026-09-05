@@ -2,7 +2,7 @@
 id: 00-read-the-profile-first
 title: Read the profile first
 inject: true
-surfaces: [claude, agents, gemini, chatgpt, prompt]
+surfaces: [claude, agents, gemini]
 ---
 
 ## universal

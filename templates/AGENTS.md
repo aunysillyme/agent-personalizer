@@ -2,7 +2,7 @@
 
 <!-- Read by Codex, Cursor and most coding agents. A POINTER file: it says where things
      live and does not restate rules. The block between the markers is generated from
-     USER.md and rules/ by render/render.js; edit those, never this block. -->
+     USER.md and rules/ by render/render.cjs; edit those, never this block. -->
 
 Read `USER.md` first, every session. It says who I am, how to talk to me, how firmly I mean things, and how I want output shaped.
 Then read `AGENT_ONBOARDING.md`: how to talk to me, what to read next, where you may write, how to save a file, and what to ask before doing. It is generated from my own answers.
@@ -26,5 +26,5 @@ Then read `AGENT_ONBOARDING.md`: how to talk to me, what to read next, where you
 - Act or ask. `[owner: rules/60-act-or-ask.md]`
 
 <!-- agent-personalizer:begin -->
-<!-- run `npx agent-personalizer` or `node render/render.js` to fill this block -->
+<!-- run `npx agent-personalizer` or `node render/render.cjs` to fill this block -->
 <!-- agent-personalizer:end -->

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-/* Fault injection for the commit/rollback path in render/render.js.
+/* Fault injection for the commit/rollback path in render/render.cjs.
    Runs render as a module with fs.renameSync patched:
      case A: the second commit rename throws  -> every target byte-for-byte as before, no temps, no backups, exit 2
      case B: the second commit rename throws AND the restore rename of the first target throws
@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const dir = process.argv[2];
 if (!dir) { console.error('need a project dir'); process.exit(2); }
-const render = require(path.join(__dirname, '..', 'render', 'render.js'));
+const render = require(path.join(__dirname, '..', 'render', 'render.cjs'));
 
 function snapshot(names) { const o = {}; for (const n of names) o[n] = fs.existsSync(path.join(dir, n)) ? fs.readFileSync(path.join(dir, n)) : null; return o; }
 function same(a, b) { return (a === null && b === null) || (a && b && a.equals(b)); }
@@ -40,7 +40,7 @@ function run(faults, unlinkFault, chmodFault, writeFault, copyFault) {
   fs.unlinkSync = (p) => { if (unlinkFault && unlinkFault(p)) throw new Error('injected: unlink'); return realUnlink(p); };
   process.exit = (code) => { throw Object.assign(new Error('exit'), { code }); };
   console.error = (m) => errs.push(String(m));
-  process.argv = ['node', 'render.js', '--dir', dir, '--targets', 'claude,agents'];
+  process.argv = ['node', 'render.cjs', '--dir', dir, '--targets', 'claude,agents'];
   let code = 0;
   const restore = () => { fs.renameSync = realRename; fs.unlinkSync = realUnlink; fs.chmodSync = realChmod; fs.writeFileSync = realWrite; fs.copyFileSync = realCopy; process.exit = realExit; console.error = realErr; };
   try { render.main(); } catch (e) { if (e.message === 'exit') code = e.code; else { restore(); throw e; } }

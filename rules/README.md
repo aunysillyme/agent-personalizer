@@ -1,6 +1,6 @@
 # rules/
 
-One rule per file. Each file is the owning copy of that rule; everything else points here. `render/render.js` turns these files plus `USER.md` into the per-AI instruction files.
+One rule per file. Each file is the owning copy of that rule; everything else points here. `render/render.cjs` turns these files plus `USER.md` into the per-AI instruction files.
 
 ## Format
 
@@ -38,7 +38,7 @@ Files render in filename order. The two-digit prefix is the order; leave gaps.
 1. Name the failure first. A rule without an origin block is a preference wearing a uniform.
 2. State it in the `universal` block without a single tool name. If you cannot, it is a binding, not a rule.
 3. Decide whether it needs injection. Most do not. Injection is for rules that lose arguments to tools at the moment of decision.
-4. Run `npm run render`, then `npm run check`.
+4. Run `node render/render.cjs --dir .`, then the same command with `--check`.
 
 ## The rules that ship here
 

@@ -6,6 +6,25 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-05
+
+Thirteen issues (#3 to #15) filed against `5972b32` by an independent installation-and-behaviour audit, every one reproduced against HEAD before its fix. One fix per issue; the harness grew from 60 to 72 checks, one regression check per issue.
+
+### Changed
+- **Answers drive the rules** (#3). A rule can declare `requires: <answer>=<value>` in its frontmatter and then renders, and enters the contract, only when the stored answer matches; `rules/40-sign-every-edit.md` requires `signature=yes`, and the installer drops its pointer line from the home files on `signature=no`. `rules/50-output-style.md` no longer hard-codes one shape (bullets, one-line corrections); it defers to the onboarding answers and states neutral defaults for when none are given. `rules/00-read-the-profile-first.md` no longer targets ChatGPT or the plain system prompt, which cannot open files.
+- **Re-running with changed answers** (#4) regenerates `AGENT_ONBOARDING.md` and every rendered block, and regenerates `USER.md` only when it still equals the render of the previous answers byte for byte; an edited `USER.md` is kept and the installer names the changed answers as a conflict. README and paste guide now describe exactly that.
+- **Runtime files are `.cjs`** (#5): `render/render.cjs`, `render/onboarding.cjs`, `check/gate.cjs`, so an installed copy runs inside a `"type": "module"` project. The hook, templates, docs and harness follow.
+- **ChatGPT render is budgeted** (#6). With answers, Box 1 is a compact profile and Box 2 is the onboarding block (always-ask, off-limits, write policy, then style) plus the `inject: true` rules; each box prints its count against the configured limit; an over-budget box is written in full and flagged, never cut; the file says where the remaining rules go (a ChatGPT Project). Without answers the old full render remains as the fallback and says so.
+- **`notes_path` is honoured** (#7): the level-2 scaffold and the `CLAUDE.md` / `AGENTS.md` pointers use it for disk tools; a cloud tool gets no local notes folder and a one-line pointer to the onboarding file; read-only and unknown tools use the `notes/` fallback. For disk tools the path is validated as a plain relative path (no `..`, no leading `/`). The default read-first list no longer hard-codes `notes/README.md`; the onboarding file adds the notes index from the answer.
+- **The session-start contract carries the write policy** (#8), and is ordered by consequence: always-ask, off-limits, writes and location, read order, then how to talk.
+- **Installed files reference only what the destination has** (#12): public, version-pinned doc links (`DOCS` in `render/onboarding.cjs`, checked against `package.json` by the harness) replace `docs/...` paths; direct `node` commands replace `npm run` in `hooks/README.md` and `rules/README.md`.
+- **Docs say what the tool does** (#13, #14, #15). README: a "what this does, and does not do" paragraph; level 2 described as instructions the AI follows, level 3 as the automation, level 4 as reading material; "wins at decision time" and "cannot decay" softened to what injection can promise; the gate described as a forbidden-string check with named limits. `docs/tiers.md`: the stories are one setup's experience, not measurements; the pointers rule allows a generated, drift-checked block and forbids hand-maintained copies. `docs/paste-guide.md`: the ChatGPT budget and overflow strategy.
+
+### Fixed
+- **Gate: symlinked parent directories** (#9). A working-tree path whose parent is a symlink is not read (it lies outside the scan root); the skip is counted and printed; the index blob is still scanned.
+- **Gate: forbidden terms in file names** (#10). Every shipped path is scanned as well as its text; a path hit is labelled `(path)` and can be allow-listed.
+- **Installer preflight** (#11). Every path is probed and every existing rendered target is decoded and marker-checked before the first write, so a malformed marker block, invalid UTF-8 or an unwritable target refuses the run with nothing written.
+
 ## [0.2.0] - 2026-09-05
 
 ### Added
@@ -45,6 +64,7 @@ Every entry names the adversarial audit round that produced it where one did. Th
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aunysillyme/agent-personalizer/releases/tag/v0.1.0
