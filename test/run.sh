@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 82 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 83 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -975,5 +975,14 @@ grep -q 'My own rule. `\[owner: the rendered block below\]`' "$T/CLAUDE.md" || f
 grep -c 'the rendered block below' "$T/AGENTS.md" | grep -q '^0$' || fail "AGENTS.md pointers not repointed"
 expect 0 "upgrade check" node render/render.cjs --dir "$T" --check
 pass "level 1 to 3 upgrade repoints installer lines only"
+
+# 83. both workflow files parse as YAML (GitHub silently drops a workflow it cannot parse: the manual trigger vanished once over an unquoted colon)
+yaml_ok() { if command -v ruby >/dev/null 2>&1; then ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$1" >/dev/null 2>&1; elif python3 -c 'import yaml' >/dev/null 2>&1; then python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$1" >/dev/null 2>&1; else return 3; fi; }
+for w in .github/workflows/harness.yml .github/workflows/publish.yml; do
+  yaml_ok "$w"; got=$?
+  case "$got" in 0) ;; 3) echo "skip: no YAML parser (ruby or python3+yaml) on this machine; $w NOT parsed (a skip, not a pass)";; *) fail "$w does not parse as YAML";; esac
+done
+grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml lost its manual trigger"
+pass "workflow files parse as YAML (or the parser is absent and says so)"
 
 echo; echo "all checks passed"
