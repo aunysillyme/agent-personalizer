@@ -5,10 +5,12 @@
      USER.md and rules/ by render/render.js; edit those, never this block. -->
 
 Read `USER.md` first, every session. It says who I am, how to talk to me, how firmly I mean things, and how I want output shaped.
+Then read `AGENT_ONBOARDING.md`: how to talk to me, what to read next, where you may write, how to save a file, and what to ask before doing. It is generated from my own answers.
 
 ## Where things live
 
 - Profile: `USER.md`
+- Agent onboarding (generated from my answers): `AGENT_ONBOARDING.md`
 - Rules, one file each, the owning copy: `rules/`
 - Notes the agent may edit, and the rules for editing them: `notes/README.md`
 - Session log (one note per week): `notes/sessions/`

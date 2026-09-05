@@ -8,7 +8,7 @@ This repo is the fix, in four levels. Stop at the level you need.
 
 | Level | You have | You get |
 |---|---|---|
-| **1. One file** | one AI, one app | a profile of you (`USER.md`) and a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`). Copy three files, done. |
+| **1. One file** | one AI, one app | a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), and a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`). |
 | **2. Dynamic docs** | a notes folder the AI may edit | folder indexes the AI keeps current, a weekly session log, a decisions log, a signature on every AI edit, an inbox that empties itself. |
 | **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | one rule source rendered per AI, a session-start contract so rules win at decision time, a drift check that fails loudly. |
 | **4. Hand-off** | several AIs | pointers to the multi-agent layer: routing, task bundles, verified CLI runs. |
@@ -43,9 +43,19 @@ Your instructions live in five places, each with one job and one failure it prev
 
 ---
 
+## The agent onboarding file
+
+The installer asks you how an AI should work with you, then writes the answers to `AGENT_ONBOARDING.md`: how to talk to you, how to shape output, what to read first and in what order, where it may write, how to save a file, and what it must always ask before doing. It is generated from your answers in `.agent-personalizer.json`, so every AI you point at the folder gets the same manual, and re-running the installer changes it everywhere at once.
+
+- **Interactive**: run the installer without `--yes` and answer the questions. Enter accepts the default.
+- **Scripted**: `--answers my-answers.json` (see [`test/fixtures/answers.json`](test/fixtures/answers.json) for the shape). Unknown keys, wrong types or unknown choices are refused before anything is written.
+- **Defaults**: `--defaults` or `--yes`. The defaults are one working setup: direct, short, one-line corrections, settle facts yourself and ask only when the answer changes what gets built, verdict first, bullets, evidence inline, sign every edit, always ask before delete / publish / send / spend / settings / standing rules. Every one is a question you can answer differently.
+
+`USER.md` is generated from the same answers the first time and is then yours to edit. The session-start contract carries a short version of the onboarding block, so it is present at the moment of decision, not only in a file.
+
 ## Level 1: one file
 
-1. Fill in [`templates/USER.md`](templates/USER.md). Who you are, how to talk to you, how firmly you mean things, how you want output shaped.
+1. Fill in [`templates/USER.md`](templates/USER.md), or let the installer generate it from your onboarding answers. Who you are, how to talk to you, how firmly you mean things, how you want output shaped.
 2. Copy [`templates/CLAUDE.md`](templates/CLAUDE.md) for Claude, or [`templates/AGENTS.md`](templates/AGENTS.md) for Codex, Cursor and most other coding agents. Both are pointers: they tell the AI to read `USER.md` first and where everything else lives.
 3. Paste the `USER.md` body into the "custom instructions" box of any chat app that has one.
 
@@ -88,6 +98,7 @@ Open any file in [`rules/`](rules/). Each ends with an `origin` block: the failu
 
 ```
 templates/   USER.md, CLAUDE.md, AGENTS.md, FOLDER_README.md, session-log.md, decisions-log.md, INBOX_README.md
+render/onboarding.js   the interview questions, their defaults, and the USER.md / AGENT_ONBOARDING.md / contract renders
 rules/       example rules in the three-fence format, plus the format spec
 render/      render.js and the target table
 hooks/       Claude Code session-start contract, plain-prompt fallback
@@ -95,7 +106,7 @@ check/       gate.js, the forbidden-string gate this repo runs on itself
 bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md
-test/        run.sh: 54 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+test/        run.sh: 57 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Contributing
