@@ -6,6 +6,14 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-05
+
+### Added
+- **On npm.** `npx agent-personalizer` is the install path; 0.4.0 was the first version published (by hand, from the tag). From 0.4.1 every version is published by `publish.yml` with provenance through npm trusted publishing, so the package page shows where each version was built. `npx github:aunysillyme/agent-personalizer` still works.
+
+### Changed
+- The installer's usage text and rerun hint say `npx agent-personalizer`; the README quick start, privacy line and cache note follow.
+
 ## [0.4.0] - 2026-09-05
 
 Two independent audits of v0.3.0 the same day: agy as code reviewer (91/100; it could not execute commands under its own settings) and Codex as a first-time user running the ten-step walkthrough in a fresh temp directory. Every finding was reproduced before its fix.
@@ -94,7 +102,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.1.0...v0.2.0

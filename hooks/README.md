@@ -1,6 +1,6 @@
 # hooks/
 
-Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.4.0/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
+Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.4.1/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
 
 Which rules? The ones with `inject: true` in their frontmatter. Keep that set small. Every injected rule costs tokens every session.
 

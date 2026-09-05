@@ -19,24 +19,24 @@ Everything here is the generalized shape of a system that runs in production eve
 
 **What this tool does, and does not do.** It writes files: a profile, an onboarding manual generated from your answers, rule files, rendered instruction files, a session-start hook, a drift check and a privacy gate. Those are the implemented parts and the harness tests every one of them. What it does not do: make an AI comply. Text in a file, or injected at session start, is the strongest placement available, and the stories in `docs/tiers.md` are one setup's experience of what held; they are not a measured guarantee across models or hosts, and nothing here measures compliance. Anything described as the AI "keeping" or "doing" is an instruction the AI is given, not a process this repo runs. The two [companion tools](#companion-tools) are where a rule becomes something a machine enforces.
 
-**Privacy:** the tool itself runs entirely on your machine: no network calls, no telemetry, no environment variables read, writes only into the folder you name. The one network step is `npx` fetching the package from GitHub through npm before the tool runs; nothing in this repo opens a connection after that. Runs on macOS and Linux, and the Node entry points (installer, renderer, gate) are smoke-tested on Windows in CI; the harness and the session hook are POSIX shell, so on Windows run those under WSL or Git Bash.
+**Privacy:** the tool itself runs entirely on your machine: no network calls, no telemetry, no environment variables read, writes only into the folder you name. The one network step is `npx` fetching the package from the npm registry (or GitHub) before the tool runs; nothing in this repo opens a connection after that. Runs on macOS and Linux, and the Node entry points (installer, renderer, gate) are smoke-tested on Windows in CI; the harness and the session hook are POSIX shell, so on Windows run those under WSL or Git Bash.
 
 ---
 
 ## Quick start
 
 ```bash
-npx github:aunysillyme/agent-personalizer
+npx agent-personalizer
 ```
 
-The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets. `--help` lists every flag; `--quick` asks the seven questions that change behaviour and defaults the rest; `--answers file.json` (or `--answers -` from stdin) scripts it.
+Published on npm with provenance from this repository's own workflow (`npx github:aunysillyme/agent-personalizer` still works and runs the same code straight from the tag). The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets. `--help` lists every flag; `--quick` asks the seven questions that change behaviour and defaults the rest; `--answers file.json` (or `--answers -` from stdin) scripts it.
 
 No Node? Copy `templates/USER.md` and `templates/CLAUDE.md` (or `templates/AGENTS.md`) into your project by hand. That is level 1.
 
 If `npx` stops with `EPERM` and a note about root-owned files in `~/.npm`, npm cannot write its cache. Point it at a local one for this run, no `sudo` needed:
 
 ```bash
-npm_config_cache=./.npm-cache npx github:aunysillyme/agent-personalizer
+npm_config_cache=./.npm-cache npx agent-personalizer
 ```
 
 ---
@@ -132,7 +132,7 @@ bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
 CHANGELOG.md keyed on audit rounds
-.github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm with provenance, manual, dormant
+.github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm publish with provenance, dispatched per tag
 test/        run.sh: 82 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
