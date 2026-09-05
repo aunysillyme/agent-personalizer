@@ -10,6 +10,8 @@ Every folder the AI may write to has an index file (`README.md`). Any write, edi
 
 Relevant means a decision, a status flip, a reversal, a new section, a changed scope. Not a typo fix or a rewording that changes no meaning. If nothing in the index became untrue, leave it alone and say so.
 
+In practice: when you change a file in a folder, fix that folder's README in the same step so it still tells the truth.
+
 ## personal
 Never hand-type fields the system derives (an `updated:` date pulled from version control, for instance). Edit the prose, not the derived keys.
 

@@ -10,7 +10,7 @@ Thanks for looking. Two kinds of contribution land well here: a **failure you hi
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 72 checks, exact exit codes, Linux and macOS
+npm test            # sh test/run.sh: 81 checks, exact exit codes, Linux and macOS
 node test/rollback.test.js "$(mktemp -d)"   # after copying examples/freelance-illustrator into it
 node check/gate.cjs --self-test
 ```
@@ -25,7 +25,7 @@ The privacy gate (`check/gate.cjs` against a real list) needs a local `check/for
 
 ## Adding a notes tool or an AI target
 
-- A notes tool touches four places in `render/onboarding.cjs`, then one doc: the option in `QUESTIONS` (`notes_tool`), otherwise `validate()` refuses it; the `TOOL` map entry with its `kind` (`disk`, `cloud`, `readonly`, `other`) and posture; the kind lists `kindOf()` reads (`DISK_TOOLS`, the cloud list; anything else is `readonly`); the installer hint in `bin/agent-personalizer.js`; and a row in `docs/companions.md`. Check 60 in the harness iterates every option; add yours to the right loop.
+- A notes tool is ONE entry in the `TOOL` table at the top of `render/onboarding.cjs` (`kind`, `label`, `name`, `reach`, `posture`); the interview option, the validation and the write section all derive from it. Then a row in `docs/companions.md`, and an installer hint in `bin/agent-personalizer.js` if the tool needs one. Check 60 in the harness iterates every option; add yours to the right loop. Check 74 asserts the interview options equal the table's keys.
 - An AI target is an entry in `render/targets.json` plus a row in `docs/paste-guide.md`. If it has a binding, add `binding:<name>` blocks to the rules that need one; unknown binding names are refused.
 
 ## Pull requests

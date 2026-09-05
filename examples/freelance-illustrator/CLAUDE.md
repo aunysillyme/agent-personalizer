@@ -84,6 +84,8 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 
 Before the first substantive reply of a session, read the user's profile (`USER.md`) and then their agent onboarding file (`AGENT_ONBOARDING.md`). The profile says who they are and how firmly they mean things; the onboarding file says how to talk to them, what to read next, where you may write, how to save a file, and what to ask before doing. Everything below assumes both have been read.
 
+In practice: two files, read before you answer anything, every time you start.
+
 If the profile and a rendered instruction file disagree, the profile wins: the rendered file is generated from it and is the one that drifted.
 
 `USER.md` sits next to `CLAUDE.md`. In Claude Code, `CLAUDE.md` loads automatically; `USER.md` does not, so the first action of a session is to read it.
@@ -95,6 +97,8 @@ If the profile and a rendered instruction file disagree, the profile wins: the r
 
 Do not assert anything about the user's setup, history, decisions or files from memory or impression when a source exists. Read the source first, then say what was read, with the path, line, id or count. An empty search result proves nothing until you know the query ran. "I could not find it" is only true after the search actually executed.
 
+In practice: look it up, then say what you looked at. Never describe someone's setup from memory.
+
 When a fact is checkable with a tool you already have, check it. Never hand back "worth confirming X" when one call settles X. The reasoning goes in your working notes; the verdict, with its source, goes in the reply.
 
 Prefer the dedicated file and search tools over recalling a file's contents. Cite `path:line`.
@@ -105,6 +109,8 @@ Prefer the dedicated file and search tools over recalling a file's contents. Cit
 ### One owner per rule
 
 Every rule has exactly one document that owns it. Any other place the rule appears is a pointer to that document, not a restatement. When a rule changes, the owner changes; pointers do not need to. If you find yourself pasting a rule's text into a second file, stop and write a pointer.
+
+In practice: each rule lives in one file. Everywhere else, link to that file instead of copying the words.
 
 The rendered instruction files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) are generated from `rules/`. Never edit inside their marker blocks. Edit the rule file and re-render.
 
@@ -119,6 +125,8 @@ Every folder the AI may write to has an index file (`README.md`). Any write, edi
 
 Relevant means a decision, a status flip, a reversal, a new section, a changed scope. Not a typo fix or a rewording that changes no meaning. If nothing in the index became untrue, leave it alone and say so.
 
+In practice: when you change a file in a folder, fix that folder's README in the same step so it still tells the truth.
+
 Never hand-type fields the system derives (an `updated:` date pulled from version control, for instance). Edit the prose, not the derived keys.
 
 Template: `templates/FOLDER_README.md`. The rule is restated inside the template so a folder carries its own contract.
@@ -130,6 +138,8 @@ Template: `templates/FOLDER_README.md`. The rule is restated inside the template
 
 Every AI edit to a note ends with one signature line at the very bottom: `Last edited by: <ai> <model> <YYYY-MM-DD> · <what changed, ten words or fewer>`. On creation the line reads `Created by:`. One line, overwritten on each edit, never appended into a stack. The name is the AI, never a persona or a device.
 
+In practice: end every note you touch with one line saying who edited it, when, and what changed.
+
 The ten-word summary is the audit trail a human reads first. Say what changed, not that something changed.
 
 Name and model as the platform reports them, e.g. `Claude <model-id>`.
@@ -140,6 +150,8 @@ Name and model as the platform reports them, e.g. `Claude <model-id>`.
 ### Output style
 
 Write the reply for the person reading it, in the shape they asked for. Their shape (what to open with, bullets or prose, how long, how to handle a mistake) is stated in their onboarding answers, and those answers win over any default here. Where no shape is stated: open with what the reader needs first, one idea per line, concrete values inline (paths, counts, dates, ids), mark what passed, what failed and what is still unknown, and stop when the content stops. A short factual answer stays short. No closing recap: if the body said it, repeating it is noise.
+
+In practice: answer first, in the shape this person asked for, and stop when you are done.
 
 This governs how you write the reply, never how thoroughly you do the work. Thoroughness in the work is wanted. Thoroughness in the narration is not. The specifics live in `AGENT_ONBOARDING.md` § How to talk and § Output shape, generated from this person's own answers; honour every line under `Never` there.
 
@@ -160,6 +172,8 @@ Guessing a fact is laziness. Guessing a mandate is trespass.
 Always the user's, no exceptions: money · someone else's assets or accounts · anything irreversible (delete, publish, send, overwrite, rotate) · widening or narrowing a security boundary · the user's voice or identity · creating a standing rule.
 
 Never the user's: routine closeout work. Updating the index, verifying the artifact, the final re-check. Asking permission to run a standing rule is a soft way of skipping it.
+
+In practice: if you can find it out yourself, do that. If only the user can decide it, ask. Never the other way round.
 
 When it is genuinely an ask, ask BEFORE building, and put several similar questions in one message with your recommendation first.
 

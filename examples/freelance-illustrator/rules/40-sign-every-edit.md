@@ -9,6 +9,8 @@ requires: signature=yes
 ## universal
 Every AI edit to a note ends with one signature line at the very bottom: `Last edited by: <ai> <model> <YYYY-MM-DD> · <what changed, ten words or fewer>`. On creation the line reads `Created by:`. One line, overwritten on each edit, never appended into a stack. The name is the AI, never a persona or a device.
 
+In practice: end every note you touch with one line saying who edited it, when, and what changed.
+
 ## personal
 The ten-word summary is the audit trail a human reads first. Say what changed, not that something changed.
 

@@ -17,6 +17,8 @@ Always the user's, no exceptions: money · someone else's assets or accounts · 
 
 Never the user's: routine closeout work. Updating the index, verifying the artifact, the final re-check. Asking permission to run a standing rule is a soft way of skipping it.
 
+In practice: if you can find it out yourself, do that. If only the user can decide it, ask. Never the other way round.
+
 ## personal
 When it is genuinely an ask, ask BEFORE building, and put several similar questions in one message with your recommendation first.
 

@@ -17,8 +17,36 @@
   DOCS points at the matching tag on GitHub so an installed copy never links to a file the
   destination does not have.
 */
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
+
+/* THE single source for notes tools. Add a tool here and nowhere else: the interview option, the
+   kind that drives the write section and the scaffold, and the prose all come from this table.
+   kind: disk = files the AI edits directly; cloud = reached through a connector, no filesystem;
+   readonly = no agent door today, so writes fall back to a local folder; other = named by the user,
+   conservative posture. p = location escaped for a code span, q = location escaped for prose. */
+const TOOL = {
+  'obsidian':    { kind: 'disk', label: 'an Obsidian vault (pairs with obsidian-tc, see the companions doc)', name: 'Obsidian',
+                   reach: (p, q, n, tc) => tc
+                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see ${DOCS}/companions.md`
+                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; ${DOCS}/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null },
+  'notion':      { kind: 'cloud', label: 'Notion', name: 'Notion', unit: 'page', reach: (p, q) => `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' },
+  'google-docs': { kind: 'cloud', label: 'Google Docs / Drive', name: 'Google Docs', unit: 'doc', reach: (p, q) => `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' },
+  'apple-notes': { kind: 'cloud', label: 'Apple Notes', name: 'Apple Notes', unit: 'note', reach: (p, q) => `the "${q}" folder through a separately installed local Apple Notes MCP (not built into any AI app; the user installs and connects it)`, posture: 'Read, and create new notes. Never edit or delete an existing note.' },
+  'onenote':     { kind: 'readonly', label: 'Microsoft OneNote', name: 'Microsoft OneNote', reach: (p, q) => `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' },
+  'evernote':    { kind: 'readonly', label: 'Evernote', name: 'Evernote', reach: (p, q) => `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' },
+  'logseq':      { kind: 'disk', label: 'Logseq', name: 'Logseq', reach: (p, q) => `the graph folder at \`${p}/\`, as plain files`, posture: null },
+  'folder':      { kind: 'disk', label: 'a plain folder of markdown files', name: 'a folder of markdown files', reach: (p, q) => `\`${p}/\` on disk`, posture: null },
+  'other':       { kind: 'other', label: 'something else (name it in the next answer)', name: null, reach: (p, q) => `"${q}"`, posture: 'Ask before the first write into it, and say which tool and location you mean. Until told otherwise, write only to the local fallback folder below.' },
+};
+/* name comes back RAW and is md-escaped exactly once at each prose render site */
+const toolFor = (a) => { const t = TOOL[a.notes_tool]; return { kind: t.kind, unit: t.unit, posture: t.posture, name: t.name || a.notes_tool_name || 'an unnamed notes tool', reach: t.reach(esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.obsidian_tc === 'yes') }; };
+const FALLBACK = 'notes';
+/* kind without rendering anything (safe before validation completes) */
+const kindOf = (a) => TOOL[a.notes_tool].kind;
+/* the folder on disk that scaffolds and home-file pointers use: the user's path for a disk tool,
+   the fixed fallback for everything else (cloud tools get no folder named after a workspace) */
+const baseFor = (a) => kindOf(a) === 'disk' ? a.notes_path : FALLBACK;
 
 const QUESTIONS = [
   { id: 'name', ask: 'What should the AI call you?', type: 'text', default: 'the user' },
@@ -40,9 +68,9 @@ const QUESTIONS = [
   { id: 'evidence', ask: 'Where should evidence for a claim go?', type: 'choice', default: 'inline',
     options: [['inline', 'in the reply: paths, counts, dates'], ['linked', 'a link to where it lives'], ['none', 'not needed']] },
   { id: 'never', ask: 'Words, punctuation or habits the AI must never use (comma-separated, blank for none)', type: 'list', default: [] },
-  { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'rules/'] },
+  { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md'] },
   { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
-    options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see the companions doc)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
+    options: Object.entries(TOOL).map(([k, t]) => [k, t.label]) },
   { id: 'obsidian_tc', ask: 'If Obsidian: do you use obsidian-tc, the governed MCP?', type: 'choice', default: 'no',
     options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
   { id: 'notes_tool_name', ask: 'If "other": the name of the tool (blank otherwise)', type: 'text', default: '' },
@@ -61,6 +89,11 @@ const QUESTIONS = [
 ];
 
 const IDS = new Set(QUESTIONS.map(q => q.id));
+/* the questions --quick asks; every other answer takes its default */
+const QUICK = ['name', 'tone', 'length', 'notes_tool', 'notes_path', 'write_policy', 'always_ask'];
+/* only the answers that differ from the defaults: what the installer stores, so the config reads as
+   "what this person chose" and a future default applies to everyone who never chose otherwise */
+function sparse(a) { const d = defaults(), out = {}; for (const k of Object.keys(a)) if (JSON.stringify(a[k]) !== JSON.stringify(d[k])) out[k] = a[k]; return out; }
 
 function defaults() {
   const a = {};
@@ -179,28 +212,7 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 /* kind: disk = files the AI edits directly; cloud = reached through a connector, no filesystem;
    readonly = no agent door today, so writes fall back to a local folder; other = named by the user,
    conservative posture. p = location escaped for a code span, q = location escaped for prose. */
-const TOOL = {
-  'obsidian':    (p, q, n, tc) => ({ kind: 'disk', name: 'Obsidian', reach: tc
-                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see ${DOCS}/companions.md`
-                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; ${DOCS}/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null }),
-  'logseq':      (p, q) => ({ kind: 'disk', name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
-  'folder':      (p, q) => ({ kind: 'disk', name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
-  'notion':      (p, q) => ({ kind: 'cloud', name: 'Notion', unit: 'page', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
-  'google-docs': (p, q) => ({ kind: 'cloud', name: 'Google Docs', unit: 'doc', reach: `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' }),
-  'apple-notes': (p, q) => ({ kind: 'cloud', name: 'Apple Notes', unit: 'note', reach: `the "${q}" folder through a separately installed local Apple Notes MCP (not built into any AI app; the user installs and connects it)`, posture: 'Read, and create new notes. Never edit or delete an existing note.' }),
-  'onenote':     (p, q) => ({ kind: 'readonly', name: 'Microsoft OneNote', reach: `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' }),
-  'evernote':    (p, q) => ({ kind: 'readonly', name: 'Evernote', reach: `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' }),
-  'other':       (p, q, n) => ({ kind: 'other', name: n || 'an unnamed notes tool', reach: `"${q}"`, posture: 'Ask before the first write into it, and say which tool and location you mean. Until told otherwise, write only to the local fallback folder below.' }),
-};
-/* name comes back RAW and is md-escaped exactly once at each prose render site */
-const toolFor = (a) => TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.obsidian_tc === 'yes');
-const FALLBACK = 'notes';
-const DISK_TOOLS = new Set(['obsidian', 'logseq', 'folder']);
-/* kind without rendering anything (safe before validation completes) */
-const kindOf = (a) => DISK_TOOLS.has(a.notes_tool) ? 'disk' : (['notion', 'google-docs', 'apple-notes'].includes(a.notes_tool) ? 'cloud' : (a.notes_tool === 'other' ? 'other' : 'readonly'));
-/* the folder on disk that scaffolds and home-file pointers use: the user's path for a disk tool,
-   the fixed fallback for everything else (cloud tools get no folder named after a workspace) */
-const baseFor = (a) => kindOf(a) === 'disk' ? a.notes_path : FALLBACK;
+
 
 function renderOnboarding(a) {
   const tool = toolFor(a);
@@ -290,17 +302,12 @@ Settle every FACT yourself: a read, a search, a probe, one tool call. Never hand
 
 ${askList}
 
-Never close a task on a claim. Verify against the artifact, then say what you checked.
+Never close a task on a claim. Verify against the artifact, then say what you checked. Then stop: no closing recap, no unrequested next steps.
 
 ### Off limits
 
 ${bullets(a.off_limits.map(x => `${md(x)}: never surfaced, quoted or summarized in any reply or deliverable, even if a search returns it`), 'nothing declared yet')}
-
-### Standing habits, whatever the task
-
-- **Evidence before assertion.** Read the source before stating anything about this person's setup, history or decisions, and cite the path or id.
-- **Match the firmness.** A word they reached for is a gesture; "I like" is a preference; "I always" is a practice; "never" is a rule. Encode nothing above the rung it arrived at.
-- **Finish the whole task**, then stop. No closing recap, no unrequested next steps.`;
+`;
 }
 
 /* The short block a session-start hook injects (and the ChatGPT "respond" box carries).
@@ -347,4 +354,4 @@ function compactProfile(a) {
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, VERSION, DOCS, FALLBACK, defaults, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
+module.exports = { QUESTIONS, QUICK, TOOL, VERSION, DOCS, FALLBACK, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };

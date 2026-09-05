@@ -29,7 +29,7 @@ Re-paste after every re-render. `--check` verifies the files on disk; it cannot 
 
 ## ChatGPT
 
-Settings → Personalization → Custom instructions. Two boxes; `chatgpt-custom-instructions.md` is rendered as exactly those two:
+Settings → Personalization → Custom instructions. Two boxes. The renderer writes them three ways: `chatgpt-box1.txt` and `chatgpt-box2.txt` are the plain paste files (open, select all, paste), and `chatgpt-custom-instructions.md` carries the same two texts inside fences with their character counts:
 1. "What would you like ChatGPT to know about you?" ← Box 1 (your profile).
 2. "How would you like ChatGPT to respond?" ← Box 2 (universal rules and the ChatGPT binding).
 

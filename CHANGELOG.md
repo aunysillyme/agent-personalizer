@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-05
+
 Two independent audits of v0.3.0 the same day: agy as code reviewer (91/100; it could not execute commands under its own settings) and Codex as a first-time user running the ten-step walkthrough in a fresh temp directory. Every finding was reproduced before its fix.
 
 ### Changed
@@ -14,7 +16,24 @@ Two independent audits of v0.3.0 the same day: agy as code reviewer (91/100; it 
 - The ChatGPT render says, above each fence, to copy only the text inside it (Codex user seat; check 64).
 - CI matrix now runs Node 18, 20 and 22 on both OSes, so the `engines: >=18` claim is tested (agy).
 - README: level 1 is "One profile" and states its footprint (about a dozen small files); the privacy line distinguishes the tool (no network) from the `npx` fetch that precedes it; macOS/Linux stated, Windows via WSL or Git Bash; a no-`sudo` recovery when npm's cache is unwritable (`npm_config_cache=./.npm-cache`).
-- SECURITY.md said "60-check harness"; it is 72 (agy). CONTRIBUTING names all four places a new notes tool touches in `render/onboarding.cjs` (agy).
+- SECURITY.md said "60-check harness"; it is 72 (agy). CONTRIBUTING names where a new notes tool goes (agy).
+
+### Added
+- `--help` and `--version` on the installer; `--help` on the renderer.
+- `--quick`: the seven questions that change behaviour (name, tone, length, notes tool and path, write policy, always-ask), the rest default. Interactive only.
+- `--answers -` reads the answers JSON from stdin, so the scripted path runs in CI.
+- `render.cjs --strict`: exit 1 and write nothing when a ChatGPT box is over its budget. `--rules <dir>` names the rule source explicitly.
+- The ChatGPT target also writes `chatgpt-box1.txt` and `chatgpt-box2.txt`, the plain paste files, covered by `--check`.
+- A Windows smoke job in CI (installer, renderer, gate, ESM install through Node); `.gitattributes` pins LF.
+- `.github/workflows/publish.yml`: npm publish with provenance and trusted publishing, manual and dormant until the package exists on npm (RELEASING.md).
+- A harness check that the quoted check count matches the number of checks, everywhere it is quoted.
+
+### Changed
+- **Level 1 is three files.** USER.md, AGENT_ONBOARDING.md and the home file(s); the renderer reads the rules from the package when the folder has no `rules/`, so nothing is copied. `rules/` arrives at level 3, where it is yours to edit. The home file's rule pointers say "the rendered block below" until then. The default read-first list is `USER.md, AGENT_ONBOARDING.md`.
+- Every rule's universal block ends with one plain-language "In practice:" line, for the stated audience.
+- `AGENT_ONBOARDING.md` lost its "Standing habits" section (the rules and USER.md already carry it).
+- `.agent-personalizer.json` stores only the answers that differ from the defaults; `validate()` fills the rest, so a future default reaches everyone who never chose otherwise.
+- The `TOOL` table in `render/onboarding.cjs` is the single source for notes tools: the interview option, the kind and the prose derive from it.
 
 ## [0.3.0] - 2026-09-05
 
@@ -74,7 +93,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aunysillyme/agent-personalizer/releases/tag/v0.1.0
