@@ -10,7 +10,7 @@ This repo is the fix, in four levels. Stop at the level you need.
 
 | Level | You have | You get |
 |---|---|---|
-| **1. One file** | one AI, one app | a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), and a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`). |
+| **1. One profile** | one AI, one app | a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`), and the `rules/` folder those point at (seven short rule files plus their index). About a dozen small files; the AI reads the home file, the rest are what it points at. |
 | **2. Dynamic docs** | a notes folder the AI may edit | templates and rules for the AI to follow: folder indexes it keeps current, a weekly session log, a decisions log, a signature on every edit (if you want one), an inbox convention (one file per item, deleted when done). Instructions, not automation: the AI does the keeping. |
 | **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | the automation: one rule source rendered per AI, a session-start contract that puts your rules in context at decision time, a drift check that fails loudly, a forbidden-string gate. |
 | **4. Hand-off** | several AIs | reading material only for now: pointers to the multi-agent layer (routing, task bundles, verified CLI runs) and to two companion tools that enforce what this repo can only state. |
@@ -19,7 +19,7 @@ Everything here is the generalized shape of a system that runs in production eve
 
 **What this tool does, and does not do.** It writes files: a profile, an onboarding manual generated from your answers, rule files, rendered instruction files, a session-start hook, a drift check and a privacy gate. Those are the implemented parts and the harness tests every one of them. What it does not do: make an AI comply. Text in a file, or injected at session start, is the strongest placement available, and the stories in `docs/tiers.md` are one setup's experience of what held; they are not a measured guarantee across models or hosts, and nothing here measures compliance. Anything described as the AI "keeping" or "doing" is an instruction the AI is given, not a process this repo runs. The two [companion tools](#companion-tools) are where a rule becomes something a machine enforces.
 
-**Privacy:** this tool runs entirely on your machine. It makes no network calls, sends no telemetry, reads no environment variables, and writes only into the folder you name.
+**Privacy:** the tool itself runs entirely on your machine: no network calls, no telemetry, no environment variables read, writes only into the folder you name. The one network step is `npx` fetching the package from GitHub through npm before the tool runs; nothing in this repo opens a connection after that. Runs on macOS and Linux; on Windows use WSL or Git Bash (the harness and the session hook are POSIX shell).
 
 ---
 
@@ -32,6 +32,12 @@ npx github:aunysillyme/agent-personalizer
 The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets.
 
 No Node? Copy `templates/USER.md` and `templates/CLAUDE.md` (or `templates/AGENTS.md`) into your project by hand. That is level 1.
+
+If `npx` stops with `EPERM` and a note about root-owned files in `~/.npm`, npm cannot write its cache. Point it at a local one for this run, no `sudo` needed:
+
+```bash
+npm_config_cache=./.npm-cache npx github:aunysillyme/agent-personalizer
+```
 
 ---
 

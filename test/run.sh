@@ -691,7 +691,11 @@ mk; D="$MK"; expect 0 "default install" node bin/agent-personalizer.js --dir "$D
 grep -q 'Sign every edit' "$D/AGENTS.md" || fail "default answers lost the signature rule"
 grep -c 'rules/40-sign-every-edit.md' "$D/AGENTS.md" | grep -q '^1$' || fail "default pointer to the signature rule missing"
 grep -q 'rules/40-sign-every-edit.md' "$T/AGENTS.md" && fail "pointer to the signature rule survived signature=no"
-pass "(#3) answers drive the rules: signature=no removes the rule and its pointer, prose is not overridden, defaults keep both"
+# the whole installed tree is coherent: no rule file, no index row, no signature template line anywhere (codex user seat, 2026-09-05)
+[ ! -e "$T/rules/40-sign-every-edit.md" ] || fail "signature rule file installed despite signature=no"
+grep -rl -e 'Last edited by:' -e '40-sign-every-edit' "$T" --include='*.md' | grep -v '^$' && fail "a signature template line or pointer survived signature=no"
+[ -f "$D/rules/40-sign-every-edit.md" ] || fail "default answers did not install the signature rule"
+pass "(#3) answers drive the rules: signature=no removes the rule, its pointer and every template line, prose is not overridden, defaults keep both"
 
 # 62. (#4) re-run with changed answers: an untouched USER.md is regenerated, an edited one is kept and the conflict is named; --check clean both ways
 mk; T="$MK"; mk; F="$MK"
@@ -739,6 +743,7 @@ for d in d f p; do
   n="$(grep -c 'of about 1500 characters' "$T/$d/chatgpt-custom-instructions.md")"; [ "$n" = "2" ] || fail "$d: expected two box counts, got $n"
 done
 grep -q 'ASK BEFORE EVERY WRITE' "$T/p/chatgpt-custom-instructions.md" || fail "write policy missing from the ChatGPT render"
+grep -q 'Copy only the text inside the fence' "$T/p/chatgpt-custom-instructions.md" || fail "ChatGPT render does not say what to copy"
 grep -q 'PrivateTopicMarker' "$T/p/chatgpt-custom-instructions.md" || fail "off-limits missing from the ChatGPT render"
 grep -q 'AGENT_ONBOARDING.md' "$T/p/chatgpt-custom-instructions.md" | head -1
 awk '/Box 2/{b=1} b && /Always ask before/{a=NR} b && /Directness/{d=NR} END{exit !(a && d && a<d)}' "$T/p/chatgpt-custom-instructions.md" || fail "box 2 does not put restrictions before style"
