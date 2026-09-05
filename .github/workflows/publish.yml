@@ -1,7 +1,7 @@
 # Publish to npm with provenance. MANUAL and dormant: it runs only when a maintainer triggers it, and it
 # will fail until the package exists on npm with trusted publishing configured for this repository
 # (npm settings -> package -> Trusted publisher -> GitHub Actions, this repo, this workflow file).
-# Until then `npx github:aunysillyme/agent-personalizer` is the install path. See RELEASING.md.
+# `npx agent-personalizer` is the install path; `npx github:aunysillyme/agent-personalizer` runs the tag directly. See RELEASING.md.
 # The input must be an existing vX.Y.Z TAG: it is resolved through refs/tags/ and checked out by its
 # commit SHA, so a branch that happens to carry the same name cannot be published.
 name: publish
