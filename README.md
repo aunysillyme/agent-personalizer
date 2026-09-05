@@ -1,5 +1,7 @@
 # agent-personalizer
 
+[![harness](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml/badge.svg)](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml) [![release](https://img.shields.io/github/v/tag/aunysillyme/agent-personalizer?label=release)](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 ### Personalize any AI with dynamic instructions. One profile, one rule source, rendered everywhere.
 
 Most people set up custom instructions once, in one app, and still get generic output. The instructions decay over a long chat, the AI forgets where things are, every app has its own copy that drifts, and the AI treats its own guesses about you as your rulings.
@@ -128,8 +130,14 @@ test/        run.sh: 60 checks, exact exit codes, adversarial fixtures (symlinks
 
 ## Contributing
 
-Open an issue with the failure you hit, not the feature you want. Rules come from failures. Every push and pull request runs the harness on Ubuntu and macOS ([.github/workflows/harness.yml](.github/workflows/harness.yml)); the privacy gate against a real forbidden list stays local by design, so CI shows that one check as a skip.
+Open an issue with the failure you hit, not the feature you want. Rules come from failures. [CONTRIBUTING.md](CONTRIBUTING.md) has the checks, the rule format and how to add a notes tool or an AI target. Every push and pull request runs the harness on Ubuntu and macOS ([.github/workflows/harness.yml](.github/workflows/harness.yml)); the privacy gate against a real forbidden list stays local by design, so CI shows that one check as a skip.
 
 ---
 
-MIT. Built in public by [@AunySillyMe](https://x.com/AunySillyMe).
+## License
+
+MIT ([LICENSE](LICENSE)). You may use, change, share and sell copies for any purpose; keep the notice; no warranty, no endorsement implied. Attribution is appreciated, not required: *Built with agent-personalizer (https://github.com/aunysillyme/agent-personalizer)*.
+
+Security reports: [SECURITY.md](SECURITY.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Releases: [RELEASING.md](RELEASING.md).
+
+Built in public by [@AunySillyMe](https://x.com/AunySillyMe).

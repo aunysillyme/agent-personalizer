@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security or conduct report (private)
+    url: https://github.com/aunysillyme/agent-personalizer/security/advisories/new
+    about: Anything that could write outside the named folder, read what it should not, or let a private list ship. Private, one reader.
+  - name: Where does each rendered file go?
+    url: https://github.com/aunysillyme/agent-personalizer/blob/main/docs/paste-guide.md
+    about: Claude Code, Codex, Cursor, Gemini CLI, ChatGPT, claude.ai. Read before filing a "my AI ignores it" issue.

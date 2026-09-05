@@ -1,0 +1,8 @@
+# Keeps the GitHub Actions in .github/workflows current. There are no npm dependencies to update.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]
