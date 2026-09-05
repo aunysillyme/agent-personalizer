@@ -151,6 +151,27 @@ async function main() {
   let root = fs.realpathSync(existing);
   for (const part of missing) { root = path.join(root, part); fs.mkdirSync(root); }
   if (!fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
+  // Config: the one file this installer rewrites. Read and VALIDATED here, before the first write, so a malformed
+  // stored config refuses the whole run and leaves the folder untouched. Existing onboarding answers are kept unless
+  // --answers or the interview supplied new ones; targets are merged; "onboarding" is always a target.
+  const { full: cfgPath, exists: cfgExists } = safeDest(root, '.agent-personalizer.json');
+  let cfg = { targets: [], level };
+  if (cfgExists) {
+    try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { die(`.agent-personalizer.json is not valid JSON (${e.message}); fix or remove it`); }
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
+    if ('targets' in cfg) {
+      if (!Array.isArray(cfg.targets)) die('.agent-personalizer.json "targets" must be a list');
+      const KNOWN = [...AIS, 'onboarding'];
+      const bad = cfg.targets.filter(t => !KNOWN.includes(t));
+      if (bad.length) die(`.agent-personalizer.json lists unknown target(s): ${bad.join(', ')} (known: ${KNOWN.join(', ')}); fix or remove them`);
+      if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
+    }
+    if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`.agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
+    if (cfg.onboarding && !answersFile && answersSource.startsWith('defaults')) {
+      try { answers = onboarding.validate(cfg.onboarding); answersSource = 'kept from .agent-personalizer.json'; } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
+    }
+  }
+
   console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\nOnboarding answers: ${answersSource}\n`);
 
   // Level 1: profile (generated from the answers when absent), home files, the rule source they render from.
@@ -187,24 +208,13 @@ async function main() {
       fs.chmodSync(hp, 0o755);
     }
   }
-  // Config: the one file this installer rewrites. Existing onboarding answers are kept unless
-  // --answers or the interview supplied new ones; targets are merged; "onboarding" is always a target.
-  const { full: cfgPath, exists: cfgExists } = safeDest(root, '.agent-personalizer.json');
-  let cfg = { targets: [], level };
-  if (cfgExists) {
-    try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { die(`.agent-personalizer.json is not valid JSON (${e.message}); fix or remove it`); }
-    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
-    if (cfg.onboarding && !answersFile && answersSource.startsWith('defaults')) {
-      try { answers = onboarding.validate(cfg.onboarding); answersSource = 'kept from .agent-personalizer.json'; } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
-    }
-  }
   const allTargets = [...new Set([...(Array.isArray(cfg.targets) ? cfg.targets : []), ...targets, 'onboarding'])];
-  cfg = { ...cfg, targets: allTargets, level: Math.max(level, Number(cfg.level) || 0), onboarding: answers };
+  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: answers };
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
   console.log(`${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})`);
 
-  // Render the chosen targets plus the onboarding file, always from the package's renderer (level 1 and 2 keep no copy).
-  execFileSync(process.execPath, [path.join(PKG, 'render', 'render.js'), '--dir', root, '--targets', [...targets, 'onboarding'].join(',')], { stdio: 'inherit' });
+  // Render the FULL merged target list (what a plain `render.js --dir .` will use from now on), from the package's renderer.
+  execFileSync(process.execPath, [path.join(PKG, 'render', 'render.js'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
 
   console.log('\nNext:');
   console.log('  1. Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer to change an answer.');

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 57 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 58 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -511,7 +511,7 @@ printf '{"always_ask": ["delete", "launch-missiles"]}' > "$F/bad4.json"; expect 
 printf '{"name": "two\nlines"}' > "$F/bad5.json"; expect 2 "multiline text" node bin/agent-personalizer.js --dir "$T/e" --ai claude --level 1 --answers "$F/bad5.json" --yes
 printf 'not json' > "$F/bad6.json"; expect 2 "answers not json" node bin/agent-personalizer.js --dir "$T/f" --ai claude --level 1 --answers "$F/bad6.json" --yes
 expect 2 "answers and defaults together" node bin/agent-personalizer.js --dir "$T/g" --ai claude --level 1 --answers test/fixtures/answers.json --defaults --yes
-[ ! -e "$T/a" ] && [ ! -e "$T/g" ] || fail "installer created folders before refusing bad answers"
+for d in a b c d e f g; do [ ! -e "$T/$d" ] || fail "installer created $T/$d before refusing bad answers"; done
 pass "onboarding: bad choice, unknown key, wrong type, unknown multi, multiline, non-JSON, exclusive flags all refused, nothing created"
 
 # 57. onboarding: --yes without answers uses the defaults and says so; the onboarding target refuses without answers in the config
@@ -524,5 +524,39 @@ expect 2 "onboarding target without answers" node render/render.js --dir "$T" --
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": ["claude"], "onboarding": {"tone": "rude"}}' > "$T/.agent-personalizer.json"
 expect 2 "invalid onboarding in config" node render/render.js --dir "$T" --check
 pass "onboarding: defaults are explicit; missing or invalid answers in the config are refusals"
+
+# 58. markdown-adversarial answers render inertly; a render-marker in an answer is refused; malformed stored config is refused before any write
+mk; T="$MK"; mk; F="$MK"
+cat > "$F/adv.json" <<'JSON'
+{"name": "# Not A Heading", "work": "<!-- not a comment --> and <b>tags</b>", "never": ["~~~", "```", "- a list item", "1. numbered", "> quoted", "| pipe | table |", "[link](http://x)"], "off_limits": ["~~~"], "read_first": ["~~~", "USER.md"], "tracker": "*stars* and _under_"}
+JSON
+expect 0 "adversarial answers install" node bin/agent-personalizer.js --dir "$T" --ai claude,chatgpt,prompt --level 1 --answers "$F/adv.json" --yes
+expect 0 "adversarial answers check" node render/render.js --dir "$T" --check
+grep -q '^- \\~\\~\\~' "$T/AGENT_ONBOARDING.md" || fail "tilde fence in a list answer was not escaped"
+grep -q '^\\# Not A Heading\|\\# Not A Heading' "$T/AGENT_ONBOARDING.md" || fail "heading marker in name was not escaped"
+grep -q '\\<!-- not a comment --\\>' "$T/AGENT_ONBOARDING.md" || fail "HTML comment delimiters were not escaped"
+grep -q '\\- a list item' "$T/AGENT_ONBOARDING.md" || fail "leading list marker in an answer was not escaped"
+grep -c '^~~~' "$T/AGENT_ONBOARDING.md" | grep -q '^0$' || fail "a raw fence line reached the generated file"
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract with adversarial answers"
+grep -q 'agent-personalizer:end' "$T/c.txt" && fail "contract contains a marker token"
+printf '{"name": "x <!-- agent-personalizer:end --> y"}' > "$F/marker.json"
+expect 2 "marker token in an answer" node bin/agent-personalizer.js --dir "$T/m" --ai claude --level 1 --answers "$F/marker.json" --yes
+[ ! -e "$T/m" ] || fail "marker-token answer created a folder"
+mk; C="$MK"; printf '{"targets": "prompt"}' > "$C/.agent-personalizer.json"; cp "$C/.agent-personalizer.json" "$C/cfg.expected"
+expect 2 "stored targets not a list" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
+cmp -s "$C/.agent-personalizer.json" "$C/cfg.expected" || fail "installer rewrote a malformed config"
+[ ! -e "$C/USER.md" ] || fail "installer wrote files despite a malformed config"
+mk; C="$MK"; printf '{"targets": ["claude", "not-a-target"]}' > "$C/.agent-personalizer.json"
+expect 2 "stored unknown target" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
+mk; C="$MK"; printf '{"targets": ["claude"], "level": "junk"}' > "$C/.agent-personalizer.json"
+expect 2 "stored level junk" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
+mk; C="$MK"; printf '{"targets": ["claude"], "level": 999}' > "$C/.agent-personalizer.json"
+expect 2 "stored level out of range" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
+mk; C="$MK"; printf '{"targets": ["agents"], "level": 2}' > "$C/.agent-personalizer.json"
+expect 0 "stored valid config merges" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
+grep -q '"agents"' "$C/.agent-personalizer.json" && grep -q '"claude"' "$C/.agent-personalizer.json" && grep -q '"level": 2' "$C/.agent-personalizer.json" || fail "merge lost a stored target or lowered the level"
+[ -f "$C/AGENTS.md" ] || fail "merged target list was not rendered"
+expect 0 "merged config renders plain" node render/render.js --dir "$C" --check
+pass "adversarial answers inert, marker answers refused, malformed stored config refused untouched, valid config merged and rendered"
 
 echo; echo "all checks passed"
