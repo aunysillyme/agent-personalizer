@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+### Added
+- `--help`/`-h` and `--version`/`-v` on all three entry points, the gate included (#16, #17).
+
+### Changed
+- A non-terminal stdin with the flags present and no `--yes` still uses the defaults, and now says so on stderr and in the answers-source line (#18). With flags missing it refuses, as before.
+
 ## [0.4.1] - 2026-09-05
 
 ### Added
