@@ -27,12 +27,13 @@ Two independent audits of v0.3.0 the same day: agy as code reviewer (91/100; it 
 - A Windows smoke job in CI (installer, renderer, gate, ESM install through Node); `.gitattributes` pins LF.
 - `.github/workflows/publish.yml`: npm publish with provenance and trusted publishing, manual and dormant until the package exists on npm (RELEASING.md).
 - A harness check that the quoted check count matches the number of checks, everywhere it is quoted.
+- Upgrading a level-1 folder to level 3 repoints the home file's installer-written rule pointers at `rules/` (Codex round 24).
 
 ### Changed
 - **Level 1 is three files.** USER.md, AGENT_ONBOARDING.md and the home file(s); the renderer reads the rules from the package when the folder has no `rules/`, so nothing is copied. `rules/` arrives at level 3, where it is yours to edit. The home file's rule pointers say "the rendered block below" until then. The default read-first list is `USER.md, AGENT_ONBOARDING.md`.
 - Every rule's universal block ends with one plain-language "In practice:" line, for the stated audience.
 - `AGENT_ONBOARDING.md` lost its "Standing habits" section (the rules and USER.md already carry it).
-- `.agent-personalizer.json` stores only the answers that differ from the defaults; `validate()` fills the rest, so a future default reaches everyone who never chose otherwise.
+- `.agent-personalizer.json` stores only the answers that differ from the defaults, plus the six pinned safety answers (write policy, always-ask, off-limits, notes tool and path, signature) which are always stored so a future default can never move them (Codex round 24); `validate()` fills the rest.
 - The `TOOL` table in `render/onboarding.cjs` is the single source for notes tools: the interview option, the kind and the prose derive from it.
 
 ## [0.3.0] - 2026-09-05

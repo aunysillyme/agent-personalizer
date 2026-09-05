@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 81 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 82 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -906,14 +906,14 @@ pass "level 1 writes three files and renders the package rules; a renderer with 
 # 76. the config stores only the answers that differ from the defaults
 mk; T="$MK"; mk; F="$MK"
 expect 0 "defaults install" node bin/agent-personalizer.js --dir "$T/d" --ai claude --level 1 --yes
-node -e 'const c=require(process.argv[1]+"/.agent-personalizer.json");if(Object.keys(c.onboarding).length)throw new Error(JSON.stringify(c.onboarding))' "$T/d" || fail "defaults were written into the config"
+node -e 'const o=require("./render/onboarding.cjs");const c=require(process.argv[1]+"/.agent-personalizer.json");const k=Object.keys(c.onboarding).sort().join(",");if(k!==[...o.PINNED].sort().join(","))throw new Error(k)' "$T/d" || fail "defaults install should store exactly the pinned keys"
 printf '{"name":"Sparse","tone":"gentle"}' > "$F/a.json"
 expect 0 "sparse install" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --answers "$F/a.json" --yes
-node -e 'const c=require(process.argv[1]+"/.agent-personalizer.json");const k=Object.keys(c.onboarding).sort().join(",");if(k!=="name,tone")throw new Error(k)' "$T/s" || fail "config stored more than the two chosen answers"
+node -e 'const o=require("./render/onboarding.cjs");const c=require(process.argv[1]+"/.agent-personalizer.json");const k=Object.keys(c.onboarding).sort().join(",");const want=[...o.PINNED,"name","tone"].sort().join(",");if(k!==want)throw new Error(k+" vs "+want)' "$T/s" || fail "config should store the two chosen answers plus the pinned keys"
 expect 0 "sparse rerun" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --yes
 grep -q 'Call them:\*\* Sparse' "$T/s/AGENT_ONBOARDING.md" || fail "rerun lost the sparse answers"
 expect 0 "sparse check" node render/render.cjs --dir "$T/s" --check
-pass "config is sparse and round-trips"
+pass "config is sparse (pinned safety keys always kept) and round-trips"
 
 # 77. --answers - reads stdin; --quick refuses a non-interactive run
 mk; T="$MK"
@@ -947,6 +947,8 @@ grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.y
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
 grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
 grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
+grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep -q 'rev-parse "refs/tags/\$TAG^{commit}"' .github/workflows/publish.yml || fail "publish.yml does not resolve the input through refs/tags"
+grep -q 'ref: \${{ inputs.tag }}' .github/workflows/publish.yml && fail "publish.yml checks out the raw input as a ref"
 grep -q 'node: \[18, 20, 22\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22"
 grep -q 'smoke-windows:' .github/workflows/harness.yml && grep -q 'windows-latest' .github/workflows/harness.yml || fail "no Windows smoke job"
 grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
@@ -960,5 +962,18 @@ grep -q "$n checks, exact exit codes" CONTRIBUTING.md || fail "CONTRIBUTING does
 grep -q "the $n checks assert" .github/workflows/harness.yml && grep -q "harness ($n checks" .github/workflows/harness.yml || fail "harness.yml does not say $n checks"
 grep -q "a $n-check harness" SECURITY.md || fail "SECURITY.md does not say $n checks"
 pass "the check count ($n) is quoted consistently"
+
+# 82. upgrading a level-1 folder to level 3 repoints the installer's own pointer lines at rules/; a user-edited line is left alone
+mk; T="$MK"
+expect 0 "level 1 first" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
+printf -- '- My own rule. `[owner: the rendered block below]`\n' >> "$T/CLAUDE.md"
+node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 3 --yes > "$T/out.txt" || fail "level 3 upgrade"
+grep -q 'update CLAUDE.md (rule pointers now name rules/' "$T/out.txt" || fail "upgrade did not report the repoint"
+grep -q 'Sign every edit.*\[owner: rules/40-sign-every-edit.md\]' "$T/CLAUDE.md" || fail "pointer not repointed at rules/"
+grep -q 'Rules, one file each, the owning copy' "$T/CLAUDE.md" || fail "rules/ line not restored in Where things live"
+grep -q 'My own rule. `\[owner: the rendered block below\]`' "$T/CLAUDE.md" || fail "a user-written line was touched"
+grep -c 'the rendered block below' "$T/AGENTS.md" | grep -q '^0$' || fail "AGENTS.md pointers not repointed"
+expect 0 "upgrade check" node render/render.cjs --dir "$T" --check
+pass "level 1 to 3 upgrade repoints installer lines only"
 
 echo; echo "all checks passed"

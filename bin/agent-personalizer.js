@@ -309,7 +309,31 @@ async function main() {
     } else userAction = 'keep';
   }
 
+  // Upgrade from level 1 or 2: the home files' pointer lines the installer wrote say "the rendered block
+  // below"; now that rules/ arrives, the same lines are repointed at their files. Only lines that equal an
+  // installer-written line byte for byte are touched; anything the user edited is left alone.
+  const upgrades = [];
+  if (level >= 3) for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+    if (!(name === 'CLAUDE.md' ? targets.includes('claude') : targets.includes('agents'))) continue;
+    const { full, exists } = probe(root, name);
+    if (!exists || !fs.lstatSync(full).isFile()) continue;
+    const tmpl = stripSig(fs.readFileSync(path.join(PKG, 'templates', name), 'utf8')).split('\n');
+    const cur = fs.readFileSync(full, 'utf8');
+    const lines = cur.split('\n');
+    let changed = false;
+    for (const t of tmpl) {
+      if (!/`\[owner: rules\/[^\]]+\]`/.test(t)) continue;
+      const placeholder = t.replace(/`\[owner: rules\/[^\]]+\]`/g, '`[owner: the rendered block below]`');
+      for (let i = 0; i < lines.length; i++) if (lines[i] === placeholder) { lines[i] = t; changed = true; }
+    }
+    const rulesLine = tmpl.find(l => /Rules, one file each, the owning copy/.test(l));
+    const anchorIdx = lines.findIndex(l => /AGENT_ONBOARDING\.md`$/.test(l) && /^- /.test(l));
+    if (rulesLine && !lines.includes(rulesLine) && anchorIdx !== -1 && changed) { lines.splice(anchorIdx + 1, 0, rulesLine); }
+    if (changed) { try { fs.accessSync(full, fs.constants.W_OK); } catch (_) { die(`${name} is not writable; nothing was written`); } upgrades.push({ name, full, text: lines.join('\n') }); }
+  }
+
   // ---- WRITE ----
+  for (const u of upgrades) { fs.writeFileSync(u.full, u.text); console.log(`update ${u.name} (rule pointers now name rules/, which this level installs)`); }
   if (userAction === 'create') { fs.writeFileSync(user.full, onboarding.renderUser(answers), { flag: 'wx' }); console.log('wrote  USER.md (from your answers)'); }
   else if (userAction === 'regenerate') { fs.writeFileSync(user.full, onboarding.renderUser(answers)); console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`); }
   else if (userAction === 'conflict') {
