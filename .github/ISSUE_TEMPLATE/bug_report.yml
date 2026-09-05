@@ -7,7 +7,7 @@ body:
     attributes:
       label: The exact command
       description: The full installer or renderer command, as you ran it.
-      placeholder: npx github:aunysillyme/agent-personalizer --dir . --ai claude --level 1 --yes
+      placeholder: npx agent-personalizer --dir . --ai claude --level 1 --yes
     validations:
       required: true
   - type: input
