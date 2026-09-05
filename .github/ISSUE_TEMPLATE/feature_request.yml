@@ -15,7 +15,7 @@ body:
       label: What kind of change
       options:
         - A new rule (rules/)
-        - A new notes tool (render/onboarding.js TOOL map + docs/companions.md)
+        - A new notes tool (render/onboarding.cjs TOOL map + docs/companions.md)
         - A new AI target (render/targets.json + docs/paste-guide.md)
         - Installer or renderer behaviour
         - Docs

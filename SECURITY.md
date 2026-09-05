@@ -10,7 +10,7 @@ You will get an acknowledgement within 7 days and a fix or a reasoned "won't fix
 
 ## Scope
 
-In scope: `bin/agent-personalizer.js`, `render/`, `check/gate.js`, `hooks/`, the templates and the harness. Out of scope: the AI products this repo writes files for, and the companion tools it links to (report those to their own projects).
+In scope: `bin/agent-personalizer.js`, `render/`, `check/gate.cjs`, `hooks/`, the templates and the harness. Out of scope: the AI products this repo writes files for, and the companion tools it links to (report those to their own projects).
 
 ## What is already done
 

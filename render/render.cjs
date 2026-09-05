@@ -1,23 +1,29 @@
 #!/usr/bin/env node
 'use strict';
 /*
-  render.js: USER.md + rules/*.md  ->  per-AI instruction files.
+  render.cjs: USER.md + rules/*.md  ->  per-AI instruction files.
 
   usage:
-    node render/render.js [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check]
-    node render/render.js [--dir <project>] --contract [--contract-target claude] [--no-personal]
+    node render/render.cjs [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check]
+    node render/render.cjs [--dir <project>] --contract [--contract-target claude] [--no-personal]
 
   --dir               project folder holding USER.md and rules/ (default: cwd). The folder you
                       name is followed once (realpath); nothing beneath it may be a symlink.
   --targets           which renders to write; default: <dir>/.agent-personalizer.json, else "claude,agents".
                       The "onboarding" target renders AGENT_ONBOARDING.md from the interview answers
-                      stored in .agent-personalizer.json (render/onboarding.js).
+                      stored in .agent-personalizer.json (render/onboarding.cjs).
   --check             render to memory, compare with disk; exit 1 on drift, 0 clean
   --contract          print the inject:true rules for one target to stdout (session-start hooks):
                       the onboarding block (how to work with this person) when answers exist and
                       personal content is allowed, then each rule: universal, personal (same
                       condition), then the target's binding block.
   --contract-target   which target's surface filter, personal policy and binding to use (default claude)
+
+  Rules render from the interview answers as well as the profile: a rule whose frontmatter says
+  `requires: <answer>=<value>` is left out of every render and every contract when the stored
+  answer differs (no stored answers = the defaults). The ChatGPT target, when answers exist,
+  renders a compact profile and the contract block plus the inject:true rules, sized for its
+  two boxes; without answers it falls back to the full profile and every rule for that surface.
 
   Rendered text lives between two marker lines inside each target file. Bytes outside the
   markers are preserved exactly (line endings included); a target that is not valid UTF-8 is
@@ -43,7 +49,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const onboarding = require('./onboarding.js');
+const onboarding = require('./onboarding.cjs');
 
 function die(msg) { console.error(`render: ${msg}`); process.exit(2); }
 
@@ -61,7 +67,7 @@ for (const [k, t] of Object.entries(TARGETS)) if (!t || typeof t !== 'object' ||
 const KNOWN = Object.keys(TARGETS);
 const BINDINGS = new Set(Object.values(TARGETS).map(t => t.binding).filter(Boolean));
 const SECTION_RE = /^(universal|personal|origin|binding:[a-z]+)$/;
-const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces']);
+const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces', 'requires']);
 const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
 
@@ -124,6 +130,14 @@ function parseFrontmatter(text, where) {
     if (bad.length) die(`${where}: unknown surface(s) ${bad.join(', ')} (known: ${KNOWN.join(', ')})`);
   }
   if ('inject' in meta && typeof meta.inject !== 'boolean') die(`${where}: "inject" must be true or false`);
+  if ('requires' in meta) {
+    const m = typeof meta.requires === 'string' && meta.requires.match(/^([a-z_]+)=([A-Za-z0-9_-]+)$/);
+    if (!m) die(`${where}: "requires" must read <answer>=<value>, e.g. signature=yes`);
+    const q = onboarding.QUESTIONS.find(x => x.id === m[1]);
+    if (!q) die(`${where}: "requires" names an unknown answer "${m[1]}"`);
+    if (q.type !== 'choice' || !q.options.some(o => o[0] === m[2])) die(`${where}: "requires" value "${m[2]}" is not a choice for "${m[1]}" (${q.type === 'choice' ? q.options.map(o => o[0]).join(', ') : 'not a choice question'})`);
+    meta.requires = { answer: m[1], value: m[2] };
+  }
   for (const k of ['id', 'title']) if (k in meta && (typeof meta[k] !== 'string' || !meta[k].trim())) die(`${where}: "${k}" must be non-empty text`);
   return { meta, body: text.slice(close + 5) };
 }
@@ -261,35 +275,53 @@ function renderRule(rule, target) {
   return out.join('\n');
 }
 
-function rulesFor(rules, key) {
-  return rules.filter(r => !Array.isArray(r.meta.surfaces) || r.meta.surfaces.includes(key));
+/* the rules that reach one surface: the surfaces filter, then the requires filter against the
+   stored answers (defaults when none are stored, so a rule set without an interview still renders) */
+function rulesFor(rules, key, answers) {
+  const a = answers || onboarding.defaults();
+  return rules.filter(r => (!Array.isArray(r.meta.surfaces) || r.meta.surfaces.includes(key))
+    && (!r.meta.requires || a[r.meta.requires.answer] === r.meta.requires.value));
 }
+const answersOf = (cfg) => (cfg && cfg.onboarding) ? cfg.onboarding : null;
 
 function renderTarget(key, target, profile, rules, cfg) {
   if (target.source === 'onboarding') {
     if (!cfg || !cfg.onboarding) die(`target "${key}": no onboarding answers in .agent-personalizer.json. Run the installer (it asks), or pass --answers <file>`);
     return onboarding.renderOnboarding(cfg.onboarding);
   }
-  const lines = [`## ${target.header}`, '', '_Generated by agent-personalizer from `USER.md` and `rules/`. Edit those, then re-render. Do not edit between the markers._', ''];
+  const answers = answersOf(cfg);
+  const lines = [`## ${target.header}`, '', '_Generated by agent-personalizer from `USER.md`, `rules/` and your onboarding answers. Edit those, then re-render. Do not edit between the markers._', ''];
   if (target.boxes) {
-    const box1 = profile || '(no USER.md found)';
-    const box2 = rulesFor(rules, key).map(r => {
+    // With answers: a compact profile and the contract block plus the inject:true rules, in
+    // consequence order, so the two boxes fit their budget and no restriction depends on trimming.
+    // Without answers: the full profile and every rule for this surface (the pre-interview shape).
+    const picked = rulesFor(rules, key, answers).filter(r => !answers || r.meta.inject === true);
+    const ruleText = picked.map(r => {
       const s = r.sections, parts = [s.universal];
-      if (target.personal && s.personal) parts.push(s.personal);
+      if (target.personal && s.personal && !answers) parts.push(s.personal);
       if (target.binding && s[`binding:${target.binding}`]) parts.push(s[`binding:${target.binding}`]);
       return parts.join('\n\n');
     }).join('\n\n');
-    const warn = (label, text) => text.length > target.limit ? `\n> ${label} is ${text.length} characters; the box allows about ${target.limit}. Trim before pasting.` : `\n> ${label}: ${text.length} characters.`;
+    const box1 = answers ? onboarding.compactProfile(answers) : (profile || '(no USER.md found)');
+    const box2 = answers ? [onboarding.contractBlock(answers, { files: false }).split('\n').slice(2).join('\n'), ruleText].filter(Boolean).join('\n\n') : ruleText;
+    const over = [];
+    const warn = (label, text) => {
+      if (text.length > target.limit) { over.push(label); return `\n> **${label} is OVER BUDGET: ${text.length} characters, the box allows about ${target.limit}.** Nothing was cut for you. Trim from the bottom up: the box is ordered by consequence (restrictions first, style last), so the last lines are the cheapest to lose.`; }
+      return `\n> ${label}: ${text.length} of about ${target.limit} characters.`;
+    };
     // a wrapping fence longer than any backtick or tilde run inside the content, so content fences can never close it
     const fenceFor = (text) => { let n = 3; for (const m of text.matchAll(/(`{3,}|~{3,})/g)) n = Math.max(n, m[1].length + 1); return '`'.repeat(n); };
     const f1 = fenceFor(box1), f2 = fenceFor(box2);
     lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', f1, box1, f1, warn('Box 1', box1), '');
     lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', f2, box2, f2, warn('Box 2', box2));
+    if (!answers) lines.push('', '> No onboarding answers in `.agent-personalizer.json`, so this is the full profile and every rule. Run the installer (it asks) for the compact, budgeted form.');
+    else lines.push('', `> ChatGPT has no file access, so only the rules marked \`inject: true\` are here (${picked.length}). The rest live in \`rules/\`; for a ChatGPT Project, upload \`AGENT_ONBOARDING.md\` and \`rules/\` as project files instead of pasting.`);
+    renderTarget.overBudget = (renderTarget.overBudget || []).concat(over.map(l => `${target.file}: ${l}`));
     return lines.join('\n');
   }
   if (target.profile && profile) lines.push('## Profile', '', profile, '');
   lines.push('## Rules', '');
-  for (const r of rulesFor(rules, key)) lines.push(renderRule(r, target), '');
+  for (const r of rulesFor(rules, key, answers)) lines.push(renderRule(r, target), '');
   return lines.join('\n').trimEnd();
 }
 
@@ -347,9 +379,9 @@ function main() {
     if (!KNOWN.includes(key)) die(`unknown contract target "${key}"`);
     const target = TARGETS[key];
     const withPersonal = target.personal && !arg('--no-personal', false);
-    const inject = rulesFor(rules, key).filter(r => r.meta.inject === true);
-    const out = [`[agent-personalizer] Session-start contract for ${key}. These rules win at the moment of decision; they are injected in full, every session.`, ''];
     const cfgC = readConfig(root);
+    const inject = rulesFor(rules, key, answersOf(cfgC)).filter(r => r.meta.inject === true);
+    const out = [`[agent-personalizer] Session-start contract for ${key}. Injected in full at the start of every session so these rules are in context at the moment of decision.`, ''];
     if (cfgC && cfgC.onboarding && withPersonal) out.push(onboarding.contractBlock(cfgC.onboarding), '');
     for (const r of inject) {
       out.push(`## ${r.meta.title || r.meta.id || r.file}`, '', r.sections.universal);
@@ -409,7 +441,7 @@ function main() {
       else if (p.current !== p.block) { console.log(`DRIFT  ${p.target.file}: rendered block differs from source`); drift++; }
       else console.log(`ok     ${p.target.file}`);
     }
-    console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.js --dir ${root}` : '\nclean: every rendered file matches its source');
+    console.log(drift ? `\n${drift} file(s) drifted. Re-render with: node render/render.cjs --dir ${root}` : '\nclean: every rendered file matches its source');
     process.exit(drift ? 1 : 0);
   }
   // Commit: stage every output beside its target under a per-run random name, back up every
@@ -468,6 +500,7 @@ function main() {
   const leftovers = [];
   for (const c of committed) if (c.bak) tryUnlink(c.bak, leftovers, 'backup not removed');
   for (const s of staged) console.log(`wrote  ${s.label}`);
+  for (const o of (renderTarget.overBudget || [])) console.log(`OVER BUDGET  ${o} (written in full; trim by hand, bottom up)`);
   if (leftovers.length) {
     console.error('render: every target was written, but CLEANUP INCOMPLETE. Remove these by hand (they hold copies of the previous targets):');
     for (const l of leftovers) console.error(`  ${l}`);

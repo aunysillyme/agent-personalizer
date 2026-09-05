@@ -3,6 +3,7 @@ id: 40-sign-every-edit
 title: Sign every edit
 inject: false
 surfaces: [claude, agents, gemini]
+requires: signature=yes
 ---
 
 ## universal

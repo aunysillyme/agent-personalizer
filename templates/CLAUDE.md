@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 <!-- This is a POINTER file. It tells Claude where things live. It does not restate rules.
-     If you use render/render.js, the block between the markers below is generated from
+     If you use render/render.cjs, the block between the markers below is generated from
      USER.md and rules/; edit those, never this block. -->
 
 Read `USER.md` first, every session. It says who I am, how to talk to me, how firmly I mean things, and how I want output shaped.
@@ -26,5 +26,5 @@ Then read `AGENT_ONBOARDING.md`: how to talk to me, what to read next, where you
 - Act or ask. A missing fact is yours to fetch; a missing mandate is mine to give. `[owner: rules/60-act-or-ask.md]`
 
 <!-- agent-personalizer:begin -->
-<!-- run `npx agent-personalizer` or `node render/render.js` to fill this block -->
+<!-- run `npx agent-personalizer` or `node render/render.cjs` to fill this block -->
 <!-- agent-personalizer:end -->

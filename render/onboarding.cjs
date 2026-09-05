@@ -1,6 +1,6 @@
 'use strict';
 /*
-  onboarding.js: the agent-onboarding interview and its two renders.
+  onboarding.cjs: the agent-onboarding interview and its two renders.
 
   The user answers a short set of questions (or accepts the defaults). From ONE answer set:
     renderUser(answers)        -> USER.md          the human profile (who I am, how to talk to me)
@@ -11,7 +11,14 @@
 
   Defaults are the generalized shape of one working setup. Every default is a question the user
   can answer differently; nothing here is imposed. No network, no environment, no secrets.
+
+  This file is COPIED into level-3 installs, so it must not require package.json or anything
+  else from the repo: VERSION is a literal, kept equal to package.json by the harness, and
+  DOCS points at the matching tag on GitHub so an installed copy never links to a file the
+  destination does not have.
 */
+const VERSION = '0.3.0';
+const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
 
 const QUESTIONS = [
   { id: 'name', ask: 'What should the AI call you?', type: 'text', default: 'the user' },
@@ -33,10 +40,10 @@ const QUESTIONS = [
   { id: 'evidence', ask: 'Where should evidence for a claim go?', type: 'choice', default: 'inline',
     options: [['inline', 'in the reply: paths, counts, dates'], ['linked', 'a link to where it lives'], ['none', 'not needed']] },
   { id: 'never', ask: 'Words, punctuation or habits the AI must never use (comma-separated, blank for none)', type: 'list', default: [] },
-  { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'notes/README.md', 'rules/'] },
+  { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'rules/'] },
   { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
-    options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see docs/companions.md)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
-  { id: 'obsidian_tc', ask: 'If Obsidian: do you use obsidian-tc, the governed MCP (see docs/companions.md)?', type: 'choice', default: 'no',
+    options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see the companions doc)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
+  { id: 'obsidian_tc', ask: 'If Obsidian: do you use obsidian-tc, the governed MCP?', type: 'choice', default: 'no',
     options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
   { id: 'notes_tool_name', ask: 'If "other": the name of the tool (blank otherwise)', type: 'text', default: '' },
   { id: 'notes_path', ask: 'Where inside it: the folder path (Obsidian, Logseq, plain folder), or the workspace / notebook / folder name (Notion, Google Docs, Apple Notes, others)', type: 'text', default: 'notes' },
@@ -89,8 +96,14 @@ function validate(input) {
       out[q.id] = allowed.filter(s => v.includes(s));
     }
   }
+  // Cross-field checks. For a tool the AI reaches on disk, notes_path is a folder the installer
+  // creates and the home files point at, so it must be a plain relative path: no leading slash,
+  // no "..", no empty segment, no backslash, nothing but [A-Za-z0-9._ -] per segment.
+  if (kindOf(out) === 'disk' && !SAFE_REL.test(out.notes_path))
+    throw new Error(`"notes_path" for ${out.notes_tool} must be a relative folder path such as "notes" or "docs/vault" (letters, digits, space, . _ -, segments joined by /; no leading /, no ..)`);
   return out;
 }
+const SAFE_REL = /^(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+)*$/;
 
 /* Parse one typed interview answer (a string) for a question; '' means the default. */
 function parseAnswer(q, raw) {
@@ -168,8 +181,8 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
    conservative posture. p = location escaped for a code span, q = location escaped for prose. */
 const TOOL = {
   'obsidian':    (p, q, n, tc) => ({ kind: 'disk', name: 'Obsidian', reach: tc
-                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`
-                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; docs/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null }),
+                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see ${DOCS}/companions.md`
+                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; ${DOCS}/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null }),
   'logseq':      (p, q) => ({ kind: 'disk', name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
   'folder':      (p, q) => ({ kind: 'disk', name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
   'notion':      (p, q) => ({ kind: 'cloud', name: 'Notion', unit: 'page', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
@@ -182,11 +195,17 @@ const TOOL = {
 /* name comes back RAW and is md-escaped exactly once at each prose render site */
 const toolFor = (a) => TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.obsidian_tc === 'yes');
 const FALLBACK = 'notes';
+const DISK_TOOLS = new Set(['obsidian', 'logseq', 'folder']);
+/* kind without rendering anything (safe before validation completes) */
+const kindOf = (a) => DISK_TOOLS.has(a.notes_tool) ? 'disk' : (['notion', 'google-docs', 'apple-notes'].includes(a.notes_tool) ? 'cloud' : (a.notes_tool === 'other' ? 'other' : 'readonly'));
+/* the folder on disk that scaffolds and home-file pointers use: the user's path for a disk tool,
+   the fixed fallback for everything else (cloud tools get no folder named after a workspace) */
+const baseFor = (a) => kindOf(a) === 'disk' ? a.notes_path : FALLBACK;
 
 function renderOnboarding(a) {
   const tool = toolFor(a);
   const disk = tool.kind === 'disk';
-  const base = disk ? esc(a.notes_path) : FALLBACK;           // where filesystem writes go, if any
+  const base = esc(baseFor(a));                                // where filesystem writes go, if any
   const unit = tool.unit || 'page';
   const naming = { 'kebab-case': 'kebab-case: `my-note-title.md`', 'snake_case': 'snake_case: `my_note_title.md`', 'any': 'no naming rule; match the folder you are writing into' }[a.file_naming];
   const askList = a.always_ask.map(v => `- **${v}**: ${label(Q.always_ask, v)}`).join('\n') || '- nothing declared; use your judgement and say what you did';
@@ -253,6 +272,7 @@ ${a.work ? `- **What they do:** ${md(a.work)}\n` : ''}${a.focus ? `- **Current f
 ### Read this first, in order
 
 ${bullets(a.read_first.map(md), 'USER.md')}
+- ${tool.kind === 'cloud' ? `The index ${unit} of "${md(a.notes_path)}", before writing there.` : `\`${base}/README.md\`, the rules of the folder you may write into, before writing there.`}
 ${a.tracker !== 'none' ? `- The task tracker (${md(a.tracker)}): what is open and what is already decided, before proposing work.\n` : ''}
 ### Where you may write
 
@@ -283,23 +303,48 @@ ${bullets(a.off_limits.map(x => `${md(x)}: never surfaced, quoted or summarized 
 - **Finish the whole task**, then stop. No closing recap, no unrequested next steps.`;
 }
 
-function contractBlock(a) {
+/* The short block a session-start hook injects (and the ChatGPT "respond" box carries).
+   Order is by consequence, so a token budget trims style before it trims a restriction:
+   always-ask, off-limits, write policy and location, then read order, then how to talk.
+   opts.files=false drops the lines that only make sense with file access (read order, paths). */
+const WRITE_POLICY = {
+  'notes-freely': 'anywhere under the notes location named here, under its own rules, nowhere else unasked',
+  'logs-and-inbox-only': 'only the session log, the decisions log and the inbox; propose anything else, do not write it',
+  'ask-before-every-write': 'ASK BEFORE EVERY WRITE, every time; show what you would write and where',
+};
+function writesLine(a) {
+  const t = toolFor(a);
+  const where = t.kind === 'cloud' ? `${md(t.name)} "${md(a.notes_path)}" through its connector, no filesystem writes`
+    : t.kind === 'readonly' ? `${md(t.name)} is read-only for you; the local fallback folder is ${esc(FALLBACK)}/`
+    : t.kind === 'other' ? `${md(t.name)} is unknown here: ask before the first write there; local fallback folder ${esc(FALLBACK)}/ meanwhile`
+    : `${md(t.name)} at ${esc(a.notes_path)}/${a.notes_tool === 'obsidian' && a.obsidian_tc === 'yes' ? ', through obsidian-tc' : ''}`;
+  return `Writes: ${WRITE_POLICY[a.write_policy]}. Notes: ${where}.`;
+}
+function contractBlock(a, opts) {
+  const files = !opts || opts.files !== false;
   return [
     `## How to work with ${md(a.name)}`,
     '',
-    `Directness: ${label(Q.tone, a.tone)}. Length: ${label(Q.length, a.length)}. When wrong: ${label(Q.mistakes, a.mistakes)}. When unsure: ${label(Q.unsure, a.unsure)}.`,
-    `Open with ${label(Q.lead_with, a.lead_with)}; ${label(Q.structure, a.structure)}; evidence ${label(Q.evidence, a.evidence)}.`,
-    a.never.length ? `Never: ${a.never.map(md).join('; ')}.` : null,
     `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
-    `Read first: ${a.read_first.map(md).join(' → ')}.`,
-    `Notes: ${md(toolFor(a).name)} at ${md(a.notes_path)}${
-      a.notes_tool === 'obsidian' && a.obsidian_tc === 'yes' ? ', through obsidian-tc'
-      : toolFor(a).kind === 'cloud' ? ', through its connector, no filesystem writes'
-      : toolFor(a).kind === 'readonly' ? `, read-only; local fallback folder ${FALLBACK}/`
-      : toolFor(a).kind === 'other' ? `, unknown tool: ask before the first write there; local fallback folder ${FALLBACK}/ meanwhile`
-      : ''}.`,
+    writesLine(a),
+    files ? `Read first: ${a.read_first.map(md).join(' → ')}.` : null,
+    `Directness: ${label(Q.tone, a.tone)}. Length: ${label(Q.length, a.length)}. When wrong: ${label(Q.mistakes, a.mistakes)}. When unsure: ${label(Q.unsure, a.unsure)}.`,
+    `Open with ${label(Q.lead_with, a.lead_with)}; ${label(Q.structure, a.structure)}; evidence ${label(Q.evidence, a.evidence)}.${a.signature === 'yes' ? ' Sign every edit to a note (one `Last edited by:` line, overwritten).' : ''}`,
+    a.never.length ? `Never: ${a.never.map(md).join('; ')}.` : null,
+  ].filter(x => x !== null).join('\n');
+}
+
+/* ChatGPT box 1, "what to know about you": the profile without the firmness table, sized for a
+   custom-instructions box. The full USER.md stays the owning copy. */
+function compactProfile(a) {
+  return [
+    `Call me ${md(a.name)}${a.pronouns ? ` (${md(a.pronouns)})` : ''}.`,
+    a.work ? `I do: ${md(a.work)}.` : null,
+    a.focus ? `Current focus: ${md(a.focus)}.` : null,
+    a.off_limits.length ? `Off limits, never surfaced in any reply: ${a.off_limits.map(md).join(', ')}.` : null,
+    'How firmly I mean things: "kind of" or a made-up word is a gesture; "I like" is a preference; "I always" is a practice; "never" or "I have to" is a rule. When unsure read one rung looser, never tighter; never loosen a stated prohibition.',
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, defaults, validate, parseAnswer, renderUser, renderOnboarding, contractBlock };
+module.exports = { QUESTIONS, VERSION, DOCS, FALLBACK, defaults, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };

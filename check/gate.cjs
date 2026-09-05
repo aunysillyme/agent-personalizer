@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 'use strict';
 /*
-  gate.js: the zero-personal-data gate.
+  gate.cjs: the zero-personal-data gate.
 
   Scans every regular, non-binary file under a directory for terms listed in
   check/forbidden.local.txt and fails loudly on any hit. The list itself is gitignored:
   a list of your own identifiers must never ship in a public repo.
 
   usage:
-    node check/gate.js [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
-    node check/gate.js --self-test                        prove the gate can go red on a seeded hit
+    node check/gate.cjs [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
+    node check/gate.cjs --self-test                        prove the gate can go red on a seeded hit
 
   Fail-closed: a missing or empty list is exit 2, never a pass; a list that git tracks is exit 2.
   The list file may never be tracked by git; every repository enclosing its REAL path is
@@ -25,9 +25,14 @@
   repo is a setup error (exit 2), never a silent fallback. Outside a repo, or with --all,
   every regular file under --dir. Any extension. Binary files (a NUL
   byte in the first 8 KB) are skipped. Symlinks are never followed.
-  Matching: case-insensitive substring. Lines "allow:<exact text>" whitelist that exact
-  string (attribution you keep on purpose); a forbidden term inside an allowed string
-  does not count. Unicode lookalikes are not detected; the list is for your real strings.
+  Matching: case-insensitive substring, over each file's TEXT and over its relative PATH (a
+  private name in a published filename is still a disclosure; a path hit is labelled "(path)").
+  Lines "allow:<exact text>" whitelist that exact string (attribution you keep on purpose); a
+  forbidden term inside an allowed string does not count. Unicode lookalikes are not detected.
+  A working-tree path whose parent directory is a symlink is NOT read (the file would be outside
+  the scan root); the index blob for that path is still scanned, and the skip is counted and
+  printed. What this gate is: a check for the exact strings you listed. What it is not: a proof
+  that no personal data ships. Unknown terms, history and binary files are outside it.
 */
 const fs = require('fs');
 const path = require('path');
@@ -195,11 +200,21 @@ function* gitItems(root) {
    (readlink, never followed). Anything else is skipped. */
 function treeItem(root, rel, suffix) {
   const p = path.join(root, rel);
+  // every ancestor of the path must be a real directory inside root: a symlinked parent would
+  // make this read a file OUTSIDE the scan root (git itself would not ship that content)
+  const parts = rel.split('/'); let cur = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    cur = path.join(cur, parts[i]);
+    let ds; try { ds = fs.lstatSync(cur); } catch (_) { return null; }
+    if (ds.isSymbolicLink() || !ds.isDirectory()) { treeItem.skipped.push(`${rel}${suffix || ' (working tree)'}: parent ${path.relative(root, cur)} is ${ds.isSymbolicLink() ? 'a symlink' : 'not a directory'}`); return null; }
+  }
   let st; try { st = fs.lstatSync(p); } catch (_) { return null; }
   if (st.isSymbolicLink()) return { rel, label: `${rel}${suffix || ' (working tree)'} symlink target`, bytes: Buffer.from(fs.readlinkSync(p), 'utf8') };
   if (st.isFile()) return { rel, label: `${rel}${suffix}`, bytes: fs.readFileSync(p) };
   return null;
 }
+
+treeItem.skipped = [];
 
 function* walkItems(root) {
   for (const p of walk(root)) {
@@ -252,6 +267,8 @@ function fileSet(root, all) {
 function scan(root, list, listFile, all) {
   root = fs.realpathSync(root);                         // every caller, self-test included, compares real paths
   const hits = [];
+  const scannedPaths = new Set();
+  treeItem.skipped = [];
   let files = 0;
   const skipPath = list.real || (listFile ? path.resolve(listFile) : null);
   const set = fileSet(root, all);
@@ -263,8 +280,17 @@ function scan(root, list, listFile, all) {
       if (/\(index/.test(item.label)) die(`the forbidden list itself is tracked by git (${item.rel}). It must never ship: run \`git rm --cached ${item.rel}\` and add it to .gitignore.`);
       continue;
     }
-    if (isBinary(item.bytes)) continue;
     files++;
+    // the PATH first: one scan per item, labelled "(path)", never covered by allow spans of the text
+    if (!scannedPaths.has(item.rel)) {
+      scannedPaths.add(item.rel);
+      const lower = item.rel.toLowerCase(), spans = allowedSpans(lower, list.allow);
+      for (const term of list.terms) {
+        const t = term.toLowerCase(); let i = lower.indexOf(t);
+        while (i !== -1) { if (!spans.some(([x, y]) => i >= x && i + t.length <= y)) hits.push({ file: `${item.rel} (path)`, line: 0, term }); i = lower.indexOf(t, i + 1); }
+      }
+    }
+    if (isBinary(item.bytes)) continue;
     const lines = item.bytes.toString('utf8').split('\n');
     lines.forEach((line, n) => {
       const lower = line.toLowerCase();
@@ -280,7 +306,7 @@ function scan(root, list, listFile, all) {
       }
     });
   }
-  return { hits, files };
+  return { hits, files, skipped: treeItem.skipped.slice() };
 }
 
 function selfTest() {
@@ -310,13 +336,14 @@ function main() {
   root = fs.realpathSync(root);                         // same canonical form as the list path, so the exclusion compares like with like
   const listFile = path.resolve(arg('--list', path.join(__dirname, 'forbidden.local.txt')));
   const all = !!arg('--all', false);
-  const { hits, files } = scan(root, loadList(listFile), listFile, all);
+  const { hits, files, skipped } = scan(root, loadList(listFile), listFile, all);
+  for (const k of skipped) console.log(`skipped  ${k} (outside the scan root; not read)`);
   if (hits.length) {
     console.log(`GATE FAILED: ${hits.length} hit(s)`);
-    for (const h of hits) console.log(`  ${h.file}:${h.line}  "${h.term}"`);
+    for (const h of hits) console.log(`  ${h.file}${h.line ? ':' + h.line : ''}  "${h.term}"`);
     process.exit(1);
   }
-  console.log(`gate clean: 0 hits across ${files} files (${scan.mode === 'git' ? 'files git would ship, index blobs included' : 'every file under --dir'})`);
+  console.log(`gate clean: 0 hits across ${files} files, text and paths (${scan.mode === 'git' ? 'files git would ship, index blobs included' : 'every file under --dir'}; ${skipped.length} skipped)`);
 }
 
 main();
