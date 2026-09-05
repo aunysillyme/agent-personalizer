@@ -587,9 +587,17 @@ for tool in obsidian logseq folder; do
   grep -q 'Every folder you write into has a README' "$OUT" || fail "$tool: README rule missing"
   grep -q 'No filesystem writes' "$OUT" && fail "$tool: cloud rule leaked into a disk render"
 done
-grep -q 'obsidian-tc' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian did not name obsidian-tc"
-grep -q 'obsidian-tc' "$F/obsidian.hint" || fail "obsidian hint missing"
-node render/render.js --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
+# obsidian without obsidian-tc (default): plain files, companion recommended, contract does not claim obsidian-tc
+grep -q 'as plain files (obsidian-tc is not installed' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian without tc: plain-files line missing"
+grep -q 'rather than raw filesystem access' "$T/obsidian/AGENT_ONBOARDING.md" && fail "obsidian without tc: rendered as mandatory"
+grep -q 'answer yes' "$F/obsidian.hint" || fail "obsidian without tc: hint should recommend installing it"
+node render/render.js --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' && fail "contract claims obsidian-tc when not installed"
+# obsidian with obsidian-tc
+printf '{"notes_tool": "obsidian", "obsidian_tc": "yes", "notes_path": "MyVault"}' > "$F/tc.json"
+node bin/agent-personalizer.js --dir "$T/tc" --ai claude --level 1 --answers "$F/tc.json" --yes > "$F/tc.hint" 2>&1 || fail "install obsidian with tc"
+grep -q 'through \*\*obsidian-tc\*\*' "$T/tc/AGENT_ONBOARDING.md" || fail "obsidian with tc: route line missing"
+grep -q 'routes the AI through obsidian-tc' "$F/tc.hint" || fail "obsidian with tc: hint missing"
+node render/render.js --dir "$T/tc" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
 grep -q 'obsidian-tc' "$T/folder/AGENT_ONBOARDING.md" && fail "folder render mentions obsidian-tc"
 # cloud tools: connector named, no filesystem instructions, posture present
 for tool in notion google-docs apple-notes; do
@@ -604,20 +612,35 @@ grep -q "Notion's own MCP connector" "$T/notion/AGENT_ONBOARDING.md" && grep -q 
 grep -q 'Google Drive / Docs connector' "$T/google-docs/AGENT_ONBOARDING.md" || fail "google-docs connector missing"
 grep -q 'separately installed local Apple Notes MCP' "$T/apple-notes/AGENT_ONBOARDING.md" && grep -q 'separately installed' "$F/apple-notes.hint" || fail "apple-notes: MCP caveat missing in render or hint"
 grep -q 'Studio Wiki/README.md' "$T/notion/USER.md" && fail "notion USER.md renders a filesystem README path"
+grep -q 'index page of "Studio Wiki"' "$T/notion/USER.md" || fail "notion USER.md missing the index-page rule"
+node render/render.js --dir "$T/notion" --contract --contract-target claude | grep -q 'through its connector, no filesystem writes' || fail "notion contract line wrong"
+grep -q 'where the app offers one' "$F/notion.hint" || fail "notion hint missing"
+grep -q 'where the app offers one' "$F/google-docs.hint" || fail "google-docs hint missing"
 # read-only tools: read-only stated, local fallback folder used
 for tool in onenote evernote; do
   render_tool "$tool" ', "notes_path": "Work Notebook"'
   grep -q 'read-only' "$OUT" || fail "$tool: not rendered as read-only"
   grep -q 'Local fallback folder:\*\* `notes/`' "$OUT" || fail "$tool: fallback folder missing"
   grep -q 'Work Notebook/' "$OUT" && fail "$tool: notebook name rendered as a path"
+  grep -q '`notes/README.md` (the local fallback folder' "$T/$tool/USER.md" || fail "$tool: USER.md does not point at the fallback README"
+  grep -q 'index page of' "$T/$tool/USER.md" && fail "$tool: USER.md points at an external index for a read-only tool"
+  node render/render.js --dir "$T/$tool" --contract --contract-target claude | grep -q 'read-only; local fallback folder notes/' || fail "$tool: contract line wrong"
+  grep -q 'no first-class agent door' "$HINT" || fail "$tool: hint missing"
 done
 # other: the named tool appears, conservative posture, fallback folder
 render_tool other ', "notes_tool_name": "Roam Research", "notes_path": "Daily graph"'
 grep -q 'Notes live in Roam Research' "$OUT" || fail "other: tool name not rendered"
 grep -q 'Ask before the first write into it' "$OUT" || fail "other: conservative posture missing"
 grep -q 'Roam Research' "$F/other.hint" || fail "other: hint missing the tool name"
+node render/render.js --dir "$T/other" --contract --contract-target claude | grep -q 'unknown tool: ask before the first write there' || fail "other: contract claims read-only or omits the posture"
+grep -q '`notes/README.md` (the local fallback folder' "$T/other/USER.md" || fail "other: USER.md does not point at the fallback README"
 render_tool other ''
 grep -q 'an unnamed notes tool' "$OUT" || fail "other without a name: placeholder missing"
+grep -q 'your notes tool' "$HINT" || fail "other without a name: hint missing"
+printf '{"notes_tool": "other", "notes_tool_name": "~~~ <!-- x"}' > "$F/advname.json"
+expect 0 "adversarial tool name" node bin/agent-personalizer.js --dir "$T/an" --ai claude --level 1 --answers "$F/advname.json" --yes
+grep -q 'Notes live in \\~\\~\\~ \\<!-- x' "$T/an/AGENT_ONBOARDING.md" || fail "tool name not escaped exactly once"
+grep -q '\\\\\\~' "$T/an/AGENT_ONBOARDING.md" && fail "tool name double-escaped"
 # adversarial location in a prose (cloud) render
 printf '{"notes_tool": "notion", "notes_path": "~~~ <!-- x"}' > "$F/adv.json"
 expect 0 "adversarial notes_path in prose" node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --answers "$F/adv.json" --yes
