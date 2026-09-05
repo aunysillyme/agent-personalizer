@@ -10,16 +10,16 @@ This repo is the fix, in four levels. Stop at the level you need.
 
 | Level | You have | You get |
 |---|---|---|
-| **1. One profile** | one AI, one app | a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`), and the `rules/` folder those point at (seven short rule files plus their index). About a dozen small files; the AI reads the home file, the rest are what it points at. |
+| **1. One profile** | one AI, one app | three files: a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), and a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`) with the rules rendered into it. Plus the installer's own `.agent-personalizer.json`. Nothing else. |
 | **2. Dynamic docs** | a notes folder the AI may edit | templates and rules for the AI to follow: folder indexes it keeps current, a weekly session log, a decisions log, a signature on every edit (if you want one), an inbox convention (one file per item, deleted when done). Instructions, not automation: the AI does the keeping. |
-| **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | the automation: one rule source rendered per AI, a session-start contract that puts your rules in context at decision time, a drift check that fails loudly, a forbidden-string gate. |
+| **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | the automation: your own copy of `rules/` to edit, one rule source rendered per AI, a session-start contract that puts your rules in context at decision time, a drift check that fails loudly, a forbidden-string gate. |
 | **4. Hand-off** | several AIs | reading material only for now: pointers to the multi-agent layer (routing, task bundles, verified CLI runs) and to two companion tools that enforce what this repo can only state. |
 
 Everything here is the generalized shape of a system that runs in production every day. The examples are invented. The failures the rules prevent are real.
 
 **What this tool does, and does not do.** It writes files: a profile, an onboarding manual generated from your answers, rule files, rendered instruction files, a session-start hook, a drift check and a privacy gate. Those are the implemented parts and the harness tests every one of them. What it does not do: make an AI comply. Text in a file, or injected at session start, is the strongest placement available, and the stories in `docs/tiers.md` are one setup's experience of what held; they are not a measured guarantee across models or hosts, and nothing here measures compliance. Anything described as the AI "keeping" or "doing" is an instruction the AI is given, not a process this repo runs. The two [companion tools](#companion-tools) are where a rule becomes something a machine enforces.
 
-**Privacy:** the tool itself runs entirely on your machine: no network calls, no telemetry, no environment variables read, writes only into the folder you name. The one network step is `npx` fetching the package from GitHub through npm before the tool runs; nothing in this repo opens a connection after that. Runs on macOS and Linux; on Windows use WSL or Git Bash (the harness and the session hook are POSIX shell).
+**Privacy:** the tool itself runs entirely on your machine: no network calls, no telemetry, no environment variables read, writes only into the folder you name. The one network step is `npx` fetching the package from GitHub through npm before the tool runs; nothing in this repo opens a connection after that. Runs on macOS and Linux, and the Node entry points (installer, renderer, gate) are smoke-tested on Windows in CI; the harness and the session hook are POSIX shell, so on Windows run those under WSL or Git Bash.
 
 ---
 
@@ -29,7 +29,7 @@ Everything here is the generalized shape of a system that runs in production eve
 npx github:aunysillyme/agent-personalizer
 ```
 
-The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets.
+The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets. `--help` lists every flag; `--quick` asks the seven questions that change behaviour and defaults the rest; `--answers file.json` (or `--answers -` from stdin) scripts it.
 
 No Node? Copy `templates/USER.md` and `templates/CLAUDE.md` (or `templates/AGENTS.md`) into your project by hand. That is level 1.
 
@@ -69,7 +69,7 @@ The installer asks you how an AI should work with you, then writes the answers t
 
 `USER.md` is generated from the same answers the first time and is then yours to edit. Re-running with changed answers regenerates `AGENT_ONBOARDING.md` and every rendered block; `USER.md` is regenerated only if you never edited it (it still equals the render of the previous answers), otherwise it is kept and the installer names the answers that changed so you can carry them over by hand. Two rules depend on answers: the signature rule renders only when you answered yes, and the output-style rule defers to your stated shape instead of imposing one. The session-start contract carries a short version of the onboarding block, restrictions first, so it is present at the moment of decision, not only in a file.
 
-ChatGPT has two custom-instruction boxes with a character budget, so its render is the compact profile plus the onboarding block and only the `inject: true` rules, each box measured against the budget. Nothing is cut silently: an over-budget box is written in full and flagged, ordered so the last lines are the cheapest to trim. For the rest of the rules, use a ChatGPT Project and upload `AGENT_ONBOARDING.md` and `rules/` as files.
+ChatGPT has two custom-instruction boxes with a character budget, so its render is the compact profile plus the onboarding block and only the `inject: true` rules, each box measured against the budget, and written twice: inside `chatgpt-custom-instructions.md` with the counts, and as two plain paste files, `chatgpt-box1.txt` and `chatgpt-box2.txt`. `render.cjs --strict` exits 1 instead of writing when a box is over budget, for people who wire the render into CI. Nothing is cut silently: an over-budget box is written in full and flagged, ordered so the last lines are the cheapest to trim. For the rest of the rules, use a ChatGPT Project and upload `AGENT_ONBOARDING.md` and `rules/` as files.
 
 ## Level 1: one file
 
@@ -95,7 +95,7 @@ A worked week for an invented user is in [`examples/freelance-illustrator/`](exa
 
 Three pieces, all in this repo, no dependencies beyond Node.
 
-- **Rule source + renderer.** Each rule is one file in [`rules/`](rules/) with three fenced blocks: `universal` (any AI), `personal` (your curation), `binding:<ai>` (tool names and paths for one AI). [`render/render.cjs`](render/render.cjs) renders `USER.md` plus the rules into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, ChatGPT custom-instruction boxes, or a plain system prompt. A rule can say `requires: signature=yes` and then renders only when the answer matches. `--check` fails if any rendered file drifted from its source. The runtime files are `.cjs` so they run inside a `"type": "module"` project too.
+- **Rule source + renderer.** Each rule is one file in [`rules/`](rules/), copied into your folder at level 3 (levels 1 and 2 render from the package's rules and copy nothing), with three fenced blocks: `universal` (any AI), `personal` (your curation), `binding:<ai>` (tool names and paths for one AI). [`render/render.cjs`](render/render.cjs) renders `USER.md` plus the rules into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, ChatGPT custom-instruction boxes, or a plain system prompt. A rule can say `requires: signature=yes` and then renders only when the answer matches. `--check` fails if any rendered file drifted from its source. The runtime files are `.cjs` so they run inside a `"type": "module"` project too.
 - **Session-start contract.** [`hooks/`](hooks/) shows how to inject the rules in full at the start of every Claude Code session, and the plain-prompt fallback for AIs without hooks. The contract carries the onboarding block first, in order of consequence (always-ask, off-limits, write policy, then style), so a token budget trims style before it trims a restriction. Injection puts the text in context; whether the model follows it is host- and model-dependent.
 - **Drift check.** `node render/render.cjs --dir . --check` in CI or a pre-commit hook (`npm run check` inside this repo). It compares each rendered block with what the sources would render now: it detects rendering drift, not whether two hand-written files agree in meaning.
 - **Forbidden-string gate.** [`check/gate.cjs`](check/gate.cjs) scans every file git would ship (or every file under a folder, with `--all`), text and file paths, for the exact strings in a gitignored list, never follows symlinks, and fails closed when the list is missing. This repo runs it on itself before every push. Copy `check/forbidden.example.txt` to `check/forbidden.local.txt` and fill it in. It is a check for the strings you listed, not a proof that no personal data ships: unknown terms, git history and binary files are outside it.
@@ -132,8 +132,8 @@ bin/         the npx installer
 examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
 CHANGELOG.md keyed on audit rounds
-.github/     harness.yml: the 72 checks on every push and PR, Ubuntu and macOS
-test/        run.sh: 72 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+.github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm with provenance, manual, dormant
+test/        run.sh: 81 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Changelog

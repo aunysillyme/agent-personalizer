@@ -12,6 +12,10 @@
   <file.json>, or --defaults / --yes to accept every default. The answers are stored under
   "onboarding" in .agent-personalizer.json and rendered to AGENT_ONBOARDING.md; USER.md is
   generated from the same answers when it does not exist yet.
+  Level 1 writes USER.md, AGENT_ONBOARDING.md and the home file(s); the rules render into the home
+  file from the package's own rules/ and nothing is copied. Level 3 copies rules/ (yours to edit from
+  then on) with the renderer, hook and gate. .agent-personalizer.json stores only the answers that
+  differ from the defaults.
   Writes only the files for the chosen AIs and level. Never overwrites a file that exists
   (except the marker block inside rendered files it owns, .agent-personalizer.json, which
   is its own record and is merged, never blindly replaced, and USER.md when, and only when,
@@ -40,7 +44,23 @@ const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex /
 function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--yes', '--defaults'];
+const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--help', '--version'];
+const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
+
+  npx github:aunysillyme/agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
+                                            [--answers <file.json> | --answers - | --defaults] [--quick] [--yes]
+                                            [--help] [--version]
+
+  Interactive when flags are missing and stdin is a terminal; the onboarding interview runs then.
+  --quick      ask only the seven questions that change behaviour (name, tone, length, notes tool and path,
+               write policy, always-ask); the rest take their defaults. Interactive only.
+  --answers    a JSON file of answers, or "-" to read the JSON from stdin. Unknown keys and values are refused.
+  --defaults   accept every default without asking.
+  --yes        non-interactive: needs --dir, --ai and --level.
+  Levels: 1 profile + onboarding + home file(s) (rules render from the package)  ·  2 + the notes folder
+          3 + renderer, session-start hook, gate and a copy of rules/ to edit  ·  4 pointers to the multi-agent layer
+  exit codes: 0 ok · 1 unexpected error · 2 refused or invalid input
+`;
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -61,6 +81,8 @@ function parseArgs() {
 }
 const ARGS = parseArgs();
 function arg(name, dflt) { return name in ARGS ? ARGS[name] : dflt; }
+if (ARGS['--help']) { process.stdout.write(USAGE); process.exit(0); }
+if (ARGS['--version']) { process.stdout.write(require(path.join(PKG, 'package.json')).version + '\n'); process.exit(0); }
 
 async function ask(q, dflt) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -145,24 +167,28 @@ async function main() {
   let answers = null, answersSource = '';
   const answersFile = arg('--answers', null);
   if (answersFile && arg('--defaults', false)) die('--answers and --defaults are exclusive');
+  if (arg('--quick', false) && (answersFile || arg('--defaults', false) || !interactive)) die('--quick is the short interview; it needs a terminal and no --answers, --defaults or --yes');
   if (answersFile) {
     let raw;
-    try { raw = JSON.parse(fs.readFileSync(path.resolve(answersFile), 'utf8')); } catch (e) { die(`--answers: cannot read ${answersFile} as JSON (${e.message})`); }
+    const label = answersFile === '-' ? 'stdin' : answersFile;
+    try { raw = JSON.parse(answersFile === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(path.resolve(answersFile), 'utf8')); } catch (e) { die(`--answers: cannot read ${label} as JSON (${e.message})`); }
     try { answers = onboarding.validate(raw); } catch (e) { die(`--answers: ${e.message}`); }
-    answersSource = `from ${answersFile}`;
+    answersSource = `from ${label}`;
   } else if (arg('--defaults', false) || !interactive) {
     answers = onboarding.defaults();
     answersSource = 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)';
   } else {
-    console.log('\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.\n');
+    const quick = !!arg('--quick', false);
+    console.log(`\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.${quick ? ' Quick interview: 7 questions, the rest default.' : ` ${onboarding.QUESTIONS.length} questions; --quick asks 7.`}\n`);
     const raw = {};
     for (const q of onboarding.QUESTIONS) {
+      if (quick && !onboarding.QUICK.includes(q.id)) continue;
       if (q.options) for (const [v, l] of q.options) console.log(`    ${v.padEnd(30)} ${l}`);
       const dflt = Array.isArray(q.default) ? q.default.join(', ') : q.default;
       raw[q.id] = onboarding.parseAnswer(q, await ask(q.ask, dflt || ''));
     }
     try { answers = onboarding.validate(raw); } catch (e) { die(`onboarding: ${e.message}`); }
-    answersSource = 'your interview answers';
+    answersSource = quick ? 'your quick-interview answers (the rest are defaults)' : 'your interview answers';
   }
 
   // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
@@ -210,12 +236,18 @@ async function main() {
   const noSig = answers.signature === 'no';
   const stripSig = (t) => noSig ? t.split('\n').filter(l => !l.includes('40-sign-every-edit.md') && !/^Last edited by:/.test(l)).join('\n') : t;
   const mdCopy = (rel, src) => plan.push({ rel, text: stripSig(fs.readFileSync(src, 'utf8')) });
-  for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
+  // rules/ is copied at level 3, where it becomes yours to edit; levels 1 and 2 render from the package's rules
+  if (level >= 3) for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
     if (noSig && f === '40-sign-every-edit.md') continue;
     mdCopy(`rules/${f}`, path.join(PKG, 'rules', f));
   }
   const home = (name) => {
     let t = fs.readFileSync(path.join(PKG, 'templates', name), 'utf8');
+    if (level < 3) {
+      // no local rules/: the pointers point at the rendered block below, which carries the full text
+      t = t.split('\n').filter(l => !/Rules, one file each, the owning copy/.test(l)).join('\n');
+      t = t.replace(/`\[owner: rules\/[^\]]+\]`/g, '`[owner: the rendered block below]`');
+    }
     if (kind === 'disk') { if (base !== 'notes') t = t.replace(/\bnotes\//g, `${base}/`); }
     else {
       // cloud, read-only and unknown tools: one line pointing at the onboarding file instead of four local paths
@@ -299,7 +331,7 @@ async function main() {
     if (!st.isFile() || st.isSymbolicLink()) die('hook file changed underneath the installer; not chmod-ing it');
     fs.chmodSync(hp, 0o755);
   }
-  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: answers };
+  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: onboarding.sparse(answers) };   // only what differs from the defaults
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
   console.log(`${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})`);
 

@@ -14,6 +14,8 @@ surfaces: [claude, agents, gemini, chatgpt, prompt]   # which renders include it
 
 ## universal
 The rule, stated for any AI. No tool names, no paths, no personal detail.
+End with one line starting "In practice:" that says the rule in plain words for
+someone new to this.
 
 ## personal
 Your curation of the rule: how it applies to you specifically. Omitted from the

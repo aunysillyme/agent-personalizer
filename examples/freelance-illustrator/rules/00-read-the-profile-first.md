@@ -8,6 +8,8 @@ surfaces: [claude, agents, gemini]
 ## universal
 Before the first substantive reply of a session, read the user's profile (`USER.md`) and then their agent onboarding file (`AGENT_ONBOARDING.md`). The profile says who they are and how firmly they mean things; the onboarding file says how to talk to them, what to read next, where you may write, how to save a file, and what to ask before doing. Everything below assumes both have been read.
 
+In practice: two files, read before you answer anything, every time you start.
+
 ## personal
 If the profile and a rendered instruction file disagree, the profile wins: the rendered file is generated from it and is the one that drifted.
 

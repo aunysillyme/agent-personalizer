@@ -31,7 +31,11 @@
     "profile": true,
     "boxes": true,
     "limit": 1500,
-    "header": "ChatGPT custom instructions (two boxes)"
+    "header": "ChatGPT custom instructions (two boxes)",
+    "boxFiles": {
+      "box1": "chatgpt-box1.txt",
+      "box2": "chatgpt-box2.txt"
+    }
   },
   "prompt": {
     "file": "system-prompt.md",

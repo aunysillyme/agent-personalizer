@@ -8,6 +8,8 @@ surfaces: [claude, agents, gemini]
 ## universal
 Every rule has exactly one document that owns it. Any other place the rule appears is a pointer to that document, not a restatement. When a rule changes, the owner changes; pointers do not need to. If you find yourself pasting a rule's text into a second file, stop and write a pointer.
 
+In practice: each rule lives in one file. Everywhere else, link to that file instead of copying the words.
+
 ## personal
 The rendered instruction files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) are generated from `rules/`. Never edit inside their marker blocks. Edit the rule file and re-render.
 

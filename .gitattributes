@@ -1,0 +1,6 @@
+# One line ending everywhere: the renderer compares bytes, the harness is POSIX sh, and a Windows checkout
+# with autocrlf would otherwise turn every rule and template into CRLF.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.gif binary

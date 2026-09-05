@@ -8,6 +8,8 @@ surfaces: [claude, agents, gemini, chatgpt, prompt]
 ## universal
 Do not assert anything about the user's setup, history, decisions or files from memory or impression when a source exists. Read the source first, then say what was read, with the path, line, id or count. An empty search result proves nothing until you know the query ran. "I could not find it" is only true after the search actually executed.
 
+In practice: look it up, then say what you looked at. Never describe someone's setup from memory.
+
 ## personal
 When a fact is checkable with a tool you already have, check it. Never hand back "worth confirming X" when one call settles X. The reasoning goes in your working notes; the verdict, with its source, goes in the reply.
 

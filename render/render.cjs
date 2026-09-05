@@ -4,8 +4,15 @@
   render.cjs: USER.md + rules/*.md  ->  per-AI instruction files.
 
   usage:
-    node render/render.cjs [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check]
+    node render/render.cjs [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check] [--strict] [--rules <dir>]
     node render/render.cjs [--dir <project>] --contract [--contract-target claude] [--no-personal]
+    node render/render.cjs --help
+
+  --rules             where the rule files live. Default: <dir>/rules when it exists (a level-3 install,
+                      or this repo), else the rules/ folder beside this renderer's own package (a level-1
+                      or level-2 install renders from the package's rules and copies none). Refused if
+                      neither exists.
+  --strict            with the ChatGPT target: exit 1 and write nothing when a box is over its budget.
 
   --dir               project folder holding USER.md and rules/ (default: cwd). The folder you
                       name is followed once (realpath); nothing beneath it may be a symlink.
@@ -74,8 +81,8 @@ const META_KEYS = new Set(['id', 'title', 'inject', 'surfaces', 'requires']);
 const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
 
-const VALUE_OPTS = ['--dir', '--targets', '--contract-target'];
-const FLAG_OPTS = ['--check', '--contract', '--no-personal'];
+const VALUE_OPTS = ['--dir', '--targets', '--contract-target', '--rules'];
+const FLAG_OPTS = ['--check', '--contract', '--no-personal', '--strict', '--help'];
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -226,15 +233,24 @@ function readSource(p, where) {
   return text;
 }
 
-function loadRules(root) {
-  const rdir = path.join(root, 'rules');
-  if (!mustBe(rdir, 'dir', 'rules/')) die('rules/ is missing; an intentionally empty rule set is an empty rules/ directory, not a missing one');
+/* Where the rules come from: --rules, else <root>/rules when present, else the rules/ folder of the
+   package this renderer belongs to (so a level-1 install, which copies no rules, still renders them). */
+function rulesDir(root, explicit) {
+  if (explicit) { const d = path.resolve(explicit); if (!mustBe(d, 'dir', `--rules ${explicit}`)) die(`--rules ${explicit} does not exist`); return fs.realpathSync(d); }
+  const local = path.join(root, 'rules');
+  if (mustBe(local, 'dir', 'rules/')) return local;
+  const pkg = path.resolve(__dirname, '..', 'rules');
+  if (pkg !== local && mustBe(pkg, 'dir', 'package rules/')) return pkg;
+  die('rules/ is missing here and beside this renderer; an intentionally empty rule set is an empty rules/ directory, not a missing one');
+}
+function loadRules(root, explicit) {
+  const rdir = rulesDir(root, explicit || null);
   const out = [];
   for (const f of fs.readdirSync(rdir).sort()) {
     if (f === 'README.md') continue;
     if (!f.endsWith('.md')) continue;
     if (!RULE_FILE_RE.test(f)) die(`rules/${f}: unexpected file name; rule files are NN-name.md (README.md is the one exception)`);
-    const where = `rules/${f}`;
+    const where = `${path.relative(root, rdir) || 'rules'}/${f}`;
     const text = readSource(path.join(rdir, f), where);
     const { meta, body } = parseFrontmatter(text, where);
     const sections = parseSections(body, where);
@@ -315,8 +331,9 @@ function renderTarget(key, target, profile, rules, cfg) {
     // a wrapping fence longer than any backtick or tilde run inside the content, so content fences can never close it
     const fenceFor = (text) => { let n = 3; for (const m of text.matchAll(/(`{3,}|~{3,})/g)) n = Math.max(n, m[1].length + 1); return '`'.repeat(n); };
     const f1 = fenceFor(box1), f2 = fenceFor(box2);
-    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', '_Copy only the text inside the fence below; the counts and headings stay here._', '', f1, box1, f1, warn('Box 1', box1), '');
-    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', '_Copy only the text inside the fence below._', '', f2, box2, f2, warn('Box 2', box2));
+    renderTarget.boxes = { box1: box1 + '\n', box2: box2 + '\n' };   // plain paste files, written beside the markdown
+    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', '_Copy only the text inside the fence below (or paste the whole of `chatgpt-box1.txt`, the same text as a plain file)._', '', f1, box1, f1, warn('Box 1', box1), '');
+    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', '_Copy only the text inside the fence below (or paste the whole of `chatgpt-box2.txt`)._', '', f2, box2, f2, warn('Box 2', box2));
     if (!answers) lines.push('', '> No onboarding answers in `.agent-personalizer.json`, so this is the full profile and every rule. Run the installer (it asks) for the compact, budgeted form.');
     else lines.push('', `> ChatGPT has no file access, so only the rules marked \`inject: true\` are here (${picked.length}). The rest live in \`rules/\`; for a ChatGPT Project, upload \`AGENT_ONBOARDING.md\` and \`rules/\` as project files instead of pasting.`);
     renderTarget.overBudget = (renderTarget.overBudget || []).concat(over.map(l => `${target.file}: ${l}`));
@@ -368,13 +385,14 @@ function between(existing, file) {
 
 function main() {
   ARGS = parseArgs();
+  if (arg('--help', false)) { const src = fs.readFileSync(__filename, 'utf8'); process.stdout.write(src.slice(src.indexOf('/*') + 2, src.indexOf('*/')).trim() + `\n\nagent-personalizer renderer ${onboarding.VERSION}\n`); return; }
   const requested = path.resolve(arg('--dir', process.cwd()));
   let root;
   try { root = fs.realpathSync(requested); } catch (_) { die(`--dir ${requested} does not exist`); }
   if (!fs.statSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
   const check = !!arg('--check', false);
   const contract = !!arg('--contract', false);
-  const rules = loadRules(root);
+  const rules = loadRules(root, arg('--rules', null));
   const profile = loadProfile(root);
 
   if (contract) {
@@ -428,8 +446,25 @@ function main() {
     // the generated file must itself re-parse to exactly one block, or the next render would refuse it
     if (output != null) { const st = markerState(output, `${target.file} (generated)`); if (st.kind !== 'one' || between(output, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
     const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
-    return { key, target, file, block, current, output, mode };
-  });
+    const entry = { key, target, file, block, current, output, mode };
+    if (!target.boxes) return entry;
+    // the two plain paste files: whole-file outputs, no markers, compared whole in --check
+    const raws = Object.entries(target.boxFiles || {}).map(([which, rel]) => {
+      const rfile = safeTargetPath(root, rel, `${key}:${which}`);
+      const text = renderTarget.boxes[which];
+      let rexisting = null;
+      if (fs.existsSync(rfile)) rexisting = decodeUtf8(fs.readFileSync(rfile), rel);
+      if (!check) { try { fs.accessSync(rexisting == null ? path.dirname(rfile) : rfile, fs.constants.W_OK); } catch (_) { die(`${rel}: not writable. Nothing was written`); } }
+      const rmode = rexisting == null ? 0o644 : (fs.statSync(rfile).mode & 0o777);
+      return { key: `${key}:${which}`, target: { file: rel }, file: rfile, block: text, current: rexisting, output: check ? null : text, mode: rmode, raw: true };
+    });
+    return [entry, ...raws];
+  }).flat();
+  if (arg('--strict', false) && (renderTarget.overBudget || []).length) {
+    for (const o of renderTarget.overBudget) console.error(`render: OVER BUDGET  ${o}`);
+    console.error('render: --strict: a box is over its budget. Nothing was written');
+    process.exit(1);
+  }
 
   // Every final path must be distinct, and no final path may look like a staging file.
   // Checked in every mode, before any output.
@@ -440,7 +475,7 @@ function main() {
   if (check) {
     let drift = 0;
     for (const p of plan) {
-      if (p.current === null) { console.log(`DRIFT  ${p.target.file}: missing or no marker block`); drift++; }
+      if (p.current === null) { console.log(`DRIFT  ${p.target.file}: ${p.raw ? 'missing' : 'missing or no marker block'}`); drift++; }
       else if (p.current !== p.block) { console.log(`DRIFT  ${p.target.file}: rendered block differs from source`); drift++; }
       else console.log(`ok     ${p.target.file}`);
     }
@@ -516,7 +551,7 @@ function main() {
    writing: an existing rules/ (each file parsed as loadRules does) and an existing USER.md (as
    loadProfile does). A missing rules/ or USER.md is fine here: the installer is about to create them. */
 function preflightSources(root) {
-  if (mustBe(path.join(root, 'rules'), 'dir', 'rules/')) loadRules(root);
+  if (mustBe(path.join(root, 'rules'), 'dir', 'rules/')) loadRules(root, null);   // library call: never read argv; a kept local rules/ must parse; package rules are the package's problem
   loadProfile(root);
 }
 

@@ -8,4 +8,6 @@ Maintainer notes. Until release automation is switched on, a release is four com
 4. `git tag -a vX.Y.Z -m "X.Y.Z: <one line>"` and `git push origin main --tags`.
 5. `gh release create vX.Y.Z --notes-from-tag` (or paste the changelog section as the notes).
 
-Not published to npm at the time of writing; `npx github:aunysillyme/agent-personalizer` runs it straight from the repo. If it moves to npm, publish with provenance (`npm publish --provenance --access public` from a workflow with `id-token: write`), which is what the surveyed repos do.
+Not published to npm at the time of writing; `npx github:aunysillyme/agent-personalizer` runs it straight from the repo.
+
+**npm, when the maintainer decides to:** `.github/workflows/publish.yml` is ready and dormant. It is manual (`workflow_dispatch` with the tag), checks the tag against `package.json`, runs the harness, then `npm publish --provenance --access public` with `id-token: write`. It will fail until two account steps are done on npmjs.com: create the package, and configure trusted publishing for this repository and workflow file. No npm token is stored anywhere; provenance and trusted publishing are what the surveyed repos do.

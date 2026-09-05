@@ -1,0 +1,36 @@
+# Publish to npm with provenance. MANUAL and dormant: it runs only when a maintainer triggers it, and it
+# will fail until the package exists on npm with trusted publishing configured for this repository
+# (npm settings -> package -> Trusted publisher -> GitHub Actions, this repo, this workflow file).
+# Until then `npx github:aunysillyme/agent-personalizer` is the install path. See RELEASING.md.
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag to publish (must match package.json version, e.g. v0.4.0)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write   # OIDC token for npm trusted publishing and --provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: the tag must match package.json
+        run: |
+          v="$(node -p 'require("./package.json").version')"
+          test "v$v" = "${{ inputs.tag }}" || { echo "tag ${{ inputs.tag }} does not match package.json $v"; exit 1; }
+      - name: harness
+        run: sh test/run.sh
+      - name: publish with provenance
+        run: npm publish --provenance --access public

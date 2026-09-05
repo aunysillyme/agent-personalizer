@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 72 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 81 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -248,14 +248,15 @@ mk; O="$MK"; printf 'gitdir: /nonexistent\n' > "$O/.git"; echo clean > "$O/a.md"
 expect 2 "gate with malformed .git metadata" node check/gate.cjs --dir "$O" --list "$T/list.txt"
 pass "gate: git failure with metadata is exit 2 (malformed .git file included); plain folders walk and still catch hits"
 
-# 29. missing rules/, unknown binding, hidden stray rule file all refused
+# 29. missing rules/ falls back to the package's rules (this renderer sits beside one); unknown binding, hidden stray rule file refused
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; rm -rf "$T/rules"
-expect 2 "missing rules/" node render/render.cjs --dir "$T" --targets claude
+expect 0 "missing rules/ uses package rules" node render/render.cjs --dir "$T" --targets claude
+grep -q 'Sign every edit' "$T/CLAUDE.md" || fail "package-rules fallback rendered no rules"
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '\n## binding:nowhere\nx\n' >> "$T/rules/40-sign-every-edit.md"
 expect 2 "unknown binding" node render/render.cjs --dir "$T" --check
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; cp "$T/rules/40-sign-every-edit.md" "$T/rules/.99-hidden.md"
 expect 2 "hidden stray rule" node render/render.cjs --dir "$T" --check
-pass "missing rules/, unknown binding, hidden stray rule file all refused"
+pass "missing rules/ falls back to the package rules; unknown binding and hidden stray rule file refused"
 
 # 30. ChatGPT box 2 (with answers) carries the inject:true rules with their chatgpt binding, and NOT a non-inject rule
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
@@ -687,7 +688,7 @@ node render/render.cjs --dir "$T" --contract --contract-target claude > "$T/c.tx
 grep -q 'Sign every edit' "$T/c.txt" && fail "contract carries the signature rule after signature=no"
 grep -q 'short paragraphs' "$T/c.txt" || fail "contract missing the prose answer"
 # the default answers keep the rule and the pointer
-mk; D="$MK"; expect 0 "default install" node bin/agent-personalizer.js --dir "$D" --ai agents --level 1 --yes
+mk; D="$MK"; expect 0 "default install" node bin/agent-personalizer.js --dir "$D" --ai agents --level 3 --yes
 grep -q 'Sign every edit' "$D/AGENTS.md" || fail "default answers lost the signature rule"
 grep -c 'rules/40-sign-every-edit.md' "$D/AGENTS.md" | grep -q '^1$' || fail "default pointer to the signature rule missing"
 grep -q 'rules/40-sign-every-edit.md' "$T/AGENTS.md" && fail "pointer to the signature rule survived signature=no"
@@ -744,6 +745,12 @@ for d in d f p; do
 done
 grep -q 'ASK BEFORE EVERY WRITE' "$T/p/chatgpt-custom-instructions.md" || fail "write policy missing from the ChatGPT render"
 grep -q 'Copy only the text inside the fence' "$T/p/chatgpt-custom-instructions.md" || fail "ChatGPT render does not say what to copy"
+[ -f "$T/p/chatgpt-box1.txt" ] && [ -f "$T/p/chatgpt-box2.txt" ] || fail "ChatGPT box files not written"
+grep -q 'ASK BEFORE EVERY WRITE' "$T/p/chatgpt-box2.txt" || fail "box2.txt lacks the write policy"
+grep -q '^Call me the user' "$T/p/chatgpt-box1.txt" || fail "box1.txt lacks the compact profile"
+grep -q '^>' "$T/p/chatgpt-box1.txt" && fail "box file carries markdown decoration"
+printf 'x\n' >> "$T/p/chatgpt-box1.txt"
+expect 1 "box file drift" node render/render.cjs --dir "$T/p" --check
 grep -q 'PrivateTopicMarker' "$T/p/chatgpt-custom-instructions.md" || fail "off-limits missing from the ChatGPT render"
 grep -q 'AGENT_ONBOARDING.md' "$T/p/chatgpt-custom-instructions.md" | head -1
 awk '/Box 2/{b=1} b && /Always ask before/{a=NR} b && /Directness/{d=NR} END{exit !(a && d && a<d)}' "$T/p/chatgpt-custom-instructions.md" || fail "box 2 does not put restrictions before style"
@@ -871,5 +878,87 @@ node -e 'const fs=require("fs");const p=process.argv[1]+"/.agent-personalizer.js
 expect 0 "requires render 2" node render/render.cjs --dir "$T" --targets claude
 grep -q GENTLEONLYRULE "$T/CLAUDE.md" || fail "requires rule missing although the answer matches"
 pass "requires: validated on load, applied against the stored answers"
+
+# 73. --help and --version exit 0 and print; the renderer's --help too
+node bin/agent-personalizer.js --version > /tmp/ap-v.txt || fail "--version exited non-zero"; grep -q "^$(node -p 'require("./package.json").version')\$" /tmp/ap-v.txt || fail "--version printed the wrong version"; rm -f /tmp/ap-v.txt
+node bin/agent-personalizer.js --help | grep -q -- '--quick' || fail "--help does not list --quick"
+node render/render.cjs --help | grep -q -- '--strict' || fail "renderer --help does not list --strict"
+pass "--help and --version work on the installer and the renderer"
+
+# 74. the TOOL table is the single source: interview options equal its keys, every kind is one of four
+node -e 'const o=require("./render/onboarding.cjs");const q=o.QUESTIONS.find(x=>x.id==="notes_tool");const a=q.options.map(x=>x[0]).join(",");const b=Object.keys(o.TOOL).join(",");if(a!==b)throw new Error(a+" vs "+b);for(const [k,t] of Object.entries(o.TOOL)) if(!["disk","cloud","readonly","other"].includes(t.kind)) throw new Error(k+" kind "+t.kind);' || fail "TOOL table and interview options diverged"
+pass "notes tools: one table drives the interview and the kinds"
+
+# 75. level 1 is three files (plus the config): rules render from the package, home pointers say so, check clean
+mk; T="$MK"
+expect 0 "level 1" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
+[ "$(find "$T" -type f | wc -l | tr -d ' ')" = "5" ] || { find "$T" -type f; fail "level 1 wrote more than USER.md, AGENT_ONBOARDING.md, CLAUDE.md, AGENTS.md and the config"; }
+[ ! -e "$T/rules" ] || fail "level 1 copied rules/"
+grep -q 'owner: the rendered block below' "$T/CLAUDE.md" || fail "level-1 home file still points at rules/ files"
+grep -q 'owning copy' "$T/CLAUDE.md" && fail "level-1 home file lists a rules/ folder it does not have"
+grep -q 'Sign every edit' "$T/CLAUDE.md" || fail "level-1 home file did not render the rules from the package"
+expect 0 "level 1 check" node render/render.cjs --dir "$T" --check
+mk; E="$MK"; cp render/render.cjs render/onboarding.cjs render/targets.json "$E/"; printf 'p\n' > "$E/USER.md"
+expect 2 "copied renderer without rules" node "$E/render.cjs" --dir "$E" --targets claude
+expect 0 "--rules explicit" node "$E/render.cjs" --dir "$E" --targets claude --rules rules
+pass "level 1 writes three files and renders the package rules; a renderer with no rules refuses; --rules names them"
+
+# 76. the config stores only the answers that differ from the defaults
+mk; T="$MK"; mk; F="$MK"
+expect 0 "defaults install" node bin/agent-personalizer.js --dir "$T/d" --ai claude --level 1 --yes
+node -e 'const c=require(process.argv[1]+"/.agent-personalizer.json");if(Object.keys(c.onboarding).length)throw new Error(JSON.stringify(c.onboarding))' "$T/d" || fail "defaults were written into the config"
+printf '{"name":"Sparse","tone":"gentle"}' > "$F/a.json"
+expect 0 "sparse install" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --answers "$F/a.json" --yes
+node -e 'const c=require(process.argv[1]+"/.agent-personalizer.json");const k=Object.keys(c.onboarding).sort().join(",");if(k!=="name,tone")throw new Error(k)' "$T/s" || fail "config stored more than the two chosen answers"
+expect 0 "sparse rerun" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --yes
+grep -q 'Call them:\*\* Sparse' "$T/s/AGENT_ONBOARDING.md" || fail "rerun lost the sparse answers"
+expect 0 "sparse check" node render/render.cjs --dir "$T/s" --check
+pass "config is sparse and round-trips"
+
+# 77. --answers - reads stdin; --quick refuses a non-interactive run
+mk; T="$MK"
+printf '{"name":"Piped"}' | node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --answers - --yes > "$T/out.txt" || fail "stdin answers install"
+grep -q 'from stdin' "$T/out.txt" && grep -q 'Piped' "$T/p/USER.md" || fail "stdin answers were not used"
+printf 'not json' | node bin/agent-personalizer.js --dir "$T/q" --ai claude --level 1 --answers - --yes >/dev/null 2>&1; got=$?; [ "$got" -eq 2 ] || fail "bad stdin answers: expected exit 2, got $got"
+[ ! -e "$T/q" ] || fail "bad stdin answers created a folder"
+expect 2 "--quick non-interactive" node bin/agent-personalizer.js --dir "$T/r" --ai claude --level 1 --quick --yes
+[ ! -e "$T/r" ] || fail "--quick refusal created a folder"
+pass "--answers - reads stdin; malformed stdin refused; --quick needs a terminal"
+
+# 78. --strict: an over-budget ChatGPT box exits 1 and writes nothing; without --strict it writes and flags
+mk; T="$MK"; mk; F="$MK"
+node -e 'const o=[];for(let i=0;i<40;i++)o.push("topic-"+i+"-"+"x".repeat(60));require("fs").writeFileSync(process.argv[1],JSON.stringify({off_limits:o}))' "$F/big.json"
+expect 0 "over-budget install" node bin/agent-personalizer.js --dir "$T" --ai chatgpt --level 1 --answers "$F/big.json" --yes
+rm -f "$T/chatgpt-custom-instructions.md" "$T/chatgpt-box1.txt" "$T/chatgpt-box2.txt"
+expect 1 "strict over budget" node render/render.cjs --dir "$T" --targets chatgpt --strict
+[ ! -e "$T/chatgpt-custom-instructions.md" ] && [ ! -e "$T/chatgpt-box2.txt" ] || fail "--strict wrote despite the overflow"
+expect 0 "non-strict over budget" node render/render.cjs --dir "$T" --targets chatgpt
+grep -q 'OVER BUDGET' "$T/chatgpt-custom-instructions.md" || fail "overflow not flagged"
+pass "--strict refuses an over-budget box with nothing written"
+
+# 79. every rule ends its universal block with a plain-language line
+for f in rules/[0-9]*.md; do
+  awk '/^## universal/{p=1;next} /^## /{p=0} p' "$f" | grep -q '^In practice: ' || fail "$f has no In practice line in its universal block"
+done
+pass "every rule carries an In practice line"
+
+# 80. workflows: the publish workflow is manual, provenance-enabled, OIDC-scoped; the harness matrix covers Node 18/20/22 and a Windows smoke job; .gitattributes pins LF
+grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
+grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
+grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
+grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
+grep -q 'node: \[18, 20, 22\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22"
+grep -q 'smoke-windows:' .github/workflows/harness.yml && grep -q 'windows-latest' .github/workflows/harness.yml || fail "no Windows smoke job"
+grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
+pass "publish workflow dormant and provenance-ready; matrix and Windows smoke present; LF pinned"
+
+# 81. the quoted check count matches the number of checks, everywhere it is quoted
+n="$(grep -c '^[[:space:]]*pass "' test/run.sh)"
+grep -q "^# Every check in this repo, and proof that each one can fail. $n checks\." test/run.sh || fail "run.sh header does not say $n checks"
+grep -q "run.sh: $n checks" README.md || fail "README does not say $n checks"
+grep -q "$n checks, exact exit codes" CONTRIBUTING.md || fail "CONTRIBUTING does not say $n checks"
+grep -q "the $n checks assert" .github/workflows/harness.yml && grep -q "harness ($n checks" .github/workflows/harness.yml || fail "harness.yml does not say $n checks"
+grep -q "a $n-check harness" SECURITY.md || fail "SECURITY.md does not say $n checks"
+pass "the check count ($n) is quoted consistently"
 
 echo; echo "all checks passed"
