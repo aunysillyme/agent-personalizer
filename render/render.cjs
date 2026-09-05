@@ -6,7 +6,7 @@
   usage:
     node render/render.cjs [--dir <project>] [--targets claude,agents,gemini,chatgpt,prompt] [--check] [--strict] [--rules <dir>]
     node render/render.cjs [--dir <project>] --contract [--contract-target claude] [--no-personal]
-    node render/render.cjs --help
+    node render/render.cjs --help | -h · --version | -v
 
   --rules             where the rule files live. Default: <dir>/rules when it exists (a level-3 install,
                       or this repo), else the rules/ folder beside this renderer's own package (a level-1
@@ -82,7 +82,7 @@ const RULE_FILE_RE = /^\d{2}-[A-Za-z0-9._-]+\.md$/;
 
 
 const VALUE_OPTS = ['--dir', '--targets', '--contract-target', '--rules'];
-const FLAG_OPTS = ['--check', '--contract', '--no-personal', '--strict', '--help'];
+const FLAG_OPTS = ['--check', '--contract', '--no-personal', '--strict', '--help', '-h', '--version', '-v'];
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -385,7 +385,8 @@ function between(existing, file) {
 
 function main() {
   ARGS = parseArgs();
-  if (arg('--help', false)) { const src = fs.readFileSync(__filename, 'utf8'); process.stdout.write(src.slice(src.indexOf('/*') + 2, src.indexOf('*/')).trim() + `\n\nagent-personalizer renderer ${onboarding.VERSION}\n`); return; }
+  if (arg('--version', false) || arg('-v', false)) { process.stdout.write(onboarding.VERSION + '\n'); return; }
+  if (arg('--help', false) || arg('-h', false)) { const src = fs.readFileSync(__filename, 'utf8'); process.stdout.write(src.slice(src.indexOf('/*') + 2, src.indexOf('*/')).trim() + `\n\nagent-personalizer renderer ${onboarding.VERSION}\n`); return; }
   const requested = path.resolve(arg('--dir', process.cwd()));
   let root;
   try { root = fs.realpathSync(requested); } catch (_) { die(`--dir ${requested} does not exist`); }

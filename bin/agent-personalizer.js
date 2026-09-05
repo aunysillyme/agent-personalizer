@@ -44,12 +44,12 @@ const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex /
 function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--help', '--version'];
+const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
                                             [--answers <file.json> | --answers - | --defaults] [--quick] [--yes]
-                                            [--help] [--version]
+                                            [--help | -h] [--version | -v]
 
   Interactive when flags are missing and stdin is a terminal; the onboarding interview runs then.
   --quick      ask only the seven questions that change behaviour (name, tone, length, notes tool and path,
@@ -81,8 +81,8 @@ function parseArgs() {
 }
 const ARGS = parseArgs();
 function arg(name, dflt) { return name in ARGS ? ARGS[name] : dflt; }
-if (ARGS['--help']) { process.stdout.write(USAGE); process.exit(0); }
-if (ARGS['--version']) { process.stdout.write(require(path.join(PKG, 'package.json')).version + '\n'); process.exit(0); }
+if (ARGS['--help'] || ARGS['-h']) { process.stdout.write(USAGE); process.exit(0); }
+if (ARGS['--version'] || ARGS['-v']) { process.stdout.write(require(path.join(PKG, 'package.json')).version + '\n'); process.exit(0); }
 
 async function ask(q, dflt) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -176,7 +176,8 @@ async function main() {
     answersSource = `from ${label}`;
   } else if (arg('--defaults', false) || !interactive) {
     answers = onboarding.defaults();
-    answersSource = 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)';
+    if (!arg('--defaults', false) && !process.stdin.isTTY) console.error('agent-personalizer: stdin is not a terminal, so the interview cannot run; using the default answers (pass --answers <file.json>, --answers -, or --defaults to silence this)');
+    answersSource = process.stdin.isTTY ? 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)' : 'defaults (stdin is not a terminal; pass --answers <file.json> or --answers - to script them)';
   } else {
     const quick = !!arg('--quick', false);
     console.log(`\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.${quick ? ' Quick interview: 7 questions, the rest default.' : ` ${onboarding.QUESTIONS.length} questions; --quick asks 7.`}\n`);

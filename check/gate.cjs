@@ -10,6 +10,7 @@
   usage:
     node check/gate.cjs [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
     node check/gate.cjs --self-test                        prove the gate can go red on a seeded hit
+    node check/gate.cjs --help | -h · --version | -v
 
   Fail-closed: a missing or empty list is exit 2, never a pass; a list that git tracks is exit 2.
   The list file may never be tracked by git; every repository enclosing its REAL path is
@@ -44,7 +45,7 @@ const SKIP_DIRS = new Set(['.git']);   // --all means every file; git mode lets 
 function die(msg) { console.error(`GATE SETUP ERROR: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--list'];
-const FLAG_OPTS = ['--self-test', '--all'];
+const FLAG_OPTS = ['--self-test', '--all', '--help', '-h', '--version', '-v'];
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -330,6 +331,13 @@ function selfTest() {
 }
 
 function main() {
+  if (arg('--version', false) || arg('-v', false)) {
+    // the version lives in the sibling module that is copied with this file; standalone copies say so
+    let v = 'unknown (render/onboarding.cjs not beside this file)';
+    try { v = require(path.join(__dirname, '..', 'render', 'onboarding.cjs')).VERSION; } catch (_) {}
+    process.stdout.write(`agent-personalizer gate ${v}\n`); return;
+  }
+  if (arg('--help', false) || arg('-h', false)) { const src = fs.readFileSync(__filename, 'utf8'); process.stdout.write(src.slice(src.indexOf('/*') + 2, src.indexOf('*/')).trim() + '\n'); return; }
   if (!!arg('--self-test', false)) return selfTest();
   let root = path.resolve(arg('--dir', path.join(__dirname, '..')));
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) die(`--dir ${root} is not a directory`);

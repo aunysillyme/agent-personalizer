@@ -883,7 +883,20 @@ pass "requires: validated on load, applied against the stored answers"
 node bin/agent-personalizer.js --version > /tmp/ap-v.txt || fail "--version exited non-zero"; grep -q "^$(node -p 'require("./package.json").version')\$" /tmp/ap-v.txt || fail "--version printed the wrong version"; rm -f /tmp/ap-v.txt
 node bin/agent-personalizer.js --help | grep -q -- '--quick' || fail "--help does not list --quick"
 node render/render.cjs --help | grep -q -- '--strict' || fail "renderer --help does not list --strict"
-pass "--help and --version work on the installer and the renderer"
+for c in "bin/agent-personalizer.js -h" "bin/agent-personalizer.js -v" "render/render.cjs -h" "render/render.cjs -v" "render/render.cjs --version" "check/gate.cjs --help" "check/gate.cjs -h" "check/gate.cjs --version" "check/gate.cjs -v"; do
+  set -- $c; node "$1" "$2" > /tmp/ap-h.txt 2>&1 || fail "$c exited non-zero"; [ -s /tmp/ap-h.txt ] || fail "$c printed nothing"
+done
+v="$(node -p 'require("./package.json").version')"
+node render/render.cjs --version | grep -q "^$v\$" || fail "renderer --version is not $v"
+node check/gate.cjs --version | grep -q "gate $v\$" || fail "gate --version is not $v"
+rm -f /tmp/ap-h.txt
+# (#18) a non-terminal stdin with all flags and no --yes uses the defaults and SAYS so on stderr; with flags missing it refuses
+mk; T="$MK"
+printf '' | node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 > "$T/out.txt" 2> "$T/err.txt" || fail "piped stdin install"
+grep -q 'stdin is not a terminal' "$T/err.txt" || fail "no stderr notice when stdin is not a terminal"
+grep -q 'stdin is not a terminal' "$T/out.txt" || fail "answers source line does not name the non-terminal stdin"
+printf '' | node bin/agent-personalizer.js --dir "$T/q" > /dev/null 2>&1; got=$?; [ "$got" -eq 2 ] || fail "flags missing on a non-terminal stdin: expected exit 2, got $got"
+pass "--help/-h and --version/-v on all three entry points; non-terminal stdin defaults with a notice (#16, #17, #18)"
 
 # 74. the TOOL table is the single source: interview options equal its keys, every kind is one of four
 node -e 'const o=require("./render/onboarding.cjs");const q=o.QUESTIONS.find(x=>x.id==="notes_tool");const a=q.options.map(x=>x[0]).join(",");const b=Object.keys(o.TOOL).join(",");if(a!==b)throw new Error(a+" vs "+b);for(const [k,t] of Object.entries(o.TOOL)) if(!["disk","cloud","readonly","other"].includes(t.kind)) throw new Error(k+" kind "+t.kind);' || fail "TOOL table and interview options diverged"
