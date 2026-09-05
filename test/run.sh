@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 58 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 59 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -558,5 +558,16 @@ grep -q '"agents"' "$C/.agent-personalizer.json" && grep -q '"claude"' "$C/.agen
 [ -f "$C/AGENTS.md" ] || fail "merged target list was not rendered"
 expect 0 "merged config renders plain" node render/render.js --dir "$C" --check
 pass "adversarial answers inert, marker answers refused, malformed stored config refused untouched, valid config merged and rendered"
+
+# 59. --contract validates the stored config like every other mode: malformed targets or level is exit 2 with no output
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
+node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:"prompt",level:"junk",onboarding:o.defaults()}));' "$T"
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" 2>"$T/e.txt"; got=$?; [ "$got" -eq 2 ] || fail "contract accepted a malformed config (exit $got)"
+[ ! -s "$T/c.txt" ] || fail "contract emitted output on a malformed config"
+node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:["claude","claude"],onboarding:o.defaults()}));' "$T"
+expect 2 "contract duplicate targets" node render/render.js --dir "$T" --contract --contract-target claude
+node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.writeFileSync(process.argv[1]+"/.agent-personalizer.json",JSON.stringify({targets:["claude"],level:9,onboarding:o.defaults()}));' "$T"
+expect 2 "contract level out of range" node render/render.js --dir "$T" --contract --contract-target claude
+pass "--contract refuses malformed stored config with no output"
 
 echo; echo "all checks passed"
