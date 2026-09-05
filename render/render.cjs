@@ -51,7 +51,10 @@ const path = require('path');
 const crypto = require('crypto');
 const onboarding = require('./onboarding.cjs');
 
-function die(msg) { console.error(`render: ${msg}`); process.exit(2); }
+class Refusal extends Error {}
+/* die(): exit 2 with the reason. When a caller (the installer's preflight) sets module.exports.DIE_THROWS,
+   the same refusal is thrown as a Refusal instead, so the caller can add its own context and exit. */
+function die(msg) { if (module.exports && module.exports.DIE_THROWS) throw new Refusal(msg); console.error(`render: ${msg}`); process.exit(2); }
 
 
 const BEGIN = '<!-- agent-personalizer:begin -->';
@@ -509,5 +512,13 @@ function main() {
 
 }
 
-module.exports = { main, fenceMap, markerState, splice, between };
+/* Everything the renderer would refuse about the SOURCES already present in a folder, checked without
+   writing: an existing rules/ (each file parsed as loadRules does) and an existing USER.md (as
+   loadProfile does). A missing rules/ or USER.md is fine here: the installer is about to create them. */
+function preflightSources(root) {
+  if (mustBe(path.join(root, 'rules'), 'dir', 'rules/')) loadRules(root);
+  loadProfile(root);
+}
+
+module.exports = { main, fenceMap, markerState, splice, between, preflightSources, Refusal, DIE_THROWS: false };
 if (require.main === module) main();

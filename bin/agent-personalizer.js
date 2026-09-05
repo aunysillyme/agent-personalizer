@@ -234,6 +234,11 @@ async function main() {
 
   // ---- PREFLIGHT: refuse now, with nothing written, everything the renderer would refuse later ----
   for (const p of plan) probe(root, p.rel);              // symlinks and non-directories on the way
+  // sources already in the folder (a kept rules/ file, a kept USER.md): parsed exactly as the renderer will parse them
+  markers.DIE_THROWS = true;
+  try { markers.preflightSources(root); }
+  catch (e) { if (e instanceof markers.Refusal) die(`${e.message}. The renderer would refuse this folder; nothing was written`); throw e; }
+  finally { markers.DIE_THROWS = false; }
   const TARGETS = JSON.parse(fs.readFileSync(path.join(PKG, 'render', 'targets.json'), 'utf8'));
   for (const t of allTargets) {
     const rel = TARGETS[t].file;

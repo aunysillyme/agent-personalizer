@@ -23,7 +23,7 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 ### Fixed
 - **Gate: symlinked parent directories** (#9). A working-tree path whose parent is a symlink is not read (it lies outside the scan root); the skip is counted and printed; the index blob is still scanned.
 - **Gate: forbidden terms in file names** (#10). Every shipped path is scanned as well as its text; a path hit is labelled `(path)` and can be allow-listed.
-- **Installer preflight** (#11). Every path is probed and every existing rendered target is decoded and marker-checked before the first write, so a malformed marker block, invalid UTF-8 or an unwritable target refuses the run with nothing written.
+- **Installer preflight** (#11). Every path is probed and every existing rendered target is decoded and marker-checked before the first write, so a malformed marker block, invalid UTF-8 or an unwritable target refuses the run with nothing written. Codex round 23 then showed the same gap for sources already in the folder (a kept `rules/*.md`, a kept `USER.md`): the renderer now exports a source preflight the installer runs first, so those refuse with nothing written too.
 
 ## [0.2.0] - 2026-09-05
 
