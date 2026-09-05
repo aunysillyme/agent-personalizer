@@ -4,6 +4,23 @@
   "description": "Personalize any AI with dynamic instructions. One profile, one rule source, rendered for Claude, Codex, Cursor, Gemini and ChatGPT.",
   "license": "MIT",
   "repository": "github:aunysillyme/agent-personalizer",
+  "homepage": "https://github.com/aunysillyme/agent-personalizer#readme",
+  "bugs": {
+    "url": "https://github.com/aunysillyme/agent-personalizer/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "custom-instructions",
+    "agents-md",
+    "claude-code",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "chatgpt",
+    "personalization",
+    "agent-onboarding",
+    "dynamic-instructions"
+  ],
   "bin": {
     "agent-personalizer": "bin/agent-personalizer.js"
   },
