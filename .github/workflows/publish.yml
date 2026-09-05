@@ -2,13 +2,15 @@
 # will fail until the package exists on npm with trusted publishing configured for this repository
 # (npm settings -> package -> Trusted publisher -> GitHub Actions, this repo, this workflow file).
 # Until then `npx github:aunysillyme/agent-personalizer` is the install path. See RELEASING.md.
+# The input must be an existing vX.Y.Z TAG: it is resolved through refs/tags/ and checked out by its
+# commit SHA, so a branch that happens to carry the same name cannot be published.
 name: publish
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The release tag to publish (must match package.json version, e.g. v0.4.0)"
+        description: "An existing release tag, vX.Y.Z; it must match package.json version"
         required: true
 
 permissions:
@@ -21,15 +23,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: resolve the input as a real tag and check out its commit
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "not a vX.Y.Z tag: $TAG"; exit 1;; esac
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "not a vX.Y.Z tag: $TAG"; exit 1; }
+          git fetch --no-tags origin "refs/tags/$TAG:refs/tags/$TAG" || { echo "no such tag on origin: $TAG"; exit 1; }
+          sha="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          echo "publishing $TAG at $sha"
+          git checkout --quiet "$sha"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
       - name: the tag must match package.json
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           v="$(node -p 'require("./package.json").version')"
-          test "v$v" = "${{ inputs.tag }}" || { echo "tag ${{ inputs.tag }} does not match package.json $v"; exit 1; }
+          test "v$v" = "$TAG" || { echo "tag $TAG does not match package.json $v"; exit 1; }
       - name: harness
         run: sh test/run.sh
       - name: publish with provenance

@@ -93,7 +93,10 @@ const IDS = new Set(QUESTIONS.map(q => q.id));
 const QUICK = ['name', 'tone', 'length', 'notes_tool', 'notes_path', 'write_policy', 'always_ask'];
 /* only the answers that differ from the defaults: what the installer stores, so the config reads as
    "what this person chose" and a future default applies to everyone who never chose otherwise */
-function sparse(a) { const d = defaults(), out = {}; for (const k of Object.keys(a)) if (JSON.stringify(a[k]) !== JSON.stringify(d[k])) out[k] = a[k]; return out; }
+/* PINNED answers are always stored, default or not: they govern what the AI may touch, so a future
+   change of a default must never move them under a person who chose the current value. */
+const PINNED = ['write_policy', 'always_ask', 'off_limits', 'notes_tool', 'notes_path', 'signature'];
+function sparse(a) { const d = defaults(), out = {}; for (const k of Object.keys(a)) if (PINNED.includes(k) || JSON.stringify(a[k]) !== JSON.stringify(d[k])) out[k] = a[k]; return out; }
 
 function defaults() {
   const a = {};
@@ -354,4 +357,4 @@ function compactProfile(a) {
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, QUICK, TOOL, VERSION, DOCS, FALLBACK, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
+module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
