@@ -25,7 +25,7 @@ The privacy gate (`check/gate.cjs` against a real list) needs a local `check/for
 
 ## Adding a notes tool or an AI target
 
-- A notes tool is an entry in the `TOOL` map in `render/onboarding.cjs` with a `kind` (`disk`, `cloud`, `readonly`, `other`) and a row in `docs/companions.md`. Check 60 in the harness iterates every option; add yours to the right loop.
+- A notes tool touches four places in `render/onboarding.cjs`, then one doc: the option in `QUESTIONS` (`notes_tool`), otherwise `validate()` refuses it; the `TOOL` map entry with its `kind` (`disk`, `cloud`, `readonly`, `other`) and posture; the kind lists `kindOf()` reads (`DISK_TOOLS`, the cloud list; anything else is `readonly`); the installer hint in `bin/agent-personalizer.js`; and a row in `docs/companions.md`. Check 60 in the harness iterates every option; add yours to the right loop.
 - An AI target is an entry in `render/targets.json` plus a row in `docs/paste-guide.md`. If it has a binding, add `binding:<name>` blocks to the rules that need one; unknown binding names are refused.
 
 ## Pull requests

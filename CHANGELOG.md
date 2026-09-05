@@ -6,6 +6,16 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+Two independent audits of v0.3.0 the same day: agy as code reviewer (91/100; it could not execute commands under its own settings) and Codex as a first-time user running the ten-step walkthrough in a fresh temp directory. Every finding was reproduced before its fix.
+
+### Changed
+- `signature: no` is now coherent across the whole installed tree: the signature rule file is not installed, `rules/README.md` loses its row, and the four note templates lose their `Last edited by:` line (Codex user seat; check 61 covers the tree).
+- The installer's rerun hint prints the command that actually ran: the `npx github:` form when it ran from npm's cache, else the local `node .../bin/agent-personalizer.js` path (Codex user seat).
+- The ChatGPT render says, above each fence, to copy only the text inside it (Codex user seat; check 64).
+- CI matrix now runs Node 18, 20 and 22 on both OSes, so the `engines: >=18` claim is tested (agy).
+- README: level 1 is "One profile" and states its footprint (about a dozen small files); the privacy line distinguishes the tool (no network) from the `npx` fetch that precedes it; macOS/Linux stated, Windows via WSL or Git Bash; a no-`sudo` recovery when npm's cache is unwritable (`npm_config_cache=./.npm-cache`).
+- SECURITY.md said "60-check harness"; it is 72 (agy). CONTRIBUTING names all four places a new notes tool touches in `render/onboarding.cjs` (agy).
+
 ## [0.3.0] - 2026-09-05
 
 Thirteen issues (#3 to #15) filed against `5972b32` by an independent installation-and-behaviour audit, every one reproduced against HEAD before its fix. One fix per issue; the harness grew from 60 to 72 checks, one regression check per issue.

@@ -205,7 +205,15 @@ async function main() {
 
   // ---- PLAN: every file this run would create, computed before anything is written ----
   const plan = [];                                        // { rel, src | text }
-  for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) plan.push({ rel: `rules/${f}`, src: path.join(PKG, 'rules', f) });
+  // signature=no: the signature rule file is not installed (a `requires:` rule that is absent cannot drift back in),
+  // and every copied markdown loses its `Last edited by:` template line and its pointer to the rule.
+  const noSig = answers.signature === 'no';
+  const stripSig = (t) => noSig ? t.split('\n').filter(l => !l.includes('40-sign-every-edit.md') && !/^Last edited by:/.test(l)).join('\n') : t;
+  const mdCopy = (rel, src) => plan.push({ rel, text: stripSig(fs.readFileSync(src, 'utf8')) });
+  for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
+    if (noSig && f === '40-sign-every-edit.md') continue;
+    mdCopy(`rules/${f}`, path.join(PKG, 'rules', f));
+  }
   const home = (name) => {
     let t = fs.readFileSync(path.join(PKG, 'templates', name), 'utf8');
     if (kind === 'disk') { if (base !== 'notes') t = t.replace(/\bnotes\//g, `${base}/`); }
@@ -216,16 +224,15 @@ async function main() {
       t = t.split('\n').filter(l => { if (!/`notes\//.test(l)) return true; if (done) return false; done = true; return true; })
         .map(l => /`notes\//.test(l) ? `- Notes: see \`AGENT_ONBOARDING.md\` § Where you may write (${tool})` : l).join('\n');
     }
-    if (answers.signature === 'no') t = t.split('\n').filter(l => !l.includes('rules/40-sign-every-edit.md')).join('\n');
-    return t;
+    return stripSig(t);
   };
   if (targets.includes('claude')) plan.push({ rel: 'CLAUDE.md', text: home('CLAUDE.md') });
   if (targets.includes('agents')) plan.push({ rel: 'AGENTS.md', text: home('AGENTS.md') });
   if (level >= 2 && kind !== 'cloud') {                   // a cloud tool's notes are not local files; no folder named after a workspace
-    plan.push({ rel: `${base}/README.md`, src: path.join(PKG, 'templates', 'FOLDER_README.md') });
-    plan.push({ rel: `${base}/sessions/TEMPLATE-week.md`, src: path.join(PKG, 'templates', 'session-log.md') });
-    plan.push({ rel: `${base}/decisions.md`, src: path.join(PKG, 'templates', 'decisions-log.md') });
-    plan.push({ rel: `${base}/inbox/README.md`, src: path.join(PKG, 'templates', 'INBOX_README.md') });
+    mdCopy(`${base}/README.md`, path.join(PKG, 'templates', 'FOLDER_README.md'));
+    mdCopy(`${base}/sessions/TEMPLATE-week.md`, path.join(PKG, 'templates', 'session-log.md'));
+    mdCopy(`${base}/decisions.md`, path.join(PKG, 'templates', 'decisions-log.md'));
+    mdCopy(`${base}/inbox/README.md`, path.join(PKG, 'templates', 'INBOX_README.md'));
   }
   if (level >= 3) {
     for (const rel of ['render/render.cjs', 'render/targets.json', 'render/onboarding.cjs', 'hooks/README.md', 'hooks/claude-code/session-start.sh', 'check/gate.cjs', 'check/forbidden.example.txt'])
@@ -300,12 +307,14 @@ async function main() {
   execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
 
   const DOCS = onboarding.DOCS;
+  // the rerun command a user can actually type: the npx form when this ran from npm's cache, else the local path that just worked
+  const SELF = /[\\/]_npx[\\/]|[\\/]node_modules[\\/]/.test(PKG) ? 'npx github:aunysillyme/agent-personalizer' : `node ${path.relative(process.cwd(), path.join(PKG, 'bin', 'agent-personalizer.js')) || 'bin/agent-personalizer.js'}`;
   console.log('\nNext:');
   console.log('  1. Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer with new answers to change it.');
   console.log('     USER.md is yours to edit freely; the onboarding file is regenerated from .agent-personalizer.json.');
   console.log(level >= 3
     ? '  2. Re-render after editing: node render/render.cjs --dir .   (drift check: add --check)'
-    : `  2. Re-render after editing by running this installer again (it keeps your files and only refreshes the rendered blocks):\n     npx github:aunysillyme/agent-personalizer --dir . --ai ${targets.join(',')} --level ${level} --yes`);
+    : `  2. Re-render after editing by running this installer again (it keeps your files and only refreshes the rendered blocks):\n     ${SELF} --dir . --ai ${targets.join(',')} --level ${level} --yes`);
   if (level >= 2 && kind !== 'cloud') console.log(`  3. Read ${base}/README.md before letting an AI write into ${base}/.`);
   if (level >= 3) console.log('  4. Register hooks/claude-code/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
   if (level >= 4) console.log('  5. Level 4 is pointers only for now: routing, task bundles and verified CLI runs live in the multi-agent layer, linked from the README when it ships.');

@@ -315,8 +315,8 @@ function renderTarget(key, target, profile, rules, cfg) {
     // a wrapping fence longer than any backtick or tilde run inside the content, so content fences can never close it
     const fenceFor = (text) => { let n = 3; for (const m of text.matchAll(/(`{3,}|~{3,})/g)) n = Math.max(n, m[1].length + 1); return '`'.repeat(n); };
     const f1 = fenceFor(box1), f2 = fenceFor(box2);
-    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', f1, box1, f1, warn('Box 1', box1), '');
-    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', f2, box2, f2, warn('Box 2', box2));
+    lines.push('### Box 1: "What would you like ChatGPT to know about you?"', '', '_Copy only the text inside the fence below; the counts and headings stay here._', '', f1, box1, f1, warn('Box 1', box1), '');
+    lines.push('### Box 2: "How would you like ChatGPT to respond?"', '', '_Copy only the text inside the fence below._', '', f2, box2, f2, warn('Box 2', box2));
     if (!answers) lines.push('', '> No onboarding answers in `.agent-personalizer.json`, so this is the full profile and every rule. Run the installer (it asks) for the compact, budgeted form.');
     else lines.push('', `> ChatGPT has no file access, so only the rules marked \`inject: true\` are here (${picked.length}). The rest live in \`rules/\`; for a ChatGPT Project, upload \`AGENT_ONBOARDING.md\` and \`rules/\` as project files instead of pasting.`);
     renderTarget.overBudget = (renderTarget.overBudget || []).concat(over.map(l => `${target.file}: ${l}`));
