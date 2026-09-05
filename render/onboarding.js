@@ -36,6 +36,8 @@ const QUESTIONS = [
   { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md', 'notes/README.md', 'rules/'] },
   { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
     options: [['obsidian', 'an Obsidian vault (pairs with obsidian-tc, see docs/companions.md)'], ['notion', 'Notion'], ['google-docs', 'Google Docs / Drive'], ['apple-notes', 'Apple Notes'], ['onenote', 'Microsoft OneNote'], ['evernote', 'Evernote'], ['logseq', 'Logseq'], ['folder', 'a plain folder of markdown files'], ['other', 'something else (name it in the next answer)']] },
+  { id: 'obsidian_tc', ask: 'If Obsidian: do you use obsidian-tc, the governed MCP (see docs/companions.md)?', type: 'choice', default: 'no',
+    options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
   { id: 'notes_tool_name', ask: 'If "other": the name of the tool (blank otherwise)', type: 'text', default: '' },
   { id: 'notes_path', ask: 'Where inside it: the folder path (Obsidian, Logseq, plain folder), or the workspace / notebook / folder name (Notion, Google Docs, Apple Notes, others)', type: 'text', default: 'notes' },
   { id: 'tracker', ask: 'Your task tracker, if the AI should read it ("none" to skip)', type: 'text', default: 'none' },
@@ -155,9 +157,9 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 
 ## Where things live
 
-- **My notes:** ${md(toolFor(a).name)}, ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/\`` : `"${md(a.notes_path)}"`}
+- **My notes:** ${md(toolFor(a).name)}, ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/\`` : `"${md(a.notes_path)}"`}${toolFor(a).kind === 'readonly' ? ' (read-only for the AI)' : toolFor(a).kind === 'other' ? ' (the AI asks before its first write there)' : ''}
 - **My task tracker:** ${md(a.tracker)}
-- **Rules the AI must read before writing anything to my notes:** ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/README.md\`` : `the index ${toolFor(a).unit || 'page'} of "${md(a.notes_path)}", and \`AGENT_ONBOARDING.md\` § Where you may write`}
+- **Rules the AI must read before writing anything to my notes:** ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/README.md\`` : toolFor(a).kind === 'cloud' ? `the index ${toolFor(a).unit || 'page'} of "${md(a.notes_path)}", and \`AGENT_ONBOARDING.md\` § Where you may write` : `\`${FALLBACK}/README.md\` (the local fallback folder the AI writes to), and \`AGENT_ONBOARDING.md\` § Where you may write`}
 `;
 }
 
@@ -165,7 +167,9 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
    readonly = no agent door today, so writes fall back to a local folder; other = named by the user,
    conservative posture. p = location escaped for a code span, q = location escaped for prose. */
 const TOOL = {
-  'obsidian':    (p, q) => ({ kind: 'disk', name: 'Obsidian', reach: `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`, posture: null }),
+  'obsidian':    (p, q, n, tc) => ({ kind: 'disk', name: 'Obsidian', reach: tc
+                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see docs/companions.md`
+                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; docs/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null }),
   'logseq':      (p, q) => ({ kind: 'disk', name: 'Logseq', reach: `the graph folder at \`${p}/\`, as plain files`, posture: null }),
   'folder':      (p, q) => ({ kind: 'disk', name: 'a folder of markdown files', reach: `\`${p}/\` on disk`, posture: null }),
   'notion':      (p, q) => ({ kind: 'cloud', name: 'Notion', unit: 'page', reach: `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' }),
@@ -175,7 +179,8 @@ const TOOL = {
   'evernote':    (p, q) => ({ kind: 'readonly', name: 'Evernote', reach: `"${q}", read-only (no first-class agent door today)`, posture: 'Treat it as read-only. Write to the local fallback folder below and say what to paste back.' }),
   'other':       (p, q, n) => ({ kind: 'other', name: n || 'an unnamed notes tool', reach: `"${q}"`, posture: 'Ask before the first write into it, and say which tool and location you mean. Until told otherwise, write only to the local fallback folder below.' }),
 };
-const toolFor = (a) => TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path), a.notes_tool_name ? md(a.notes_tool_name) : '');
+/* name comes back RAW and is md-escaped exactly once at each prose render site */
+const toolFor = (a) => TOOL[a.notes_tool](esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.obsidian_tc === 'yes');
 const FALLBACK = 'notes';
 
 function renderOnboarding(a) {
@@ -288,7 +293,12 @@ function contractBlock(a) {
     `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
     `Read first: ${a.read_first.map(md).join(' → ')}.`,
-    `Notes: ${md(toolFor(a).name)} at ${md(a.notes_path)}${a.notes_tool === 'obsidian' ? ', through obsidian-tc' : toolFor(a).kind === 'cloud' ? ', through its connector, no filesystem writes' : toolFor(a).kind !== 'disk' ? `, read-only; local fallback folder ${FALLBACK}/` : ''}.`,
+    `Notes: ${md(toolFor(a).name)} at ${md(a.notes_path)}${
+      a.notes_tool === 'obsidian' && a.obsidian_tc === 'yes' ? ', through obsidian-tc'
+      : toolFor(a).kind === 'cloud' ? ', through its connector, no filesystem writes'
+      : toolFor(a).kind === 'readonly' ? `, read-only; local fallback folder ${FALLBACK}/`
+      : toolFor(a).kind === 'other' ? `, unknown tool: ask before the first write there; local fallback folder ${FALLBACK}/ meanwhile`
+      : ''}.`,
   ].filter(Boolean).join('\n');
 }
 

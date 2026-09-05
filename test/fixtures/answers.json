@@ -39,5 +39,6 @@
     "spend",
     "standing-rules"
   ],
-  "notes_tool": "obsidian"
+  "notes_tool": "obsidian",
+  "obsidian_tc": "yes"
 }

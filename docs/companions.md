@@ -27,7 +27,7 @@ npx obsidian-tc /path/to/vault
 ```
 Lexical search and every note tool work immediately; semantic and graph retrieval need an embeddings backend (Ollama by default). Also ships as a Docker image, an `.mcpb` bundle, and standalone binaries.
 
-**How it pairs with this repo.** When you answer `notes_tool: obsidian`, the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through obsidian-tc rather than the filesystem, and your **off-limits** and **always-ask** answers become the folder ACL and the human-in-the-loop list you configure there. Same intent, now enforced.
+**How it pairs with this repo.** Answer `notes_tool: obsidian` and `obsidian_tc: yes` and the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through obsidian-tc rather than the filesystem; your **off-limits** and **always-ask** answers become the folder ACL and the human-in-the-loop list you configure there. Same intent, now enforced. Answer `obsidian_tc: no` (the default) and the AI works on the vault folder directly, with the onboarding file naming what obsidian-tc would add.
 
 ---
 
@@ -51,7 +51,7 @@ Level 4 (several agents) is where it earns its keep: each delegation carries a p
 
 | `notes_tool` answer | How an AI reaches it | Write posture rendered into the onboarding file |
 |---|---|---|
-| `obsidian` | obsidian-tc (above), or the vault folder on disk | your write policy, enforced by obsidian-tc's ACL when configured |
+| `obsidian` | obsidian-tc (above) when `obsidian_tc: yes`, else the vault folder on disk | your write policy, enforced by obsidian-tc's ACL when configured |
 | `logseq` / `folder` | the folder on disk | your write policy, under each folder's README |
 | `notion` | Notion's own MCP connector | writes only into the pages or databases you name; the AI proposes new top-level pages, never creates them unasked |
 | `google-docs` | the Google Drive / Docs connector | the AI drafts into a doc named for the topic and never edits a shared doc's existing text without being asked |
