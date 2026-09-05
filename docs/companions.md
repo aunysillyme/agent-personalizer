@@ -55,8 +55,8 @@ Level 4 (several agents) is where it earns its keep: each delegation carries a p
 | `logseq` / `folder` | the folder on disk | your write policy, under each folder's README |
 | `notion` | Notion's own MCP connector | writes only into the pages or databases you name; the AI proposes new top-level pages, never creates them unasked |
 | `google-docs` | the Google Drive / Docs connector | the AI drafts into a doc named for the topic and never edits a shared doc's existing text without being asked |
-| `apple-notes` | a local Apple Notes MCP | read, and create new notes; never edit or delete existing notes |
-| `onenote` / `evernote` | no first-class agent door today | treated as a read-only source; the AI writes to your notes folder and tells you what to paste |
-| `other` | you tell it | your write policy, as written |
+| `apple-notes` | a separately installed local Apple Notes MCP (no AI app ships one built in) | read, and create new notes; never edit or delete existing notes |
+| `onenote` / `evernote` | no first-class agent door today | treated as a read-only source; the AI writes to a local fallback folder (`notes/`) and tells you what to paste back |
+| `other` | you name the tool and the location | the AI asks before its first write there and uses the local fallback folder (`notes/`) until then |
 
-None of these connectors ship in this repo. The onboarding file names the door; you connect it in your AI's own settings.
+None of these connectors ship in this repo. The onboarding file names the door; you connect it in your AI's own settings, where the app offers one. For cloud tools the onboarding file also says, explicitly, that none of these notes are local files, so the AI does not invent a folder named after your workspace.

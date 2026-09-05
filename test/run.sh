@@ -570,32 +570,63 @@ node -e 'const fs=require("fs");const o=require("./render/onboarding.js");fs.wri
 node render/render.js --dir "$T" --contract --contract-target claude > "$T/c3.txt" 2>/dev/null; got=$?; [ "$got" -eq 2 ] || fail "contract level out of range: expected exit 2, got $got"; [ ! -s "$T/c3.txt" ] || fail "contract emitted output on a bad level"
 pass "--contract refuses malformed stored config with no output"
 
-# 60. notes_tool: obsidian names obsidian-tc, notion names its connector with the write posture, an unknown tool is refused; companions doc ships
+# 60. notes_tool: all nine options render a consistent write section; companions doc ships; unknown tool refused
 [ -f docs/companions.md ] || fail "docs/companions.md missing"
 grep -q 'obsidian-tc' docs/companions.md && grep -q 'sierracatalina.com/context-layer' docs/companions.md || fail "companions doc missing a companion"
 mk; T="$MK"; mk; F="$MK"
-printf '{"notes_tool": "obsidian", "notes_path": "MyVault"}' > "$F/ob.json"
-expect 0 "obsidian answers" node bin/agent-personalizer.js --dir "$T/o" --ai claude --level 1 --answers "$F/ob.json" --yes
-grep -q 'obsidian-tc' "$T/o/AGENT_ONBOARDING.md" || fail "obsidian answer did not name obsidian-tc"
-grep -q 'MyVault' "$T/o/AGENT_ONBOARDING.md" || fail "vault path missing"
-node render/render.js --dir "$T/o" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
-printf '{"notes_tool": "notion", "notes_path": "Studio Wiki"}' > "$F/no.json"
-expect 0 "notion answers" node bin/agent-personalizer.js --dir "$T/n" --ai claude --level 1 --answers "$F/no.json" --yes
-grep -q "Notion's own MCP connector" "$T/n/AGENT_ONBOARDING.md" || fail "notion answer did not name the connector"
-grep -q 'never create one unasked' "$T/n/AGENT_ONBOARDING.md" || fail "notion write posture missing"
-grep -q 'obsidian-tc' "$T/n/AGENT_ONBOARDING.md" && fail "notion render mentions obsidian-tc"
-printf '{"notes_tool": "onenote"}' > "$F/one.json"
-expect 0 "onenote answers" node bin/agent-personalizer.js --dir "$T/e" --ai claude --level 1 --answers "$F/one.json" --yes
-grep -q 'read-only source' "$T/e/AGENT_ONBOARDING.md" || fail "onenote not rendered as read-only"
-printf '{"notes_tool": "roam"}' > "$F/bad.json"
-expect 2 "unknown notes tool" node bin/agent-personalizer.js --dir "$T/x" --ai claude --level 1 --answers "$F/bad.json" --yes
-[ ! -e "$T/x" ] || fail "unknown notes tool created a folder"
-expect 0 "obsidian check" node render/render.js --dir "$T/o" --check
+render_tool() { # $1 tool, $2 extra json fields; sets OUT (onboarding file) and HINT (installer output)
+  printf '{"notes_tool": "%s"%s}' "$1" "$2" > "$F/$1.json"
+  node bin/agent-personalizer.js --dir "$T/$1" --ai claude --level 1 --answers "$F/$1.json" --yes > "$F/$1.hint" 2>&1 || fail "install for $1"
+  OUT="$T/$1/AGENT_ONBOARDING.md"; HINT="$F/$1.hint"
+  node render/render.js --dir "$T/$1" --check >/dev/null || fail "check for $1"
+}
+# on-disk tools: filesystem rules present
+for tool in obsidian logseq folder; do
+  render_tool "$tool" ', "notes_path": "MyVault"'
+  grep -q 'MyVault/sessions/' "$OUT" || fail "$tool: session-log path missing"
+  grep -q 'Every folder you write into has a README' "$OUT" || fail "$tool: README rule missing"
+  grep -q 'No filesystem writes' "$OUT" && fail "$tool: cloud rule leaked into a disk render"
+done
+grep -q 'obsidian-tc' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian did not name obsidian-tc"
+grep -q 'obsidian-tc' "$F/obsidian.hint" || fail "obsidian hint missing"
+node render/render.js --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
+grep -q 'obsidian-tc' "$T/folder/AGENT_ONBOARDING.md" && fail "folder render mentions obsidian-tc"
+# cloud tools: connector named, no filesystem instructions, posture present
+for tool in notion google-docs apple-notes; do
+  render_tool "$tool" ', "notes_path": "Studio Wiki"'
+  grep -q 'No filesystem writes' "$OUT" || fail "$tool: no-filesystem rule missing"
+  grep -q 'Studio Wiki/' "$OUT" && fail "$tool: workspace name rendered as a filesystem path"
+  grep -q '/sessions/' "$OUT" && fail "$tool: filesystem session-log path leaked"
+  grep -q 'Every folder you write into has a README' "$OUT" && fail "$tool: folder README rule leaked into a cloud render"
+  grep -q 'Session log' "$OUT" || fail "$tool: session log unit missing"
+done
+grep -q "Notion's own MCP connector" "$T/notion/AGENT_ONBOARDING.md" && grep -q 'never create one unasked' "$T/notion/AGENT_ONBOARDING.md" || fail "notion connector or posture missing"
+grep -q 'Google Drive / Docs connector' "$T/google-docs/AGENT_ONBOARDING.md" || fail "google-docs connector missing"
+grep -q 'separately installed local Apple Notes MCP' "$T/apple-notes/AGENT_ONBOARDING.md" && grep -q 'separately installed' "$F/apple-notes.hint" || fail "apple-notes: MCP caveat missing in render or hint"
+grep -q 'Studio Wiki/README.md' "$T/notion/USER.md" && fail "notion USER.md renders a filesystem README path"
+# read-only tools: read-only stated, local fallback folder used
+for tool in onenote evernote; do
+  render_tool "$tool" ', "notes_path": "Work Notebook"'
+  grep -q 'read-only' "$OUT" || fail "$tool: not rendered as read-only"
+  grep -q 'Local fallback folder:\*\* `notes/`' "$OUT" || fail "$tool: fallback folder missing"
+  grep -q 'Work Notebook/' "$OUT" && fail "$tool: notebook name rendered as a path"
+done
+# other: the named tool appears, conservative posture, fallback folder
+render_tool other ', "notes_tool_name": "Roam Research", "notes_path": "Daily graph"'
+grep -q 'Notes live in Roam Research' "$OUT" || fail "other: tool name not rendered"
+grep -q 'Ask before the first write into it' "$OUT" || fail "other: conservative posture missing"
+grep -q 'Roam Research' "$F/other.hint" || fail "other: hint missing the tool name"
+render_tool other ''
+grep -q 'an unnamed notes tool' "$OUT" || fail "other without a name: placeholder missing"
+# adversarial location in a prose (cloud) render
 printf '{"notes_tool": "notion", "notes_path": "~~~ <!-- x"}' > "$F/adv.json"
 expect 0 "adversarial notes_path in prose" node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --answers "$F/adv.json" --yes
 grep -c '^~~~' "$T/p/AGENT_ONBOARDING.md" | grep -q '^0$' || fail "notes_path reached prose unescaped"
-grep -q '\\~\\~\\~ \\<!-- x' "$T/p/AGENT_ONBOARDING.md" || fail "notes_path not escaped in prose"
 expect 0 "adversarial notes_path check" node render/render.js --dir "$T/p" --check
-pass "notes_tool: obsidian → obsidian-tc, notion → connector + posture, onenote → read-only, unknown refused, companions doc present"
+# unknown tool refused, nothing created
+printf '{"notes_tool": "roam"}' > "$F/bad.json"
+expect 2 "unknown notes tool" node bin/agent-personalizer.js --dir "$T/x" --ai claude --level 1 --answers "$F/bad.json" --yes
+[ ! -e "$T/x" ] || fail "unknown notes tool created a folder"
+pass "notes_tool: disk tools get filesystem rules, cloud tools get connector rules and no paths, read-only and other get the fallback folder; unknown refused"
 
 echo; echo "all checks passed"
