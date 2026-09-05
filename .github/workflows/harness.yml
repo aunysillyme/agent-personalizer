@@ -83,5 +83,6 @@ jobs:
       - name: misuse exits 2
         shell: bash
         run: |
-          node bin/agent-personalizer.js --dir bad --ai claude --level 7 --yes; test $? -eq 2
-          node bin/agent-personalizer.js --dir bad --ai bing --level 1 --yes; test $? -eq 2
+          rc=0; node bin/agent-personalizer.js --dir bad --ai claude --level 7 --yes || rc=$?; test "$rc" -eq 2
+          rc=0; node bin/agent-personalizer.js --dir bad --ai bing --level 1 --yes || rc=$?; test "$rc" -eq 2
+          test ! -e bad
