@@ -3,11 +3,18 @@
 /*
   agent-personalizer installer.
 
-    npx github:aunysillyme/agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4] [--yes]
+    npx github:aunysillyme/agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
+                                              [--answers <file.json>] [--defaults] [--yes]
 
   Interactive when flags are missing and stdin is a terminal. Non-interactive with flags.
+  The ONBOARDING INTERVIEW (how to talk to you, output shape, what to read first, where the AI
+  may write, how to save, what to ask before doing) runs interactively, or takes --answers
+  <file.json>, or --defaults / --yes to accept every default. The answers are stored under
+  "onboarding" in .agent-personalizer.json and rendered to AGENT_ONBOARDING.md; USER.md is
+  generated from the same answers when it does not exist yet.
   Writes only the files for the chosen AIs and level. Never overwrites a file that exists
-  (except the marker block inside rendered files it owns). Refuses to write through any
+  (except the marker block inside rendered files it owns, and .agent-personalizer.json, which
+  is its own record and is merged, never blindly replaced). Refuses to write through any
   symlink or outside the install folder (the folder you name is followed once, via realpath;
   nothing beneath it may be a symlink). Reads no environment variables. Writes no secrets.
 
@@ -19,13 +26,14 @@ const readline = require('readline');
 const { execFileSync } = require('child_process');
 
 const PKG = path.resolve(__dirname, '..');
+const onboarding = require(path.join(PKG, 'render', 'onboarding.js'));
 const AIS = ['claude', 'agents', 'gemini', 'chatgpt', 'prompt'];
 const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex / Cursor / anything that reads AGENTS.md', gemini: 'Gemini', chatgpt: 'ChatGPT custom instructions', prompt: 'a plain system prompt (shareable, no profile)' };
 
 function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
-const VALUE_OPTS = ['--dir', '--ai', '--level'];
-const FLAG_OPTS = ['--yes'];
+const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
+const FLAG_OPTS = ['--yes', '--defaults'];
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -109,6 +117,30 @@ async function main() {
   if (!targets.length) die('no AIs chosen');
   if (new Set(targets).size !== targets.length) die(`an AI is listed twice in --ai (${targets.join(',')}); list each once`);
 
+  // Onboarding answers: a file, the defaults, or the interview. Validated before anything is created.
+  let answers = null, answersSource = '';
+  const answersFile = arg('--answers', null);
+  if (answersFile && arg('--defaults', false)) die('--answers and --defaults are exclusive');
+  if (answersFile) {
+    let raw;
+    try { raw = JSON.parse(fs.readFileSync(path.resolve(answersFile), 'utf8')); } catch (e) { die(`--answers: cannot read ${answersFile} as JSON (${e.message})`); }
+    try { answers = onboarding.validate(raw); } catch (e) { die(`--answers: ${e.message}`); }
+    answersSource = `from ${answersFile}`;
+  } else if (arg('--defaults', false) || !interactive) {
+    answers = onboarding.defaults();
+    answersSource = 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)';
+  } else {
+    console.log('\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.\n');
+    const raw = {};
+    for (const q of onboarding.QUESTIONS) {
+      if (q.options) for (const [v, l] of q.options) console.log(`    ${v.padEnd(30)} ${l}`);
+      const dflt = Array.isArray(q.default) ? q.default.join(', ') : q.default;
+      raw[q.id] = onboarding.parseAnswer(q, await ask(q.ask, dflt || ''));
+    }
+    try { answers = onboarding.validate(raw); } catch (e) { die(`onboarding: ${e.message}`); }
+    answersSource = 'your interview answers';
+  }
+
   // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
   // missing tail is created one level at a time, so nothing is ever created through a
   // symlink that did not exist when you ran the command. Everything beneath root is then
@@ -119,10 +151,14 @@ async function main() {
   let root = fs.realpathSync(existing);
   for (const part of missing) { root = path.join(root, part); fs.mkdirSync(root); }
   if (!fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
-  console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\n`);
+  console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\nOnboarding answers: ${answersSource}\n`);
 
-  // Level 1: profile, home files, the rule source they render from.
-  copyIfAbsent(path.join(PKG, 'templates', 'USER.md'), root, 'USER.md');
+  // Level 1: profile (generated from the answers when absent), home files, the rule source they render from.
+  {
+    const { full, exists } = safeDest(root, 'USER.md');
+    if (exists) console.log('kept   USER.md (exists)');
+    else { fs.writeFileSync(full, onboarding.renderUser(answers), { flag: 'wx' }); console.log('wrote  USER.md (from your answers)'); }
+  }
   for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) copyIfAbsent(path.join(PKG, 'rules', f), root, `rules/${f}`);
   if (targets.includes('claude')) copyIfAbsent(path.join(PKG, 'templates', 'CLAUDE.md'), root, 'CLAUDE.md');
   if (targets.includes('agents')) copyIfAbsent(path.join(PKG, 'templates', 'AGENTS.md'), root, 'AGENTS.md');
@@ -139,6 +175,7 @@ async function main() {
   if (level >= 3) {
     copyIfAbsent(path.join(PKG, 'render', 'render.js'), root, 'render/render.js');
     copyIfAbsent(path.join(PKG, 'render', 'targets.json'), root, 'render/targets.json');
+    copyIfAbsent(path.join(PKG, 'render', 'onboarding.js'), root, 'render/onboarding.js');
     copyIfAbsent(path.join(PKG, 'hooks', 'README.md'), root, 'hooks/README.md');
     const hookCreated = copyIfAbsent(path.join(PKG, 'hooks', 'claude-code', 'session-start.sh'), root, 'hooks/claude-code/session-start.sh');
     copyIfAbsent(path.join(PKG, 'check', 'gate.js'), root, 'check/gate.js');
@@ -150,14 +187,28 @@ async function main() {
       fs.chmodSync(hp, 0o755);
     }
   }
-  const { full: cfg, exists: cfgExists } = safeDest(root, '.agent-personalizer.json');
-  if (!cfgExists) { fs.writeFileSync(cfg, JSON.stringify({ targets, level }, null, 2) + '\n', { flag: 'wx' }); console.log('wrote  .agent-personalizer.json'); }
+  // Config: the one file this installer rewrites. Existing onboarding answers are kept unless
+  // --answers or the interview supplied new ones; targets are merged; "onboarding" is always a target.
+  const { full: cfgPath, exists: cfgExists } = safeDest(root, '.agent-personalizer.json');
+  let cfg = { targets: [], level };
+  if (cfgExists) {
+    try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { die(`.agent-personalizer.json is not valid JSON (${e.message}); fix or remove it`); }
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
+    if (cfg.onboarding && !answersFile && answersSource.startsWith('defaults')) {
+      try { answers = onboarding.validate(cfg.onboarding); answersSource = 'kept from .agent-personalizer.json'; } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
+    }
+  }
+  const allTargets = [...new Set([...(Array.isArray(cfg.targets) ? cfg.targets : []), ...targets, 'onboarding'])];
+  cfg = { ...cfg, targets: allTargets, level: Math.max(level, Number(cfg.level) || 0), onboarding: answers };
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
+  console.log(`${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})`);
 
-  // Render the chosen targets, always from the package's renderer (level 1 and 2 keep no copy).
-  execFileSync(process.execPath, [path.join(PKG, 'render', 'render.js'), '--dir', root, '--targets', targets.join(',')], { stdio: 'inherit' });
+  // Render the chosen targets plus the onboarding file, always from the package's renderer (level 1 and 2 keep no copy).
+  execFileSync(process.execPath, [path.join(PKG, 'render', 'render.js'), '--dir', root, '--targets', [...targets, 'onboarding'].join(',')], { stdio: 'inherit' });
 
   console.log('\nNext:');
-  console.log('  1. Open USER.md and replace every line in parentheses.');
+  console.log('  1. Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer to change an answer.');
+  console.log('     USER.md is yours to edit freely; the onboarding file is regenerated from .agent-personalizer.json.');
   console.log(level >= 3
     ? '  2. Re-render after editing: node render/render.js --dir .'
     : `  2. Re-render after editing by running this installer again (it keeps your files and only refreshes the rendered blocks):\n     npx github:aunysillyme/agent-personalizer --dir . --ai ${targets.join(',')} --level ${level} --yes`);

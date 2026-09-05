@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 54 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 57 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -54,7 +54,7 @@ fi
 # 7. installer: level 3, five targets, clean temp dir, then check clean
 mk; T="$MK"
 expect 0 "installer level 3" node bin/agent-personalizer.js --dir "$T" --ai claude,agents,gemini,chatgpt,prompt --level 3 --yes
-for f in USER.md CLAUDE.md AGENTS.md GEMINI.md chatgpt-custom-instructions.md system-prompt.md rules/50-output-style.md notes/README.md render/render.js check/gate.js hooks/claude-code/session-start.sh .agent-personalizer.json; do
+for f in USER.md AGENT_ONBOARDING.md CLAUDE.md AGENTS.md GEMINI.md chatgpt-custom-instructions.md system-prompt.md rules/50-output-style.md notes/README.md render/render.js render/onboarding.js check/gate.js hooks/claude-code/session-start.sh .agent-personalizer.json; do
   [ -f "$T/$f" ] || fail "installer did not write $f"
 done
 [ -x "$T/hooks/claude-code/session-start.sh" ] || fail "hook not executable"
@@ -93,7 +93,7 @@ cmp -s "$O/victim.md" "$O/victim.expected" || fail "renderer wrote through a sym
 pass "renderer refuses a symlinked target, outside file unchanged"
 
 # 13. renderer refuses a traversal target name from a tampered targets.json
-mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; mk; O="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js render/onboarding.js "$T/render/"
 printf 'SENTINEL\n' > "$O/victim.md"; cp "$O/victim.md" "$O/victim.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='../'+process.argv[1]+'/victim.md';fs.writeFileSync(process.argv[2]+'/render/targets.json',JSON.stringify(t));" "$(basename "$O")" "$T"
 expect 2 "render traversal" node "$T/render/render.js" --dir "$T" --targets claude
@@ -140,7 +140,7 @@ grep -q "sits next to \`CLAUDE.md\`" "$T/c-claude.txt" || fail "claude contract 
 pass "contract respects surfaces, target personal policy, --no-personal, and emits the binding"
 
 # 18. hook exits non-zero when node is absent, zero when present
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render" "$T/hooks/claude-code"; cp render/render.js render/onboarding.js render/targets.json "$T/render/"; cp hooks/claude-code/session-start.sh "$T/hooks/claude-code/"
 /bin/sh "$T/hooks/claude-code/session-start.sh" > "$T/hook.out" || fail "hook failed with node present"
 grep -q 'Session-start contract for claude' "$T/hook.out" || fail "hook printed no contract"
 grep -q 'Read the profile first' "$T/hook.out" || fail "hook contract missing an inject:true rule"
@@ -213,7 +213,7 @@ after="$(ls -d "${TMPDIR:-/tmp}"/gate-selftest-* 2>/dev/null | wc -l | tr -d ' '
 pass "gate self-test cleans up"
 
 # 26. no partial render when a target's parent directory is missing (tampered targets.json)
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js render/onboarding.js "$T/render/"
 printf 'stale\n' > "$T/CLAUDE.md"; cp "$T/CLAUDE.md" "$T/CLAUDE.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.agents.file='missing/AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
 expect 2 "missing parent dir" node "$T/render/render.js" --dir "$T" --targets claude,agents
@@ -291,7 +291,7 @@ grep -q REALPERSONAL "$T/system-prompt.md" && fail "real personal block leaked i
 pass "a heading inside a fenced example is not a section boundary"
 
 # 34. staging cannot collide with a target: two targets on one file, or a target named with the staging suffix, are refused before any write
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js render/onboarding.js "$T/render/"
 printf 'HANDWRITTEN\n' > "$T/AGENTS.md"; cp "$T/AGENTS.md" "$T/AGENTS.expected"
 node -e "const fs=require('fs');const t=JSON.parse(fs.readFileSync('render/targets.json','utf8'));t.claude.file='AGENTS.md';fs.writeFileSync(process.argv[1]+'/render/targets.json',JSON.stringify(t));" "$T"
 expect 2 "two targets one file" node "$T/render/render.js" --dir "$T" --targets claude,agents
@@ -316,7 +316,7 @@ expect 2 "invalid utf-8 USER.md" node render/render.js --dir "$T" --targets clau
 pass "non-UTF-8 sources refused"
 
 # 37. malformed targets.json and malformed .agent-personalizer.json are refusals (exit 2), not crashes
-mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js "$T/render/"; printf '{ not json' > "$T/render/targets.json"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; mkdir -p "$T/render"; cp render/render.js render/onboarding.js "$T/render/"; printf '{ not json' > "$T/render/targets.json"
 expect 2 "malformed targets.json" node "$T/render/render.js" --dir "$T" --targets claude
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{ not json' > "$T/.agent-personalizer.json"
 expect 2 "malformed config" node render/render.js --dir "$T" --check
@@ -478,5 +478,51 @@ mk; L="$MK"; printf 'zzqqxx-no-such-term\n' > "$L/list.txt"; echo "zzqqxx-no-suc
 node check/gate.js --dir "$R/sub" --list "$L/list.txt" > "$L/o.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "nested --dir missed a modified tracked file (exit $got)"
 grep -q 'a.txt (working tree)' "$L/o.txt" || fail "nested --dir hit not attributed to the working tree"
 pass "nested --dir scans modified tracked files' working-tree copies"
+
+# 55. onboarding: --answers renders AGENT_ONBOARDING.md and USER.md from the answers; check clean; rerun keeps them; contract carries the block
+mk; T="$MK"
+expect 0 "installer with answers" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --answers test/fixtures/answers.json --yes
+for f in AGENT_ONBOARDING.md USER.md .agent-personalizer.json; do [ -f "$T/$f" ] || fail "onboarding: $f not written"; done
+grep -q 'Call them:\*\* Mara (she/her)' "$T/AGENT_ONBOARDING.md" || fail "onboarding: name/pronouns missing"
+grep -q 'a kanban board the AI reads' "$T/AGENT_ONBOARDING.md" || fail "onboarding: tracker missing"
+grep -q 'signed contracts' "$T/AGENT_ONBOARDING.md" || fail "onboarding: off-limits missing"
+grep -q 'start a reply with Great question' "$T/AGENT_ONBOARDING.md" || fail "onboarding: never-list missing"
+grep -q '^- \*\*delete\*\*' "$T/AGENT_ONBOARDING.md" || fail "onboarding: always-ask list missing"
+grep -q 'settings' "$T/AGENT_ONBOARDING.md" && grep -q '^- \*\*settings\*\*' "$T/AGENT_ONBOARDING.md" && fail "onboarding: an always-ask item the user did not choose was rendered"
+grep -q 'Name and pronouns:\*\* Mara, she/her' "$T/USER.md" || fail "USER.md not generated from answers"
+grep -q 'AGENT_ONBOARDING.md' "$T/CLAUDE.md" || fail "CLAUDE.md does not point at the onboarding file"
+expect 0 "onboarding check" node render/render.js --dir "$T" --check
+printf 'MINE\n' > "$T/USER.md.expected"; cp "$T/USER.md" "$T/USER.md.expected"
+expect 0 "installer rerun" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes
+cmp -s "$T/USER.md" "$T/USER.md.expected" || fail "rerun changed USER.md"
+grep -q '"name": "Mara"' "$T/.agent-personalizer.json" || fail "rerun lost the onboarding answers"
+node render/render.js --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract failed"
+grep -q 'How to work with Mara' "$T/c.txt" || fail "contract missing the onboarding block"
+node render/render.js --dir "$T" --contract --contract-target claude --no-personal > "$T/c2.txt" || fail "contract --no-personal failed"
+grep -q 'How to work with Mara' "$T/c2.txt" && fail "--no-personal still emitted the onboarding block"
+pass "onboarding: answers render both files, check clean, rerun keeps answers, contract carries the block"
+
+# 56. onboarding: invalid answers are refused before anything is created
+mk; T="$MK"; mk; F="$MK"
+printf '{"tone": "rude"}' > "$F/bad1.json"; expect 2 "bad choice" node bin/agent-personalizer.js --dir "$T/a" --ai claude --level 1 --answers "$F/bad1.json" --yes
+printf '{"favourite_colour": "blue"}' > "$F/bad2.json"; expect 2 "unknown key" node bin/agent-personalizer.js --dir "$T/b" --ai claude --level 1 --answers "$F/bad2.json" --yes
+printf '{"never": "em dashes"}' > "$F/bad3.json"; expect 2 "list as string" node bin/agent-personalizer.js --dir "$T/c" --ai claude --level 1 --answers "$F/bad3.json" --yes
+printf '{"always_ask": ["delete", "launch-missiles"]}' > "$F/bad4.json"; expect 2 "unknown multi value" node bin/agent-personalizer.js --dir "$T/d" --ai claude --level 1 --answers "$F/bad4.json" --yes
+printf '{"name": "two\nlines"}' > "$F/bad5.json"; expect 2 "multiline text" node bin/agent-personalizer.js --dir "$T/e" --ai claude --level 1 --answers "$F/bad5.json" --yes
+printf 'not json' > "$F/bad6.json"; expect 2 "answers not json" node bin/agent-personalizer.js --dir "$T/f" --ai claude --level 1 --answers "$F/bad6.json" --yes
+expect 2 "answers and defaults together" node bin/agent-personalizer.js --dir "$T/g" --ai claude --level 1 --answers test/fixtures/answers.json --defaults --yes
+[ ! -e "$T/a" ] && [ ! -e "$T/g" ] || fail "installer created folders before refusing bad answers"
+pass "onboarding: bad choice, unknown key, wrong type, unknown multi, multiline, non-JSON, exclusive flags all refused, nothing created"
+
+# 57. onboarding: --yes without answers uses the defaults and says so; the onboarding target refuses without answers in the config
+mk; T="$MK"
+node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes > "$T/out.txt" || fail "installer defaults"
+grep -q 'onboarding: defaults' "$T/out.txt" || fail "installer did not say it used defaults"
+grep -q 'Call them:\*\* the user' "$T/AGENT_ONBOARDING.md" || fail "defaults not rendered"
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": ["claude"]}' > "$T/.agent-personalizer.json"
+expect 2 "onboarding target without answers" node render/render.js --dir "$T" --targets onboarding
+mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": ["claude"], "onboarding": {"tone": "rude"}}' > "$T/.agent-personalizer.json"
+expect 2 "invalid onboarding in config" node render/render.js --dir "$T" --check
+pass "onboarding: defaults are explicit; missing or invalid answers in the config are refusals"
 
 echo; echo "all checks passed"
