@@ -17,7 +17,7 @@
   DOCS points at the matching tag on GitHub so an installed copy never links to a file the
   destination does not have.
 */
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
 
 /* THE single source for notes tools. Add a tool here and nowhere else: the interview option, the

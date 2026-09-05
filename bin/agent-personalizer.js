@@ -3,7 +3,7 @@
 /*
   agent-personalizer installer.
 
-    npx github:aunysillyme/agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
+    npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
                                               [--answers <file.json>] [--defaults] [--yes]
 
   Interactive when flags are missing and stdin is a terminal. Non-interactive with flags.
@@ -47,7 +47,7 @@ const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
 const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--help', '--version'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
-  npx github:aunysillyme/agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
+  npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3|4]
                                             [--answers <file.json> | --answers - | --defaults] [--quick] [--yes]
                                             [--help] [--version]
 
@@ -364,7 +364,7 @@ async function main() {
 
   const DOCS = onboarding.DOCS;
   // the rerun command a user can actually type: the npx form when this ran from npm's cache, else the local path that just worked
-  const SELF = /[\\/]_npx[\\/]|[\\/]node_modules[\\/]/.test(PKG) ? 'npx github:aunysillyme/agent-personalizer' : `node ${path.relative(process.cwd(), path.join(PKG, 'bin', 'agent-personalizer.js')) || 'bin/agent-personalizer.js'}`;
+  const SELF = /[\\/]_npx[\\/]|[\\/]node_modules[\\/]/.test(PKG) ? 'npx agent-personalizer' : `node ${path.relative(process.cwd(), path.join(PKG, 'bin', 'agent-personalizer.js')) || 'bin/agent-personalizer.js'}`;
   console.log('\nNext:');
   console.log('  1. Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer with new answers to change it.');
   console.log('     USER.md is yours to edit freely; the onboarding file is regenerated from .agent-personalizer.json.');
