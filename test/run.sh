@@ -586,6 +586,9 @@ for tool in obsidian logseq folder; do
   grep -q 'MyVault/sessions/' "$OUT" || fail "$tool: session-log path missing"
   grep -q 'Every folder you write into has a README' "$OUT" || fail "$tool: README rule missing"
   grep -q 'No filesystem writes' "$OUT" && fail "$tool: cloud rule leaked into a disk render"
+  grep -q '`MyVault/README.md`' "$T/$tool/USER.md" || fail "$tool: USER.md does not point at the vault README"
+  grep -q 'index page of' "$T/$tool/USER.md" && fail "$tool: USER.md points at an external index for a disk tool"
+  node render/render.js --dir "$T/$tool" --contract --contract-target claude | grep -q 'at MyVault\.' || fail "$tool: contract line wrong"
 done
 # obsidian without obsidian-tc (default): plain files, companion recommended, contract does not claim obsidian-tc
 grep -q 'as plain files (obsidian-tc is not installed' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian without tc: plain-files line missing"
@@ -607,6 +610,10 @@ for tool in notion google-docs apple-notes; do
   grep -q '/sessions/' "$OUT" && fail "$tool: filesystem session-log path leaked"
   grep -q 'Every folder you write into has a README' "$OUT" && fail "$tool: folder README rule leaked into a cloud render"
   grep -q 'Session log' "$OUT" || fail "$tool: session log unit missing"
+  grep -q 'Studio Wiki/README.md' "$T/$tool/USER.md" && fail "$tool: USER.md renders a filesystem README path"
+  grep -q 'of "Studio Wiki"' "$T/$tool/USER.md" || fail "$tool: USER.md missing the index-unit rule"
+  node render/render.js --dir "$T/$tool" --contract --contract-target claude | grep -q 'through its connector, no filesystem writes' || fail "$tool: contract line wrong"
+  grep -qE 'where the app offers one|separately installed' "$HINT" || fail "$tool: hint missing"
 done
 grep -q "Notion's own MCP connector" "$T/notion/AGENT_ONBOARDING.md" && grep -q 'never create one unasked' "$T/notion/AGENT_ONBOARDING.md" || fail "notion connector or posture missing"
 grep -q 'Google Drive / Docs connector' "$T/google-docs/AGENT_ONBOARDING.md" || fail "google-docs connector missing"
