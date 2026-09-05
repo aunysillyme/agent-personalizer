@@ -332,7 +332,8 @@ pass "--check refuses duplicate targets"
 # 39. an existing target keeps its mode across a render; a new target gets 0644
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; chmod 600 "$T/CLAUDE.md"; rm -f "$T/AGENTS.md"
 expect 0 "mode render" node render/render.js --dir "$T" --targets claude,agents
-m1="$(stat -f %Lp "$T/CLAUDE.md" 2>/dev/null || stat -c %a "$T/CLAUDE.md")"; m2="$(stat -f %Lp "$T/AGENTS.md" 2>/dev/null || stat -c %a "$T/AGENTS.md")"
+mode() { node -e 'console.log((require("fs").statSync(process.argv[1]).mode & 0o777).toString(8))' "$1"; }   # portable: GNU stat -f means filesystem status, not file mode
+m1="$(mode "$T/CLAUDE.md")"; m2="$(mode "$T/AGENTS.md")"
 [ "$m1" = "600" ] || fail "existing target mode changed to $m1"
 [ "$m2" = "644" ] || fail "new target mode is $m2, expected 644"
 pass "target modes preserved (600 kept, new file 644)"
