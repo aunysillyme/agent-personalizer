@@ -1,6 +1,6 @@
 {
   "name": "agent-personalizer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Personalize any AI with dynamic instructions. One profile, one rule source, rendered for Claude, Codex, Cursor, Gemini and ChatGPT.",
   "license": "MIT",
   "repository": "github:aunysillyme/agent-personalizer",
