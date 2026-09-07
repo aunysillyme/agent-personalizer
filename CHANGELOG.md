@@ -6,6 +6,14 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-06
+
+### Added
+
+- `author` in `package.json`, so npm shows a byline: `aunysillyme (https://github.com/aunysillyme)`. It needs an `allow:` entry in the private forbidden list, which is the gate working as designed: attribution is opt-in, one exact string at a time.
+- An npm version badge in the README, matching the other published package.
+- The installer's last line now points at the repository, on the reasoning that the end of a successful install is the moment a user is most likely to act on it.
+
 ## [0.4.2] - 2026-09-05
 
 ### Added
@@ -111,6 +119,7 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
 [Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...HEAD
+[0.4.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.3.0...v0.4.0

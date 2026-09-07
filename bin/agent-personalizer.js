@@ -384,6 +384,7 @@ async function main() {
   else if (['onenote', 'evernote'].includes(answers.notes_tool)) console.log(`\nNote: ${answers.notes_tool} has no first-class agent door today; the onboarding file treats it as read-only. See ${DOCS}/companions.md`);
   console.log(`Several agents? Read ${DOCS}/companions.md on the Context Layer: purpose-bound bundles and receipts for every delegation.`);
   console.log('\nNothing here read an environment variable or wrote a secret.');
+  console.log('\nIf this saved you time, a star helps people find it: https://github.com/aunysillyme/agent-personalizer');
 }
 
 main().catch(e => { if (e && e.status !== undefined) process.exit(e.status || 1); console.error(e.message); process.exit(1); });
