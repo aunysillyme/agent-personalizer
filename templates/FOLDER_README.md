@@ -1,4 +1,4 @@
-# <Folder name>
+# `<Folder name>`
 
 *One line: what this folder is for and what does NOT belong here.*
 
@@ -32,4 +32,4 @@
 Relevant means a decision, a status flip, a reversal, a new section, a changed scope. Not a typo fix. If nothing became untrue, leave it and say so.
 
 ---
-Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words on what changed>
+`Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words on what changed>`

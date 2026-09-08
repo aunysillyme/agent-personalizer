@@ -8,9 +8,9 @@ A decision that reverses an earlier one names the earlier line and says "superse
 
 ---
 
-- <YYYY-MM-DD> · <decision> · why: <reason> · where: <session slug>
+- `<YYYY-MM-DD> · <decision> · why: <reason> · where: <session slug>`
 
 ---
 <!-- synthesis watermark: read through <YYYY-MM-DD> (a sweep that promotes decisions to memory updates this line) -->
 
-Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>
+`Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>`

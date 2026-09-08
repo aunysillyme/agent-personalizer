@@ -383,6 +383,17 @@ function between(existing, file) {
   return existing.slice(st.bEnd, st.eStart).replace(/\r\n/g, '\n').replace(/^\n/, '').replace(/\n$/, '');
 }
 
+/* One line per file, one verb per line, and the verb is the one that is true of THAT file. The
+   installer writes a home file from its template and then calls this renderer to fill the block, so
+   a run that printed "wrote" for both steps said the same file was created twice, and a re-run that
+   kept the file printed "kept" and then "wrote" it. */
+function report(label, existing, current, block, raw) {
+  if (existing == null) return `wrote  ${label}`;
+  if (current === block) return `ok     ${label} (${raw ? 'already current' : 'rendered block already current'})`;
+  if (!raw && current === null) return `update ${label} (rendered block added)`;
+  return `update ${label} (${raw ? 'rewritten' : 'rendered block'})`;
+}
+
 function main() {
   ARGS = parseArgs();
   if (arg('--version', false) || arg('-v', false)) { process.stdout.write(onboarding.VERSION + '\n'); return; }
@@ -447,7 +458,7 @@ function main() {
     // the generated file must itself re-parse to exactly one block, or the next render would refuse it
     if (output != null) { const st = markerState(output, `${target.file} (generated)`); if (st.kind !== 'one' || between(output, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
     const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
-    const entry = { key, target, file, block, current, output, mode };
+    const entry = { key, target, file, block, current, output, mode, report: report(target.file, existing, current, block, false) };
     if (!target.boxes) return entry;
     // the two plain paste files: whole-file outputs, no markers, compared whole in --check
     const raws = Object.entries(target.boxFiles || {}).map(([which, rel]) => {
@@ -457,7 +468,7 @@ function main() {
       if (fs.existsSync(rfile)) rexisting = decodeUtf8(fs.readFileSync(rfile), rel);
       if (!check) { try { fs.accessSync(rexisting == null ? path.dirname(rfile) : rfile, fs.constants.W_OK); } catch (_) { die(`${rel}: not writable. Nothing was written`); } }
       const rmode = rexisting == null ? 0o644 : (fs.statSync(rfile).mode & 0o777);
-      return { key: `${key}:${which}`, target: { file: rel }, file: rfile, block: text, current: rexisting, output: check ? null : text, mode: rmode, raw: true };
+      return { key: `${key}:${which}`, target: { file: rel }, file: rfile, block: text, current: rexisting, output: check ? null : text, mode: rmode, raw: true, report: report(rel, rexisting, rexisting, text, true) };
     });
     return [entry, ...raws];
   }).flat();
@@ -516,7 +527,7 @@ function main() {
   try {
     for (const p of plan) {
       const tmp = path.join(path.dirname(p.file), `.${path.basename(p.file)}.${run}.agent-personalizer.tmp`);
-      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode });   // recorded BEFORE the file can exist; cleanup tolerates ENOENT
+      staged.push({ tmp, file: p.file, label: p.target.file, mode: p.mode, report: p.report });   // recorded BEFORE the file can exist; cleanup tolerates ENOENT
       fs.writeFileSync(tmp, p.output, { flag: 'wx', mode: p.mode });
       fs.chmodSync(tmp, p.mode);
     }
@@ -538,7 +549,7 @@ function main() {
   } catch (e) { undo(`could not commit output (${e.message})`); }
   const leftovers = [];
   for (const c of committed) if (c.bak) tryUnlink(c.bak, leftovers, 'backup not removed');
-  for (const s of staged) console.log(`wrote  ${s.label}`);
+  for (const s of staged) console.log(s.report);
   for (const o of (renderTarget.overBudget || [])) console.log(`OVER BUDGET  ${o} (written in full; trim by hand, bottom up)`);
   if (leftovers.length) {
     console.error('render: every target was written, but CLEANUP INCOMPLETE. Remove these by hand (they hold copies of the previous targets):');

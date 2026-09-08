@@ -43,7 +43,7 @@ Lexical search and every note tool work immediately; semantic and graph retrieva
 - **Write policy** "logs and inbox only" or "ask before every write" is the Layer's rule that memory writes remain proposals until approved.
 - **Off limits** is the Layer's vault stage: originals that never enter a bundle.
 - **Always ask before** is the Layer's decide stage: allow, reduce, approve or deny by action and recipient.
-Level 4 (several agents) is where it earns its keep: each delegation carries a purpose-bound bundle and returns a receipt, so you can answer "who saw what, and why" after the fact. The repo's `AGENT_ONBOARDING.md` is the human-readable policy; the Context Layer is how you make a machine enforce and record it.
+Running several agents is where it earns its keep (the hand-off layer, which this repo does not install): each delegation carries a purpose-bound bundle and returns a receipt, so you can answer "who saw what, and why" after the fact. The repo's `AGENT_ONBOARDING.md` is the human-readable policy; the Context Layer is how you make a machine enforce and record it.
 
 ---
 

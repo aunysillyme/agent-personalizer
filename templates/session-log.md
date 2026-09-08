@@ -1,4 +1,4 @@
-# Session log · <YYYY>-W<ww>
+# Session log · `<YYYY>-W<ww>`
 
 *One note per ISO week. Each session appends a dated section below. Records are grouped by type so a later sweep can promote the durable ones to memory. Nothing here is a rule until it is promoted.*
 
@@ -6,7 +6,7 @@ Record types: `decision` · `correction` (the AI was wrong, how, what it should 
 
 ---
 
-## <YYYY-MM-DD> - <three-to-six-word slug>
+## `<YYYY-MM-DD>` - `<three-to-six-word slug>`
 
 **What happened:** one or two lines.
 
@@ -19,4 +19,4 @@ Record types: `decision` · `correction` (the AI was wrong, how, what it should 
 
 <!-- next session appends above this line, newest at the top of the week -->
 
-Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>
+`Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>`

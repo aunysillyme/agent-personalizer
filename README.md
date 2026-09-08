@@ -6,14 +6,15 @@
 
 Most people set up custom instructions once, in one app, and still get generic output. The instructions decay over a long chat, the AI forgets where things are, every app has its own copy that drifts, and the AI treats its own guesses about you as your rulings.
 
-This repo is the fix, in four levels. Stop at the level you need.
+This repo is the fix, in three install levels. Stop at the level you need. A level is the only thing the installer asks you to pick.
 
-| Level | You have | You get |
+| Level | You have | It writes |
 |---|---|---|
-| **1. One profile** | one AI, one app | three files: a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), and a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`) with the rules rendered into it. Plus the installer's own `.agent-personalizer.json`. Nothing else. |
-| **2. Dynamic docs** | a notes folder the AI may edit | templates and rules for the AI to follow: folder indexes it keeps current, a weekly session log, a decisions log, a signature on every edit (if you want one), an inbox convention (one file per item, deleted when done). Instructions, not automation: the AI does the keeping. |
-| **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | the automation: your own copy of `rules/` to edit, one rule source rendered per AI, a session-start contract that puts your rules in context at decision time, a drift check that fails loudly, a forbidden-string gate. |
-| **4. Hand-off** | several AIs | reading material only for now: pointers to the multi-agent layer (routing, task bundles, verified CLI runs) and to two companion tools that enforce what this repo can only state. |
+| **1. Profile and home file** | one AI, one app | four files and no folders: a profile of you (`USER.md`), an agent onboarding file written from your answers (`AGENT_ONBOARDING.md`), a home file the AI reads first (`CLAUDE.md` or `AGENTS.md`) with the rules rendered into it, and the installer's own `.agent-personalizer.json`. Nothing else, and the home file names nothing that is not there. |
+| **2. Dynamic docs** | a notes folder the AI may edit | everything in level 1, plus the notes folder itself: a folder index, a weekly session log, a decisions log and an inbox, each with the rules the AI follows when it writes there. Instructions, not automation: the AI does the keeping. |
+| **3. Mechanisms** | a coding agent (Claude Code, Codex, Cursor) | everything above, plus the automation: your own copy of `rules/` to edit, one rule source rendered per AI, a session-start contract that puts your rules in context at decision time, a drift check that fails loudly, a forbidden-string gate. |
+
+Level 3 is the top. There is a fourth tier of this system, the hand-off layer, but it ships no files yet and the installer does not offer it: [read what it is](#the-hand-off-layer-not-an-install-level) rather than installing it.
 
 Everything here is the generalized shape of a system that runs in production every day. The examples are invented. The failures the rules prevent are real.
 
@@ -29,7 +30,19 @@ Everything here is the generalized shape of a system that runs in production eve
 npx agent-personalizer
 ```
 
-Published on npm with provenance from this repository's own workflow (`npx github:aunysillyme/agent-personalizer` still works and runs the same code straight from the tag). The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets. `--help` lists every flag; `--quick` asks the seven questions that change behaviour and defaults the rest; `--answers file.json` (or `--answers -` from stdin) scripts it.
+Published on npm with provenance from this repository's own workflow (`npx github:aunysillyme/agent-personalizer` still works and runs the same code straight from the tag). The installer asks which AIs you use and which level you want, then writes only the matching files into the folder you point it at. It never writes secrets. `--help` lists every flag.
+
+**The interview is short by default.** A bare `npx agent-personalizer` asks the seven questions that change behaviour (name, tone, length, notes tool and path, write policy, always-ask) plus any question the notes tool you pick makes apply, and defaults the rest. `--full` asks all 23.
+
+**`--yes` and `--defaults` are not the same flag.**
+
+- `--defaults` is the ANSWER SOURCE: accept every default without being asked. Use it with or without `--yes`.
+- `--yes` is NON-INTERACTIVE MODE. It needs `--dir`, `--ai` and `--level`; without those it exits 2. With no `--answers` it falls back to the defaults.
+- `--answers file.json` (or `--answers -` from stdin) is the other answer source, and scripts the whole interview.
+
+```bash
+npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
+```
 
 No Node? Copy `templates/USER.md` and `templates/CLAUDE.md` (or `templates/AGENTS.md`) into your project by hand. That is level 1.
 
@@ -41,9 +54,9 @@ npm_config_cache=./.npm-cache npx agent-personalizer
 
 ---
 
-## The five tiers (why this works)
+## Why this works: the five places instructions live
 
-Your instructions live in five places, each with one job and one failure it prevents. Read [docs/tiers.md](docs/tiers.md) before writing a rule.
+**These are not the install levels, and there is nothing to pick here.** The levels above are what the installer writes. The five tiers below are where instructions live once they are written, and why each placement exists. Read [docs/tiers.md](docs/tiers.md) before writing a rule of your own.
 
 | Tier | What | Prevents |
 |---|---|---|
@@ -63,19 +76,21 @@ Your instructions live in five places, each with one job and one failure it prev
 
 The installer asks you how an AI should work with you, then writes the answers to `AGENT_ONBOARDING.md`: how to talk to you, how to shape output, what to read first and in what order, where it may write, how to save a file, and what it must always ask before doing. It is generated from your answers in `.agent-personalizer.json`, so every AI you point at the folder gets the same manual, and re-running the installer changes it everywhere at once.
 
-- **Interactive**: run the installer without `--yes` and answer the questions. Enter accepts the default.
-- **Scripted**: `--answers my-answers.json` (see [`test/fixtures/answers.json`](test/fixtures/answers.json) for the shape). Unknown keys, wrong types or unknown choices are refused before anything is written.
-- **Defaults**: `--defaults` or `--yes`. The defaults are one working setup: direct, short, one-line corrections, settle facts yourself and ask only when the answer changes what gets built, verdict first, bullets, evidence inline, sign every edit, always ask before delete / publish / send / spend / settings / standing rules. Every one is a question you can answer differently.
+- **Interactive**: run the installer without `--yes` and answer the questions. Enter accepts the default. The short interview is the default: seven questions, plus any the notes tool you pick makes apply. `--full` asks all 23. A question that applies to one notes tool is never asked about another, so nobody answers the Obsidian question about Notion.
+- **Scripted**: `--answers my-answers.json` (see [`test/fixtures/answers.json`](test/fixtures/answers.json) for the shape), or `--answers -` to read the JSON from stdin. Unknown keys, wrong types or unknown choices are refused before anything is written.
+- **Defaults**: `--defaults`. That is the answer source, and it is not `--yes`, which is non-interactive mode and needs `--dir`, `--ai` and `--level`. A non-interactive run with no answer source falls back to the defaults and says so. The defaults are one working setup: direct, short, one-line corrections, settle facts yourself and ask only when the answer changes what gets built, verdict first, bullets, evidence inline, sign every edit, always ask before delete / publish / send / spend / settings / standing rules. Every one is a question you can answer differently.
 
 `USER.md` is generated from the same answers the first time and is then yours to edit. Re-running with changed answers regenerates `AGENT_ONBOARDING.md` and every rendered block; `USER.md` is regenerated only if you never edited it (it still equals the render of the previous answers), otherwise it is kept and the installer names the answers that changed so you can carry them over by hand. Two rules depend on answers: the signature rule renders only when you answered yes, and the output-style rule defers to your stated shape instead of imposing one. The session-start contract carries a short version of the onboarding block, restrictions first, so it is present at the moment of decision, not only in a file.
 
 ChatGPT has two custom-instruction boxes with a character budget, so its render is the compact profile plus the onboarding block and only the `inject: true` rules, each box measured against the budget, and written twice: inside `chatgpt-custom-instructions.md` with the counts, and as two plain paste files, `chatgpt-box1.txt` and `chatgpt-box2.txt`. `render.cjs --strict` exits 1 instead of writing when a box is over budget, for people who wire the render into CI. Nothing is cut silently: an over-budget box is written in full and flagged, ordered so the last lines are the cheapest to trim. For the rest of the rules, use a ChatGPT Project and upload `AGENT_ONBOARDING.md` and `rules/` as files.
 
-## Level 1: one file
+## Level 1: the profile and one home file
 
 1. Fill in [`templates/USER.md`](templates/USER.md), or let the installer generate it from your onboarding answers. Who you are, how to talk to you, how firmly you mean things, how you want output shaped.
 2. Copy [`templates/CLAUDE.md`](templates/CLAUDE.md) for Claude, or [`templates/AGENTS.md`](templates/AGENTS.md) for Codex, Cursor and most other coding agents. Both are pointers: they tell the AI to read `USER.md` first and where everything else lives.
 3. Paste the `USER.md` body into the "custom instructions" box of any chat app that has one.
+
+Level 1 creates no notes folder, so the home file it writes names none: it points at `AGENT_ONBOARDING.md` for where the AI may write. Level 2 creates the folder and repoints the home file at it in the same run.
 
 **The one idea in level 1:** the home file carries pointers, not hand-maintained copies. Text you retype drifts. A pointer does not, and neither does a block the renderer regenerates and `--check` compares (level 3): that block is a generated snapshot, with one owner and a drift check, which is the other acceptable shape.
 
@@ -107,9 +122,11 @@ Two companions turn the onboarding answers from advice into enforcement. Neither
 - **[obsidian-tc](https://github.com/The-40-Thieves/obsidian-tc)** for Obsidian vaults: governed MCP access. Your **off-limits** answer becomes a folder ACL, your **always-ask** answer becomes its human-in-the-loop list, and destructive tools fail closed until you confirm. `npx obsidian-tc /path/to/vault`.
 - **[The Context Layer](https://sierracatalina.com/context-layer)** by Sierra Catalina: purpose-bound context with receipts. Capture → normalize → vault → decide → bundle → act; memory writes remain proposals. Your **write policy** and **off-limits** answers are its decide and vault stages in miniature. Read the essay first, then run the starter.
 
-## Level 4: hand-off
+## The hand-off layer (not an install level)
 
 Once you run several AIs, personalization is not the problem any more; routing is. That is a separate layer: which model handles which task, task bundles for every delegation, and CLI runs that only count as success when a deliverable exists. It is being built as its own repo and will link from here when it ships. This repo stays the beginner tier of that stack.
+
+Nothing here installs it, so the installer stops at level 3. `--level 4` is still accepted, because it once was offered, and it writes exactly what `--level 3` writes.
 
 ---
 
@@ -133,7 +150,7 @@ examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
 CHANGELOG.md keyed on audit rounds
 .github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm publish with provenance, dispatched per tag
-test/        run.sh: 83 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+test/        run.sh: 88 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Changelog
