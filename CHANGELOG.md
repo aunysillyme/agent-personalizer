@@ -6,6 +6,30 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-08
+
+A first-run walkthrough of 0.4.3 by an outside reader, filed as issues #19 to #24. Every one was reproduced before its fix, and each has a harness check that fails on 0.4.3 and passes here (checks 84 to 88).
+
+### Changed
+
+- **The interview is short by default** (#23). A bare `npx agent-personalizer` asks the seven questions that change behaviour, not all 23. `--full` asks the rest. `--quick` still works and is now the default it used to name.
+- **A conditional question is asked only when it applies** (#23). The Obsidian question is asked about an Obsidian vault and nothing else; the "name your tool" question only when the tool is `other`. That answer was previously asked of everyone and skipped by `--quick`, so a short interview could pick `other` and never name it. One exported rule, `onboarding.asks()`, decides this for the installer and for the harness, so the check tests the installer rather than a copy of it.
+- **A level-1 install no longer names a notes folder it did not create** (#19). Level 1 writes four files and no folders, and its `CLAUDE.md` / `AGENTS.md` said to read `notes/README.md`, `notes/sessions/`, `notes/decisions.md` and `notes/inbox/`: four dead pointers in the first session. The home file now carries one line pointing at `AGENT_ONBOARDING.md`, and a later `--level 2` restores the four real pointers in the same run that creates the folder behind them, touching only lines this installer wrote.
+- **One verb per file in the install log** (#20). The installer wrote a home file from its template and the renderer then filled its marker block, and both steps printed `wrote`; a re-run printed `kept` and then `wrote` the same file. The renderer now says what is true of that file: `wrote` a file that did not exist, `update ... (rendered block)` when the block changed, `ok ... (rendered block already current)` when it did not. The installer labels the template write `wrote CLAUDE.md (pointer file; the renderer fills its block below)`.
+- **The success text names the folder that was installed, and the paste step** (#21). The rerun command printed `--dir .`, which writes into wherever it is pasted from, not where the install went; it now prints the absolute path. The same block separates the files an AI reads from the folder by itself (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) from the ones a human still has to paste (claude.ai, ChatGPT, a system prompt), and links `docs/paste-guide.md`. The companions line prints only when more than one AI was installed, which is what it is about.
+- **Level 4 is no longer offered** (#22). It was listed as a peer of 1 to 3 and then described as reading material for a layer that ships nothing. The installer, its `--help`, and the README now stop at 3. `--level 4` is still accepted so an older script keeps working, and says outright that it installs exactly what level 3 installs.
+- **The README stops mixing levels with tiers** (#22). The install table has three rows and one name for the choice; the five tiers are introduced as where instructions live once written, not as something to pick. The heading "Level 1: one file" said one file over a table that said four; it now says what it writes.
+- **`--yes` and `--defaults` are documented as the different flags they are** (#23). `--defaults` is the answer source, `--yes` is non-interactive mode and needs `--dir`, `--ai` and `--level`.
+
+### Fixed
+
+- **The default profile told the AI to "settle facts itself" under a heading addressed to it** (#24). The interview asks the human about the AI, so its option labels are third person; `USER.md`, `AGENT_ONBOARDING.md` and the session-start contract address the AI, and now take a second-person phrasing where a choice carries one ("settle facts yourself"). Every default install shipped the wrong voice, and the same line was copied into the ChatGPT boxes.
+- **Angle-bracket placeholders no longer vanish on GitHub** (#24). `Last edited by: <ai> <model> <date>` rendered as `Last edited by:  ·` in the four note templates, because GitHub treats the brackets as HTML. They, and five more in the same files (`# <Folder name>`, the week heading, the decisions-log example row), are now inside code spans. The README's own two occurrences were already fenced and rendered correctly; the files it links to were not. Check 88 scans every template, skipping fenced blocks and HTML comments, so a new one cannot reappear.
+
+### Added
+
+- Harness checks 84 to 88, one per issue, each verified to fail against the 0.4.3 tree and pass here. 88 checks in total.
+
 ## [0.4.3] - 2026-09-06
 
 ### Added
@@ -118,7 +142,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.0...v0.4.1

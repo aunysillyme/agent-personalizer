@@ -16,4 +16,4 @@
 | (none) | |
 
 ---
-Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>
+`Last edited by: <ai> <model> <YYYY-MM-DD> · <ten words>`

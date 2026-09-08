@@ -17,7 +17,7 @@
   DOCS points at the matching tag on GitHub so an installed copy never links to a file the
   destination does not have.
 */
-const VERSION = '0.4.3';
+const VERSION = '0.5.0';
 const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
 
 /* THE single source for notes tools. Add a tool here and nowhere else: the interview option, the
@@ -60,7 +60,7 @@ const QUESTIONS = [
   { id: 'mistakes', ask: 'When the AI is wrong, how should it handle it?', type: 'choice', default: 'one-line',
     options: [['one-line', 'state the correction in one line and move on'], ['brief', 'correction plus one line on the cause'], ['full', 'correction plus the full cause']] },
   { id: 'unsure', ask: 'When the AI is unsure, what should it do?', type: 'choice', default: 'ask-when-it-changes-the-build',
-    options: [['ask-when-it-changes-the-build', 'settle facts itself; ask only when the answer changes what gets built'], ['ask-first', 'ask before doing anything uncertain'], ['assume-and-say', 'proceed on a stated assumption, never ask']] },
+    options: [['ask-when-it-changes-the-build', 'settle facts itself; ask only when the answer changes what gets built', 'settle facts yourself; ask only when the answer changes what gets built'], ['ask-first', 'ask before doing anything uncertain'], ['assume-and-say', 'proceed on a stated assumption, never ask']] },
   { id: 'lead_with', ask: 'What should a reply open with?', type: 'choice', default: 'verdict',
     options: [['verdict', 'the answer or the verdict'], ['summary', 'a one-paragraph summary'], ['context', 'the context, then the answer']] },
   { id: 'structure', ask: 'How should replies be shaped?', type: 'choice', default: 'bullets',
@@ -71,9 +71,9 @@ const QUESTIONS = [
   { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md'] },
   { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
     options: Object.entries(TOOL).map(([k, t]) => [k, t.label]) },
-  { id: 'obsidian_tc', ask: 'If Obsidian: do you use obsidian-tc, the governed MCP?', type: 'choice', default: 'no',
+  { id: 'obsidian_tc', ask: 'Do you use obsidian-tc, the governed MCP?', type: 'choice', default: 'no', when: (a) => a.notes_tool === 'obsidian',
     options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
-  { id: 'notes_tool_name', ask: 'If "other": the name of the tool (blank otherwise)', type: 'text', default: '' },
+  { id: 'notes_tool_name', ask: 'The name of that tool', type: 'text', default: '', when: (a) => a.notes_tool === 'other' },
   { id: 'notes_path', ask: 'Where inside it: the folder path (Obsidian, Logseq, plain folder), or the workspace / notebook / folder name (Notion, Google Docs, Apple Notes, others)', type: 'text', default: 'notes' },
   { id: 'tracker', ask: 'Your task tracker, if the AI should read it ("none" to skip)', type: 'text', default: 'none' },
   { id: 'write_policy', ask: 'How freely may the AI write into your notes?', type: 'choice', default: 'notes-freely',
@@ -89,8 +89,18 @@ const QUESTIONS = [
 ];
 
 const IDS = new Set(QUESTIONS.map(q => q.id));
-/* the questions --quick asks; every other answer takes its default */
+/* the short interview, which is what a bare `npx agent-personalizer` runs; every other answer takes
+   its default. --full asks the rest as well. */
 const QUICK = ['name', 'tone', 'length', 'notes_tool', 'notes_path', 'write_policy', 'always_ask'];
+/* Does this interview ask question q, given the answers so far? A question with a `when` is
+   CONDITIONAL: it is asked exactly when its condition holds, short interview or long, so nobody
+   answers the Obsidian question about Notion and nobody picks "other" without being asked to name
+   it. Every other question is asked in the long interview and only in the short set otherwise.
+   The installer's interview loop calls this, so a test of it is a test of the installer. */
+function asks(q, answersSoFar, full) {
+  if (q.when) return !!q.when(answersSoFar || {});
+  return !!full || QUICK.includes(q.id);
+}
 /* only the answers that differ from the defaults: what the installer stores, so the config reads as
    "what this person chose" and a future default applies to everyone who never chose otherwise */
 /* PINNED answers are always stored, default or not: they govern what the AI may touch, so a future
@@ -151,6 +161,11 @@ function parseAnswer(q, raw) {
 }
 
 const label = (q, v) => { const o = q.options && q.options.find(x => x[0] === v); return o ? o[1] : v; };
+/* The interview asks the HUMAN about the AI, so an option's label is third person ("settle facts
+   itself"). USER.md, AGENT_ONBOARDING.md and the session-start contract all address the AI
+   directly, so they take the option's third element, its second-person phrasing, where a choice
+   carries one. Without it the AI reads "when you are unsure: settle facts itself". */
+const youLabel = (q, v) => { const o = q.options && q.options.find(x => x[0] === v); return o ? (o[2] || o[1]) : v; };
 const Q = Object.fromEntries(QUESTIONS.map(q => [q.id, q]));
 const bullets = (arr, empty) => arr.length ? arr.map(x => `- ${x}`).join('\n') : `- ${empty}`;
 /* md(): for values placed INSIDE an inline-code span; a code span cannot carry structure, so only
@@ -180,7 +195,7 @@ function renderUser(a) {
 - **Directness:** ${label(Q.tone, a.tone)}
 - **Length:** ${label(Q.length, a.length)}
 - **When you are wrong:** ${label(Q.mistakes, a.mistakes)}
-- **When you are unsure:** ${label(Q.unsure, a.unsure)}
+- **When you are unsure:** ${youLabel(Q.unsure, a.unsure)}
 - **Never:** ${a.never.length ? a.never.map(md).join('; ') : 'nothing declared yet'}
 
 ## How firmly I mean things
@@ -274,7 +289,7 @@ ${a.work ? `- **What they do:** ${md(a.work)}\n` : ''}${a.focus ? `- **Current f
 - **Directness:** ${label(Q.tone, a.tone)}.
 - **Length:** ${label(Q.length, a.length)}.
 - **When you are wrong:** ${label(Q.mistakes, a.mistakes)}.
-- **When you are unsure:** ${label(Q.unsure, a.unsure)}.
+- **When you are unsure:** ${youLabel(Q.unsure, a.unsure)}.
 - **Never:** ${a.never.length ? a.never.map(md).join('; ') : 'nothing declared'}.
 
 ### Output shape
@@ -339,7 +354,7 @@ function contractBlock(a, opts) {
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
     writesLine(a),
     files ? `Read first: ${a.read_first.map(md).join(' → ')}.` : null,
-    `Directness: ${label(Q.tone, a.tone)}. Length: ${label(Q.length, a.length)}. When wrong: ${label(Q.mistakes, a.mistakes)}. When unsure: ${label(Q.unsure, a.unsure)}.`,
+    `Directness: ${label(Q.tone, a.tone)}. Length: ${label(Q.length, a.length)}. When wrong: ${label(Q.mistakes, a.mistakes)}. When unsure: ${youLabel(Q.unsure, a.unsure)}.`,
     `Open with ${label(Q.lead_with, a.lead_with)}; ${label(Q.structure, a.structure)}; evidence ${label(Q.evidence, a.evidence)}.${a.signature === 'yes' ? ' Sign every edit to a note (one `Last edited by:` line, overwritten).' : ''}`,
     a.never.length ? `Never: ${a.never.map(md).join('; ')}.` : null,
   ].filter(x => x !== null).join('\n');
@@ -357,4 +372,4 @@ function compactProfile(a) {
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
+module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, asks, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };

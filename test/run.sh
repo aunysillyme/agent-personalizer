@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 83 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 88 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -997,5 +997,114 @@ for w in .github/workflows/harness.yml .github/workflows/publish.yml; do
 done
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml lost its manual trigger"
 pass "workflow files parse as YAML (or the parser is absent and says so)"
+
+# 84. (#19) a level-1 home file names no notes folder, because level 1 creates none; level 2 restores the
+#     four pointers and leaves a user-written line alone; a cloud tool never gets a local folder at all
+mk; T="$MK"
+expect 0 "level 1 notes pointers" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
+[ ! -e "$T/notes" ] || fail "level 1 created a notes folder"
+for f in CLAUDE.md AGENTS.md; do
+  grep -qF 'no local notes folder at level 1; level 2 creates `notes/`' "$T/$f" || fail "$f does not say the notes folder is not there yet"
+  grep -qF -- '- Session log (one note per week): `notes/sessions/`' "$T/$f" && fail "$f points at notes/sessions/, which level 1 never creates"
+  grep -qF -- '`notes/decisions.md`' "$T/$f" && fail "$f points at notes/decisions.md, which level 1 never creates"
+done
+printf -- '- My own line: `notes/mine.md`\n' >> "$T/CLAUDE.md"
+node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 2 --yes > "$T/up.txt" || fail "level 2 upgrade"
+grep -qF 'update CLAUDE.md (notes pointers now name notes/' "$T/up.txt" || fail "the level 2 upgrade did not report the notes repoint"
+for f in CLAUDE.md AGENTS.md; do
+  grep -qF -- '- Session log (one note per week): `notes/sessions/`' "$T/$f" || fail "$f: the notes pointers were not restored at level 2"
+  grep -qF 'no local notes folder at level 1' "$T/$f" && fail "$f: the level-1 placeholder survived the upgrade"
+done
+grep -qF -- '- My own line: `notes/mine.md`' "$T/CLAUDE.md" || fail "the notes upgrade touched a user-written line"
+[ -f "$T/notes/README.md" ] && [ -f "$T/notes/sessions/TEMPLATE-week.md" ] || fail "level 2 did not create the folder it now points at"
+expect 0 "notes upgrade check" node render/render.cjs --dir "$T" --check
+mk; C="$MK"; mk; F="$MK"; printf '{"notes_tool": "notion", "notes_path": "Studio Wiki"}' > "$F/cloud.json"
+expect 0 "cloud level 2" node bin/agent-personalizer.js --dir "$C" --ai claude --level 2 --answers "$F/cloud.json" --yes
+grep -qF 'reached through its connector, no local files' "$C/CLAUDE.md" || fail "a cloud install lost its one-line notes pointer"
+[ ! -e "$C/notes" ] || fail "a cloud tool was given a local notes folder"
+pass "(#19) level 1 names no notes folder it does not create; level 2 restores the pointers and leaves user lines alone"
+
+# 85. (#20) one verb per file, and it is the verb that is true of THAT file: the installer creates the
+#     pointer file, the renderer fills its block, and a re-run says kept and ok, never "wrote" twice
+mk; T="$MK"
+node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes > "$T/first.txt" || fail "first install"
+grep -qF 'wrote  CLAUDE.md (pointer file' "$T/first.txt" || fail "the first install does not name CLAUDE.md as the pointer file"
+grep -qF 'update CLAUDE.md (rendered block)' "$T/first.txt" || fail "the first install does not say the block was rendered"
+[ "$(grep -c '^wrote  CLAUDE\.md' "$T/first.txt")" = "1" ] || fail "CLAUDE.md was reported as written more than once"
+node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes > "$T/again.txt" || fail "re-run"
+grep -qF 'kept   CLAUDE.md (exists)' "$T/again.txt" || fail "the re-run did not report the kept file"
+grep -qF 'ok     CLAUDE.md (rendered block already current)' "$T/again.txt" || fail "the re-run does not say the block was already current"
+grep -q '^wrote  CLAUDE\.md' "$T/again.txt" && fail "a re-run that changed nothing still says it wrote CLAUDE.md"
+node render/render.cjs --dir "$T" --targets claude,prompt > "$T/r.txt" || fail "render a target that does not exist yet"
+grep -q '^wrote  system-prompt\.md$' "$T/r.txt" || fail "a target that did not exist should be reported as wrote"
+grep -q '^ok     CLAUDE\.md' "$T/r.txt" || fail "an unchanged block should be reported as ok"
+pass "(#20) one verb per file: wrote a new file, update a changed block, ok an unchanged one, kept an existing source"
+
+# 86. (#21) the rerun command names the folder that was installed, in full, not "."; the success text
+#     separates what an AI reads by itself from what a human still pastes, and links the paste guide
+mk; T="$MK"; RT="$(cd "$T" && pwd -P)" || fail "resolve temp dir"
+node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes > "$T/one.txt" || fail "single-AI install"
+grep -qF -- "--dir $RT --ai claude" "$T/one.txt" || fail "the rerun command does not name the installed folder"
+grep -qF -- '--dir . --ai' "$T/one.txt" && fail "the rerun command still says --dir ."
+grep -qF "Read from $RT automatically, nothing to paste: CLAUDE.md (Claude Code)" "$T/one.txt" || fail "the files read automatically are not named"
+grep -qF 'claude.ai and the Claude apps read no files' "$T/one.txt" || fail "the paste step for claude.ai is missing"
+grep -qF 'docs/paste-guide.md' "$T/one.txt" || fail "the paste guide is not linked from the success text"
+grep -qF 'Several agents?' "$T/one.txt" && fail "the companions line printed for a single-AI install"
+mk; T2="$MK"
+node bin/agent-personalizer.js --dir "$T2" --ai claude,agents,chatgpt --level 1 --yes > "$T2/many.txt" || fail "multi-AI install"
+grep -qF 'Several agents?' "$T2/many.txt" || fail "the companions line is missing from a multi-AI install"
+grep -qF 'chatgpt-box1.txt and chatgpt-box2.txt' "$T2/many.txt" || fail "the ChatGPT paste step is missing"
+pass "(#21) the Next block names the installed folder, splits automatic from paste, links the paste guide, companions only for several agents"
+
+# 87. (#22, #23) level 4 is no longer offered and still installs level 3; the interview is SHORT by default
+#     and asks a conditional question only when the chosen notes tool makes it apply
+grep -qF -- '--level 1|2|3]' bin/agent-personalizer.js || fail "the usage still offers level 4"
+grep -qF -- '4 pointers to the multi-agent layer' bin/agent-personalizer.js && fail "the usage still describes level 4 as an install level"
+grep -qF -- '--level 1|2|3|4' README.md && fail "the README still offers level 4 as an install level"
+mk; T="$MK"
+node bin/agent-personalizer.js --dir "$T" --ai claude --level 4 --yes > "$T/l4.txt" || fail "--level 4 refused"
+grep -qF 'installs exactly what --level 3 installs' "$T/l4.txt" || fail "--level 4 does not say it is level 3"
+[ -f "$T/rules/50-output-style.md" ] && [ -f "$T/render/render.cjs" ] || fail "--level 4 did not install what level 3 installs"
+expect 2 "quick and full together" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --quick --full --yes
+expect 2 "full without a terminal" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --yes
+expect 2 "full with defaults" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --defaults
+node -e '
+const o = require("./render/onboarding.cjs");
+const asked = (full, tool) => { const raw = {}, out = [];
+  for (const q of o.QUESTIONS) { if (!o.asks(q, raw, full)) continue; out.push(q.id);
+    raw[q.id] = q.id === "notes_tool" ? tool : (Array.isArray(q.default) ? [...q.default] : q.default); }
+  return out; };
+const eq = (a, b, why) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error(why, JSON.stringify(a), "!=", JSON.stringify(b)); process.exit(1); } };
+eq(asked(false, "folder"), o.QUICK, "the short interview is not exactly the quick set for a plain folder");
+eq(asked(false, "obsidian").includes("obsidian_tc"), true, "the short interview skips the Obsidian question for an Obsidian vault");
+eq(asked(false, "obsidian").includes("notes_tool_name"), false, "the short interview asks for a tool name when the tool is Obsidian");
+eq(asked(false, "other").includes("notes_tool_name"), true, "the short interview does not ask for the name of an unnamed tool");
+eq(asked(true, "notion").includes("obsidian_tc"), false, "the full interview asks the Obsidian question about Notion");
+eq(asked(true, "notion").length, o.QUESTIONS.length - 2, "the full interview does not skip both conditional questions");
+' || fail "the interview asks the wrong set of questions"
+pass "(#22, #23) level 4 is not offered and still installs level 3; the interview is short by default and conditional questions apply only when they apply"
+
+# 88. (#24) the files the AI reads speak to the AI ("settle facts yourself"), and every angle-bracket
+#     placeholder in templates/ sits inside a code span, so GitHub cannot eat it as an HTML tag
+mk; T="$MK"
+expect 0 "voice install" node bin/agent-personalizer.js --dir "$T" --ai claude,chatgpt --level 3 --yes
+for f in USER.md AGENT_ONBOARDING.md CLAUDE.md; do
+  grep -qF 'settle facts yourself' "$T/$f" || fail "$f addresses the AI in the third person"
+  grep -qF 'settle facts itself' "$T/$f" && fail "$f still says \"settle facts itself\" to the AI it is written for"
+done
+node render/render.cjs --dir "$T" --contract --contract-target claude | grep -qF 'settle facts yourself' || fail "the contract addresses the AI in the third person"
+node -e 'const o=require("./render/onboarding.cjs");const q=o.QUESTIONS.find(x=>x.id==="unsure");if(!q.options.some(x=>x[1].includes("itself")))process.exit(1)' || fail "the interview no longer asks the human about the AI in the third person"
+for f in templates/*.md; do
+  awk -v F="$f" '
+    /^```/ { fence = !fence; next } fence { next }
+    { line = $0
+      if (comment) { if (line ~ /-->/) { comment = 0; sub(/^.*-->/, "", line) } else next }   # an HTML comment is never rendered
+      while (match(line, /<!--.*-->/)) sub(/<!--.*-->/, "", line)
+      if (line ~ /<!--/) { comment = 1; sub(/<!--.*$/, "", line) }
+      gsub(/`[^`]*`/, "", line)
+      if (line ~ /<[A-Za-z]/) { print "  " F ": " $0; bad = 1 } }
+    END { exit bad ? 1 : 0 }' "$f" || fail "$f has an angle-bracket placeholder outside a code span; GitHub renders it as an HTML tag and eats it"
+done
+pass "(#24) the AI-facing renders use the second person; no templates/ placeholder can be eaten as HTML"
 
 echo; echo "all checks passed"
