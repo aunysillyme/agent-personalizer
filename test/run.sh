@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 88 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 89 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -587,9 +587,12 @@ pass "--contract refuses malformed stored config with no output"
 [ -f docs/companions.md ] || fail "docs/companions.md missing"
 grep -q 'obsidian-tc' docs/companions.md && grep -q 'sierracatalina.com/context-layer' docs/companions.md || fail "companions doc missing a companion"
 mk; T="$MK"; mk; F="$MK"
+# Level 2, because these assertions are about the notes_tool TABLE and every path they name has to be
+# on disk to be named at all: a level-1 install creates no folders, so it renders the pending shape
+# instead (#25, asserted in its own case below).
 render_tool() { # $1 tool, $2 extra json fields; sets OUT (onboarding file) and HINT (installer output)
   printf '{"notes_tool": "%s"%s}' "$1" "$2" > "$F/$1.json"
-  node bin/agent-personalizer.js --dir "$T/$1" --ai claude --level 1 --answers "$F/$1.json" --yes > "$F/$1.hint" 2>&1 || fail "install for $1"
+  node bin/agent-personalizer.js --dir "$T/$1" --ai claude --level 2 --answers "$F/$1.json" --yes > "$F/$1.hint" 2>&1 || fail "install for $1"
   OUT="$T/$1/AGENT_ONBOARDING.md"; HINT="$F/$1.hint"
   node render/render.cjs --dir "$T/$1" --check >/dev/null || fail "check for $1"
 }
@@ -610,7 +613,7 @@ grep -q 'answer yes' "$F/obsidian.hint" || fail "obsidian without tc: hint shoul
 node render/render.cjs --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' && fail "contract claims obsidian-tc when not installed"
 # obsidian with obsidian-tc
 printf '{"notes_tool": "obsidian", "obsidian_tc": "yes", "notes_path": "MyVault"}' > "$F/tc.json"
-node bin/agent-personalizer.js --dir "$T/tc" --ai claude --level 1 --answers "$F/tc.json" --yes > "$F/tc.hint" 2>&1 || fail "install obsidian with tc"
+node bin/agent-personalizer.js --dir "$T/tc" --ai claude --level 2 --answers "$F/tc.json" --yes > "$F/tc.hint" 2>&1 || fail "install obsidian with tc"   # level 2: the contract names the vault path, which must exist
 grep -q 'through \*\*obsidian-tc\*\*' "$T/tc/AGENT_ONBOARDING.md" || fail "obsidian with tc: route line missing"
 grep -q 'routes the AI through obsidian-tc' "$F/tc.hint" || fail "obsidian with tc: hint missing"
 node render/render.cjs --dir "$T/tc" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
@@ -659,7 +662,7 @@ grep -q 'an unnamed notes tool' "$OUT" || fail "other without a name: placeholde
 grep -q 'your notes tool' "$HINT" || fail "other without a name: hint missing"
 printf '{"notes_tool": "other", "notes_tool_name": "~~~ <!-- x"}' > "$F/advname.json"
 expect 0 "adversarial tool name" node bin/agent-personalizer.js --dir "$T/an" --ai claude --level 1 --answers "$F/advname.json" --yes
-grep -q 'Notes live in \\~\\~\\~ \\<!-- x' "$T/an/AGENT_ONBOARDING.md" || fail "tool name not escaped exactly once"
+grep -q 'live in \\~\\~\\~ \\<!-- x' "$T/an/AGENT_ONBOARDING.md" || fail "tool name not escaped exactly once"   # matches the level-1 ("will live in") and level-2+ ("live in") lead-ins alike
 grep -q '\\\\\\~' "$T/an/AGENT_ONBOARDING.md" && fail "tool name double-escaped"
 # adversarial location in a prose (cloud) render
 printf '{"notes_tool": "notion", "notes_path": "~~~ <!-- x"}' > "$F/adv.json"
@@ -1106,5 +1109,110 @@ for f in templates/*.md; do
     END { exit bad ? 1 : 0 }' "$f" || fail "$f has an angle-bracket placeholder outside a code span; GitHub renders it as an HTML tag and eats it"
 done
 pass "(#24) the AI-facing renders use the second person; no templates/ placeholder can be eaten as HTML"
+
+# 89. (#25) the two files RENDERED from the answers name no notes path that is not on disk. #19 fixed the
+#     home files, which collapse to one line pointing at AGENT_ONBOARDING.md; that file, and USER.md,
+#     still named notes/README.md, notes/sessions/, notes/decisions.md and notes/inbox/ at level 1.
+#     Mechanical loud negative: at level 1 every line naming a path under the notes base must also say
+#     the folder is not there yet, so a future line cannot quietly reintroduce a dead pointer.
+mk; T="$MK"; mk; F="$MK"
+expect 0 "level 1 rendered files" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes --defaults
+[ ! -e "$T/notes" ] || fail "level 1 created a notes folder"
+no_dead_pointer() {  # $1 folder, $2.. files: every line naming a path under the notes base must say the folder is absent
+  d="$1"; shift
+  for f in "$@"; do
+    [ -f "$d/$f" ] || continue
+    awk -v F="$f" '
+      /`notes\// {
+        if ($0 ~ /not on disk yet|does not exist yet|no local notes folder|level 2 creates|-level 2. creates|once that folder exists|Once it exists|no notes folder to read/) next
+        print "  " F ": " $0; bad = 1 }
+      END { exit bad ? 1 : 0 }' "$d/$f" || fail "$f names a notes/ path at level 1 without saying the folder is not there yet"
+  done
+}
+no_dead_pointer "$T" USER.md AGENT_ONBOARDING.md CLAUDE.md AGENTS.md
+grep -qF 'no local notes folder yet, so no folder rules yet' "$T/USER.md" || fail "USER.md does not say the folder rules do not exist yet"
+grep -qF '`notes/README.md`' "$T/USER.md" && fail "USER.md still points at notes/README.md, which level 1 never creates"
+grep -qF 'That folder is not on disk yet' "$T/AGENT_ONBOARDING.md" || fail "AGENT_ONBOARDING.md does not say the folder is absent"
+grep -qF 'do not create that folder yourself' "$T/AGENT_ONBOARDING.md" || fail "AGENT_ONBOARDING.md does not tell the AI to leave the folder alone"
+grep -qF 'Once it exists' "$T/AGENT_ONBOARDING.md" || fail "AGENT_ONBOARDING.md dropped the write policy instead of deferring it"
+node render/render.cjs --dir "$T" --contract --contract-target claude | grep -qF 'no notes folder yet (level 2 creates notes/)' || fail "the session-start contract still describes a folder that is not there"
+node render/render.cjs --dir "$T" --contract --contract-target claude | grep -qF 'ASK BEFORE EVERY WRITE' && fail "the pending contract line reported the wrong policy"
+expect 0 "level 1 rendered check" node render/render.cjs --dir "$T" --check
+# the strictest policy survives the compression of the pending line
+printf '{"write_policy":"ask-before-every-write"}' > "$F/strict.json"
+expect 0 "level 1 strict policy" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --answers "$F/strict.json" --yes
+node render/render.cjs --dir "$T/s" --contract --contract-target claude | grep -qF 'ASK BEFORE EVERY WRITE' || fail "the pending contract line dropped ask-before-every-write"
+# the pending line goes into the ChatGPT boxes, which are plain text on a ~1500-character budget with
+# about two characters of slack on this repo's own fixture: every write policy has to fit at level 1
+for pol in notes-freely logs-and-inbox-only ask-before-every-write; do
+  node -e 'const fs=require("fs");const a=JSON.parse(fs.readFileSync("test/fixtures/answers.json","utf8"));a.write_policy=process.argv[1];fs.writeFileSync(process.argv[2],JSON.stringify(a))' "$pol" "$F/$pol.json"
+  expect 0 "level 1 chatgpt $pol" node bin/agent-personalizer.js --dir "$T/cg-$pol" --ai chatgpt --level 1 --answers "$F/$pol.json" --yes
+  grep -q 'OVER BUDGET' "$T/cg-$pol/chatgpt-custom-instructions.md" && fail "the pending writes line puts the ChatGPT box over budget for $pol"
+done
+grep -qF 'show what you would write and where' "$T/cg-ask-before-every-write/chatgpt-box2.txt" || fail "the pending line dropped the consent clause of ask-before-every-write; a box-only user has no other copy of it"
+# level 2 puts the real paths back in both rendered files, and reports the USER.md repoint
+node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 2 --yes > "$T/up.txt" || fail "level 2 upgrade"
+grep -qF 'update USER.md (notes pointers now name notes/' "$T/up.txt" || fail "the level 2 upgrade did not report the USER.md repoint"
+grep -qF '`notes/README.md`' "$T/USER.md" || fail "USER.md did not get the real notes README path back at level 2"
+grep -qF 'no local notes folder yet' "$T/USER.md" && fail "the level-1 wording survived the upgrade in USER.md"
+grep -qF -- '`notes/sessions/`' "$T/AGENT_ONBOARDING.md" || fail "AGENT_ONBOARDING.md did not get the session-log path back at level 2"
+grep -qF 'That folder is not on disk yet' "$T/AGENT_ONBOARDING.md" && fail "the level-1 wording survived the upgrade in AGENT_ONBOARDING.md"
+[ -f "$T/notes/README.md" ] || fail "level 2 did not create the folder it now points at"
+expect 0 "upgraded check" node render/render.cjs --dir "$T" --check
+# an EDITED USER.md is kept, and the run says so instead of repointing it silently
+mk; E="$MK"
+node bin/agent-personalizer.js --dir "$E" --ai claude --level 1 --yes --defaults > /dev/null || fail "level 1 for the edit case"
+printf -- '\n- My own line: kept\n' >> "$E/USER.md"
+node bin/agent-personalizer.js --dir "$E" --ai claude --level 2 --yes > "$E/up.txt" || fail "level 2 over an edited USER.md"
+grep -qF 'kept   USER.md' "$E/up.txt" || fail "an edited USER.md was not kept"
+grep -qF 'you edited USER.md while it still said there is no local notes folder' "$E/up.txt" || fail "the run did not name the stale notes lines in the kept USER.md"
+grep -qF -- '- My own line: kept' "$E/USER.md" || fail "the upgrade touched a user-written line in USER.md"
+# a cloud tool has no local folder at any level, so nothing about it is "pending"
+mk; C="$MK"; printf '{"notes_tool": "notion", "notes_path": "Studio Wiki"}' > "$F/cloud.json"
+expect 0 "cloud level 1" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --answers "$F/cloud.json" --yes
+grep -qF 'no local notes folder yet' "$C/USER.md" && fail "a cloud install was told its notes folder is coming at level 2"
+grep -qF 'index page of "Studio Wiki"' "$C/USER.md" || fail "a cloud install lost its index-page rule at level 1"
+grep -q '`notes/' "$C/AGENT_ONBOARDING.md" && fail "a cloud install names a local notes path"
+# a read-only tool writes to the local fallback folder, which level 1 does not create either
+mk; R="$MK"; printf '{"notes_tool": "onenote", "notes_path": "Work Notebook"}' > "$F/ro.json"
+expect 0 "readonly level 1" node bin/agent-personalizer.js --dir "$R" --ai claude --level 1 --answers "$F/ro.json" --yes
+[ ! -e "$R/notes" ] || fail "level 1 created the fallback folder"
+grep -qF 'no local notes folder yet' "$R/USER.md" || fail "a read-only install still points at a fallback README that is not there"
+grep -qF 'read-only' "$R/AGENT_ONBOARDING.md" || fail "the read-only posture was lost in the pending render"
+grep -qF 'Notes will live in' "$R/AGENT_ONBOARDING.md" && fail "a read-only tool was told its own notebook arrives at level 2; only the local fallback folder is pending"
+no_dead_pointer "$R" USER.md AGENT_ONBOARDING.md CLAUDE.md
+# ROUND 1 of the Codex audit on this change. The level is only a PROXY for "is the folder there": the
+# disk is the truth, and one boolean now drives the home-file collapse and both rendered files.
+# (3) a hand-written config carries no level at all
+mk; H="$MK"
+printf '%s\n' '{"targets":["onboarding"],"onboarding":{"notes_tool":"folder","notes_path":"notes","write_policy":"notes-freely","always_ask":[],"off_limits":[],"signature":"yes"}}' > "$H/.agent-personalizer.json"
+expect 0 "render with no level in the config" node render/render.cjs --dir "$H" --targets onboarding
+[ ! -e "$H/notes" ] || fail "the render created a notes folder"
+grep -qF '`notes/README.md`' "$H/AGENT_ONBOARDING.md" && fail "a config with no level rendered live notes pointers into a folder that does not exist"
+grep -qF 'not on disk yet' "$H/AGENT_ONBOARDING.md" || fail "a config with no level did not fall back to the pending shape"
+# (4) a level-1 install landing in a folder that ALREADY has the notes scaffold must not claim it is absent
+mk; P="$MK"; mkdir "$P/notes"; printf 'mine\n' > "$P/notes/README.md"
+expect 0 "level 1 beside an existing notes folder" node bin/agent-personalizer.js --dir "$P" --ai claude --level 1 --yes --defaults
+for f in USER.md AGENT_ONBOARDING.md CLAUDE.md; do
+  grep -qE 'not on disk yet|no local notes folder' "$P/$f" && fail "$f says the notes folder is absent when it is on disk"
+done
+grep -qF '`notes/README.md`' "$P/USER.md" || fail "USER.md does not point at the notes README that is on disk"
+grep -qF 'mine' "$P/notes/README.md" || fail "the installer overwrote an existing notes README"
+# (5) a re-run at a LOWER level does not delete the folder, so nothing may start calling it absent
+mk; D="$MK"; printf '{"tone":"balanced"}' > "$F/down.json"
+expect 0 "level 2 first" node bin/agent-personalizer.js --dir "$D" --ai claude --level 2 --yes --defaults
+expect 0 "level 1 re-run over it" node bin/agent-personalizer.js --dir "$D" --ai claude --level 1 --answers "$F/down.json" --yes
+[ -f "$D/notes/README.md" ] || fail "the level-1 re-run removed the scaffold"
+grep -qE 'not on disk yet|no local notes folder' "$D/USER.md" && fail "USER.md was rewritten to call a folder absent that is still there"
+grep -qF '`notes/README.md`' "$D/AGENT_ONBOARDING.md" || fail "AGENT_ONBOARDING.md stopped naming a folder that is still there"
+expect 0 "downgrade check" node render/render.cjs --dir "$D" --check
+# (6) the stale-notes notice survives an edit to the exact sentence it used to key on
+mk; S="$MK"
+expect 0 "level 1 before the sentence edit" node bin/agent-personalizer.js --dir "$S" --ai claude --level 1 --yes --defaults
+sed 's/no local notes folder yet, so no folder rules yet/folder rules are pending/' "$S/USER.md" > "$S/u.tmp" && mv "$S/u.tmp" "$S/USER.md"
+node bin/agent-personalizer.js --dir "$S" --ai claude --level 2 --yes > "$S/up.txt" || fail "level 2 after the sentence edit"
+grep -qF 'kept   USER.md' "$S/up.txt" || fail "an edited USER.md was not kept"
+grep -qF 'you edited USER.md while it still said there is no local notes folder' "$S/up.txt" || fail "editing the one sentence the notice keyed on silenced the notice"
+pass "(#25) USER.md, AGENT_ONBOARDING.md and the contract name no notes path level 1 does not create; level 2 restores them and keeps an edited USER.md"
 
 echo; echo "all checks passed"

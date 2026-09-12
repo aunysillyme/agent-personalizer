@@ -90,7 +90,7 @@ ChatGPT has two custom-instruction boxes with a character budget, so its render 
 2. Copy [`templates/CLAUDE.md`](templates/CLAUDE.md) for Claude, or [`templates/AGENTS.md`](templates/AGENTS.md) for Codex, Cursor and most other coding agents. Both are pointers: they tell the AI to read `USER.md` first and where everything else lives.
 3. Paste the `USER.md` body into the "custom instructions" box of any chat app that has one.
 
-Level 1 creates no notes folder, so the home file it writes names none: it points at `AGENT_ONBOARDING.md` for where the AI may write. Level 2 creates the folder and repoints the home file at it in the same run.
+Level 1 creates no notes folder, so none of the files it writes names one. The home file points at `AGENT_ONBOARDING.md` for where the AI may write; `AGENT_ONBOARDING.md` and `USER.md` say outright that the folder is not on disk yet and that the AI is to propose writes rather than create it. Level 2 creates the folder and repoints all three at it in the same run.
 
 **The one idea in level 1:** the home file carries pointers, not hand-maintained copies. Text you retype drifts. A pointer does not, and neither does a block the renderer regenerates and `--check` compares (level 3): that block is a generated snapshot, with one owner and a drift check, which is the other acceptable shape.
 
@@ -150,7 +150,7 @@ examples/    one invented user, end to end
 docs/        tiers.md, companions.md, paste-guide.md
 CHANGELOG.md keyed on audit rounds
 .github/     harness.yml: the checks on every push and PR, Ubuntu and macOS x Node 18/20/22, plus a Windows smoke job; publish.yml: npm publish with provenance, dispatched per tag
-test/        run.sh: 88 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
+test/        run.sh: 89 checks, exact exit codes, adversarial fixtures (symlinks, traversal, malformed markers, CRLF, partial renders)
 ```
 
 ## Changelog

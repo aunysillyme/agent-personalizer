@@ -262,10 +262,19 @@ async function main() {
   // pointers. NOTES_ONE_LINE is also what the level-2 upgrade looks for, byte for byte.
   const NOTES_ONE_LINE = (why) => `- Notes: see \`AGENT_ONBOARDING.md\` § Where you may write (${why})`;
   const NOTES_LATER = `no local notes folder at level 1; level 2 creates \`${base}/\``;
+  // Is the folder every notes pointer names going to be there to read? The README is the file the AI
+  // is told to read before it writes, and the level-2 scaffold creates it with the folder. The LEVEL
+  // alone is a proxy that is wrong in both directions: a level-1 install can land beside a notes
+  // folder that already exists, and a re-run at a lower level does not delete what a higher one made
+  // (round 1, findings 4 and 5). One boolean drives the home-file collapse and both rendered files,
+  // so they can never disagree about the same folder.
+  const scaffoldExists = (() => { try { return fs.statSync(path.join(root, base, 'README.md')).isFile(); } catch (_) { return false; } })();
+  const willScaffold = level >= 2 && kind !== 'cloud';    // this run's own scaffold, written further down
+  const notesScaffolded = kind !== 'cloud' && (scaffoldExists || willScaffold);
   const notesWhy = kind === 'cloud' ? 'reached through its connector, no local files'
-    : level < 2 ? NOTES_LATER
+    : !notesScaffolded ? NOTES_LATER
     : kind !== 'disk' ? 'local fallback folder `notes/`'
-    : null;                                               // disk, level 2+: the four paths, retargeted at notes_path
+    : null;                                               // disk, scaffold present: the four paths, retargeted at notes_path
   const home = (name) => {
     let t = fs.readFileSync(path.join(PKG, 'templates', name), 'utf8');
     if (level < 3) {
@@ -323,13 +332,25 @@ async function main() {
   // changed answer that the kept file still carries the old value of is named as a conflict.
   const user = probe(root, 'USER.md');
   let userAction = 'create';
+  let staleNotesInUser = false;
   const changedKeys = prevAnswers ? Object.keys(answers).filter(k => JSON.stringify(answers[k]) !== JSON.stringify(prevAnswers[k])) : [];
   if (user.exists) {
     if (!fs.lstatSync(user.full).isFile()) die('USER.md exists and is not a regular file');
+    const current = fs.readFileSync(user.full, 'utf8');
+    // Two candidate renders per answer set, one saying the notes folder is there and one saying it is
+    // not (#25). A match against EITHER means the file is still exactly what this installer wrote,
+    // so regenerating loses nothing; anything else is yours and is kept.
+    const untouched = (ans) => [true, false].some(ns => current === onboarding.renderUser(ans, { notesScaffolded: ns }));
     if (changedKeys.length) {
-      const current = fs.readFileSync(user.full, 'utf8');
-      userAction = current === onboarding.renderUser(prevAnswers) ? 'regenerate' : 'conflict';
+      userAction = untouched(prevAnswers) ? 'regenerate' : 'conflict';
+    } else if (notesScaffolded && current === onboarding.renderUser(answers, { notesScaffolded: false })) {
+      // Same answers, but the file says the folder is absent and it is not (this run created it, or
+      // it was already there). The real paths go back, and only on a byte-for-byte match.
+      userAction = 'relevel';
     } else userAction = 'keep';
+    // A kept file that does not name the folder README while the folder is there is stale, however it
+    // was worded: keying the notice on one sentence let an edit to that sentence silence it (finding 6).
+    if (userAction === 'keep' && notesScaffolded && !current.includes(`\`${base}/README.md\``)) staleNotesInUser = true;
   }
 
   // Upgrade from a lower level. Two repairs, each matched byte for byte against a line THIS installer
@@ -369,13 +390,17 @@ async function main() {
 
   // ---- WRITE ----
   for (const u of upgrades) { fs.writeFileSync(u.full, u.text); console.log(`update ${u.name} (${u.why.join('; ')})`); }
-  if (userAction === 'create') { fs.writeFileSync(user.full, onboarding.renderUser(answers), { flag: 'wx' }); console.log('wrote  USER.md (from your answers)'); }
-  else if (userAction === 'regenerate') { fs.writeFileSync(user.full, onboarding.renderUser(answers)); console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`); }
+  if (userAction === 'create') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded }), { flag: 'wx' }); console.log('wrote  USER.md (from your answers)'); }
+  else if (userAction === 'regenerate') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded })); console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`); }
+  else if (userAction === 'relevel') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded })); console.log(`update USER.md (notes pointers now name ${base}/, which is there; it matched the render that said it was not, byte for byte)`); }
   else if (userAction === 'conflict') {
     console.log(`kept   USER.md (you edited it, so it was not regenerated)`);
     console.log(`       ANSWERS CHANGED: ${changedKeys.join(', ')}. USER.md still carries the old value(s) and the rendered profile sections come from USER.md.`);
     console.log(`       Fix by hand, or delete USER.md and re-run to regenerate it from the new answers. AGENT_ONBOARDING.md already carries the new answers.`);
-  } else console.log('kept   USER.md (exists)');
+  } else {
+    console.log('kept   USER.md (exists)');
+    if (staleNotesInUser) console.log(`       NOTE: you edited USER.md while it still said there is no local notes folder. ${base}/ exists now. Fix the two "Where things live" lines by hand, or delete USER.md and re-run.`);
+  }
   for (const p of plan) {
     if (p.src) copyIfAbsent(p.src, root, p.rel);
     else {

@@ -6,6 +6,23 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-12
+
+Issue #25, filed on a recheck of 0.5.0 by the same outside reader as #19 to #24. Reproduced, then fixed, then handed to Codex as one adversarial read-only round against `AUDIT_BRIEF.md`, which returned six findings. All six were reproduced by hand and fixed here, and every fix has a harness assertion inside check 89 that goes red when the fix is backed out. The harness is 89 checks now.
+
+### Fixed
+
+- **The two files rendered from the onboarding answers no longer name a notes path that is not on disk** (#25). #19 fixed the home files: a level-1 `CLAUDE.md` / `AGENTS.md` collapsed four `notes/...` pointers into one line pointing at `AGENT_ONBOARDING.md`. The file that line points AT, and `USER.md`, still named `notes/README.md`, `notes/sessions/`, `notes/decisions.md` and `notes/inbox/`, so the first session was told to read and write into a folder the installer had not created. One predicate now owns the question for all of it, `onboarding.notesPending()`: a local notes folder is intended for every non-cloud tool, and the level-2 scaffold is what creates it, so below level 2 the renders say the folder is absent, tell the AI to propose writes and create nothing unasked, and defer the write policy to "once it exists" rather than dropping it. A cloud notes tool is untouched at any level, because it never gets a local folder. The session-start contract and both ChatGPT boxes carry the same pending line, compressed: it is never longer than the line it replaces, which the harness asserts, because the ChatGPT box budget has about two characters of slack on this repo's own fixture.
+- **The disk is the truth about whether the notes folder is there; the level was only a proxy** (round 1, findings 3 to 5). The first cut of the #25 fix keyed on the install level, which is wrong in both directions: a hand-written `.agent-personalizer.json` carries no `level` at all, so a plain `render.cjs` run emitted live `notes/README.md`, session-log, decisions-log and inbox pointers into a folder that did not exist; a level-1 install landing in a folder that already had a notes folder told the AI that folder was absent; and a re-run at a lower level does not delete what a higher one created, so a 2-then-1 sequence rewrote `USER.md` to call a folder absent while `AGENT_ONBOARDING.md` still named its paths. One boolean now answers the question for the home-file collapse and both rendered files, from the presence of the folder README, which is the file the AI is told to read before it writes. The renders stay pure functions of the answers plus that boolean, because `render/onboarding.cjs` is copied into level-3 installs and the look at the disk belongs in the caller.
+- **`ask-before-every-write` keeps "show what you would write and where" in the pending contract line** (round 1, finding 1). The compressed line had dropped it, and that clause is the consent: someone who pasted the two ChatGPT boxes and nothing else had no other copy of it. The three pending lines now each carry "create nothing unasked" plus their own policy, and all three are shorter than the line they replace; the harness installs every policy at level 1 and refuses an over-budget box, rather than asserting a proxy for it.
+- **A read-only or unknown notes tool is no longer told its own notebook arrives at level 2** (round 1, finding 2). The pending section said "Notes will live in Microsoft OneNote ... once that folder exists", but level 2 creates the local fallback folder, not a OneNote notebook: only the fallback is pending, and the notebook exists already.
+- **The stale-notes notice no longer keys on one sentence** (round 1, finding 6). Editing the sentence it matched silenced it while the other stale line stayed. A kept `USER.md` that does not name the folder README while the folder is there now earns the notice however it was worded.
+- **A `--level 2` run puts the real paths back in `USER.md` too** (#25). `AGENT_ONBOARDING.md` is regenerated from the answers on every render, so it repointed itself once the renderer knew the level; `USER.md` is yours once it exists, so it is rewritten only when it still equals the render of the same answers at the previous level, byte for byte. If you edited it, it is kept and the run says which two lines are now stale, in place of repointing it underneath you.
+
+### Changed
+
+- **Three harness cases moved from level 1 to level 2** (#25). Checks 60, 64 and the obsidian-tc contract assertion install at level 2, because every path they assert on has to exist on disk to be named at all; their subject is the `notes_tool` table and the ChatGPT budget, not the install level. Check 89 covers the level-1 shape, including a mechanical loud negative: at level 1 every line naming a path under the notes base must also say the folder is not there yet, so a new line cannot quietly reintroduce a dead pointer.
+
 ## [0.5.0] - 2026-09-08
 
 A first-run walkthrough of 0.4.3 by an outside reader, filed as issues #19 to #24. Every one was reproduced before its fix, and each has a harness check that fails on 0.4.3 and passes here (checks 84 to 88).
@@ -142,7 +159,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.1...v0.4.2
