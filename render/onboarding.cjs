@@ -17,7 +17,7 @@
   DOCS points at the matching tag on GitHub so an installed copy never links to a file the
   destination does not have.
 */
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
 
 /* THE single source for notes tools. Add a tool here and nowhere else: the interview option, the
@@ -47,6 +47,29 @@ const kindOf = (a) => TOOL[a.notes_tool].kind;
 /* the folder on disk that scaffolds and home-file pointers use: the user's path for a disk tool,
    the fixed fallback for everything else (cloud tools get no folder named after a workspace) */
 const baseFor = (a) => kindOf(a) === 'disk' ? a.notes_path : FALLBACK;
+/* Is the local notes folder the rendered instructions name NOT there? Every non-cloud tool gets one
+   (a disk tool's own path, a read-only or unknown tool's fallback) and the level-2 scaffold is what
+   creates it, so below level 2 nothing may name a path inside it: the first session would be told to
+   read and write into a folder the installer never created. #19 fixed that for the home files, which
+   the installer collapses to one line; #25 was the same bug in the two files rendered from here,
+   which that one line points AT.
+
+   The LEVEL is only a proxy, and it is wrong in both directions: a hand-written config carries no
+   level, a level-1 install can land in a folder that already has a notes folder, and a re-run at a
+   lower level does not remove the folder a higher one created. So `opts.notesScaffolded` (the
+   caller's own look at the disk, which is the ground truth) wins whenever the caller passes it, and
+   the level is the fallback for a caller that has no root to look in. Round 1, findings 3 to 5.
+
+   This file is copied into level-3 installs, so the look at the disk stays in the CALLER: these two
+   renders are pure functions of the answers plus this one boolean. */
+function notesPending(a, opts) {
+  if (kindOf(a) === 'cloud') return false;                       // no local folder at any level
+  if (opts && typeof opts.notesScaffolded === 'boolean') return !opts.notesScaffolded;
+  return (opts && Number.isInteger(opts.level) ? opts.level : 2) < 2;
+}
+/* the phrase a pending USER.md carries where the folder rules would be */
+const NOTES_PENDING_MARK = 'no local notes folder yet, so no folder rules yet';
+const notesLater = (base) => `\`--level 2\` creates \`${base}/\``;
 
 const QUESTIONS = [
   { id: 'name', ask: 'What should the AI call you?', type: 'text', default: 'the user' },
@@ -178,7 +201,8 @@ const esc = (s) => String(s).replace(/`/g, "'");
    character as the character itself. */
 const md = (s) => String(s).replace(/[`~<>#*_\[\]|\\]/g, (c) => '\\' + c).replace(/^([-+]|\d+[.)])(?=\s|$)/, (m) => '\\' + m);
 
-function renderUser(a) {
+function renderUser(a, opts) {
+  const pending = notesPending(a, opts);
   return `# USER.md
 
 *Who I am, how to talk to me, how firmly I mean things, how I want output shaped. Every AI reads this first. Generated from my onboarding answers; edit freely, it is mine.*
@@ -221,9 +245,9 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
 
 ## Where things live
 
-- **My notes:** ${md(toolFor(a).name)}, ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/\`` : `"${md(a.notes_path)}"`}${toolFor(a).kind === 'readonly' ? ' (read-only for the AI)' : toolFor(a).kind === 'other' ? ' (the AI asks before its first write there)' : ''}
+- **My notes:** ${md(toolFor(a).name)}, ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/\`` : `"${md(a.notes_path)}"`}${toolFor(a).kind === 'readonly' ? ' (read-only for the AI)' : toolFor(a).kind === 'other' ? ' (the AI asks before its first write there)' : ''}${pending && toolFor(a).kind === 'disk' ? ` (not on disk yet; ${notesLater(esc(a.notes_path))})` : ''}
 - **My task tracker:** ${md(a.tracker)}
-- **Rules the AI must read before writing anything to my notes:** ${toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/README.md\`` : toolFor(a).kind === 'cloud' ? `the index ${toolFor(a).unit || 'page'} of "${md(a.notes_path)}", and \`AGENT_ONBOARDING.md\` § Where you may write` : `\`${FALLBACK}/README.md\` (the local fallback folder the AI writes to), and \`AGENT_ONBOARDING.md\` § Where you may write`}
+- **Rules the AI must read before writing anything to my notes:** ${pending ? `\`AGENT_ONBOARDING.md\` § Where you may write (${NOTES_PENDING_MARK}; ${notesLater(esc(baseFor(a)))} and its README)` : toolFor(a).kind === 'disk' ? `\`${esc(a.notes_path)}/README.md\`` : toolFor(a).kind === 'cloud' ? `the index ${toolFor(a).unit || 'page'} of "${md(a.notes_path)}", and \`AGENT_ONBOARDING.md\` § Where you may write` : `\`${FALLBACK}/README.md\` (the local fallback folder the AI writes to), and \`AGENT_ONBOARDING.md\` § Where you may write`}
 `;
 }
 
@@ -232,16 +256,38 @@ Two guards. First: loosen only descriptive claims about me. Never loosen a state
    conservative posture. p = location escaped for a code span, q = location escaped for prose. */
 
 
-function renderOnboarding(a) {
+function renderOnboarding(a, opts) {
   const tool = toolFor(a);
   const disk = tool.kind === 'disk';
+  const pending = notesPending(a, opts);        // the local folder is intended but level 2 has not created it
   const base = esc(baseFor(a));                                // where filesystem writes go, if any
   const unit = tool.unit || 'page';
   const naming = { 'kebab-case': 'kebab-case: `my-note-title.md`', 'snake_case': 'snake_case: `my_note_title.md`', 'any': 'no naming rule; match the folder you are writing into' }[a.file_naming];
   const askList = a.always_ask.map(v => `- **${v}**: ${label(Q.always_ask, v)}`).join('\n') || '- nothing declared; use your judgement and say what you did';
 
   let writeSection;
-  if (disk) {
+  if (pending) {
+    // Level 1 writes four files and no folders, so every path under base/ is a dead pointer until a
+    // level-2 run creates it. Two things stay true regardless: the notes TOOL and its location exist
+    // already for a read-only or unknown tool (only the local fallback folder is missing, so do not
+    // tell them their own notebook is coming at level 2), and the write policy they chose is not
+    // dropped, only deferred to "once it exists".
+    const laterLine = {
+      'notes-freely': `anywhere under \`${base}/\`, under that folder's rules, and nowhere else unasked`,
+      'logs-and-inbox-only': `only the session log (\`${base}/sessions/\`), the decisions log (\`${base}/decisions.md\`) and the inbox (\`${base}/inbox/\`)`,
+      'ask-before-every-write': 'ask before every write, every time, showing what you would write and where',
+    }[a.write_policy];
+    const whereLine = disk
+      ? `- **Notes will live in ${md(tool.name)}:** ${tool.reach}, once that folder exists.`
+      : `- **Notes live in ${md(tool.name)}:** reach them as ${tool.reach}. ${tool.posture}`;
+    const absentLine = disk
+      ? `- **That folder is not on disk yet, so nothing under \`${base}/\` exists to read or write.**`
+      : `- **The local fallback folder \`${base}/\` that your writes would go to does not exist yet.**`;
+    writeSection = `${whereLine}
+${absentLine} This is a level-1 install: four profile files, no folders. ${notesLater(base)} with its README, session log, decisions log and inbox.
+- **So do not write files there, and do not create that folder yourself.** Propose the write instead: say what would go in it and where it would live, and let them run the level-2 install (or tell you to make the folder).
+- **Once it exists**, the policy they chose applies: you may write ${laterLine}. Every folder you write into has a README, and any write, edit or delete means that README is corrected in the same pass. A stale index is worse than none, because the next agent believes it.`;
+  } else if (disk) {
     const writeLine = {
       'notes-freely': `You may create and edit files anywhere under \`${base}/\`, under that folder's rules. Nowhere else without being asked.`,
       'logs-and-inbox-only': `You may write only to the session log (\`${base}/sessions/\`), the decisions log (\`${base}/decisions.md\`) and the inbox (\`${base}/inbox/\`). Anything else: propose it, do not write it.`,
@@ -302,7 +348,7 @@ ${a.work ? `- **What they do:** ${md(a.work)}\n` : ''}${a.focus ? `- **Current f
 ### Read this first, in order
 
 ${bullets(a.read_first.map(md), 'USER.md')}
-- ${tool.kind === 'cloud' ? `The index ${unit} of "${md(a.notes_path)}", before writing there.` : `\`${base}/README.md\`, the rules of the folder you may write into, before writing there.`}
+- ${pending ? `Nothing else yet: there is no notes folder to read, and no folder README (${notesLater(base)} and its README). See § Where you may write below.` : tool.kind === 'cloud' ? `The index ${unit} of "${md(a.notes_path)}", before writing there.` : `\`${base}/README.md\`, the rules of the folder you may write into, before writing there.`}
 ${a.tracker !== 'none' ? `- The task tracker (${md(a.tracker)}): what is open and what is already decided, before proposing work.\n` : ''}
 ### Where you may write
 
@@ -337,8 +383,26 @@ const WRITE_POLICY = {
   'logs-and-inbox-only': 'only the session log, the decisions log and the inbox; propose anything else, do not write it',
   'ask-before-every-write': 'ASK BEFORE EVERY WRITE, every time; show what you would write and where',
 };
-function writesLine(a) {
+/* The writes line for a folder that is not there yet. It carries BOTH halves in one clause per
+   policy: do not create anything unasked (the operative rule while the folder is absent) and the
+   policy that applies once it exists. ask-before-every-write keeps its full text, including "show
+   what you would write and where": that clause IS the consent, and someone who pasted the two
+   ChatGPT boxes and nothing else has no other copy of it (round 1, finding 1). Every line here is
+   shorter than the non-pending line it replaces, because the ChatGPT boxes are plain text on a
+   ~1500-character budget with about two characters of slack on this repo's own fixture, and the
+   harness installs all three policies at level 1 and refuses an over-budget box. */
+const WRITE_POLICY_PENDING = {
+  'notes-freely': 'Create nothing unasked; once it exists, anywhere under it, under its rules, nowhere else',
+  'logs-and-inbox-only': 'Create nothing unasked; once it exists, only the session log, decisions log and inbox',
+  'ask-before-every-write': WRITE_POLICY['ask-before-every-write'],
+};
+function writesLine(a, opts) {
   const t = toolFor(a);
+  // No backticks, and the policy in its SHORT form: this line also goes into the ChatGPT boxes, which
+  // are plain text on a ~1500-character budget with almost no slack, so the pending line is kept no
+  // longer than the line it replaces. The strictest policy has to survive the trim, so the policy is
+  // named, not dropped; AGENT_ONBOARDING.md § Where you may write carries all of it in full.
+  if (notesPending(a, opts)) return `Writes: no notes folder yet (level 2 creates ${esc(baseFor(a))}/). ${WRITE_POLICY_PENDING[a.write_policy]}.`;
   const where = t.kind === 'cloud' ? `${md(t.name)} "${md(a.notes_path)}" through its connector, no filesystem writes`
     : t.kind === 'readonly' ? `${md(t.name)} is read-only for you; the local fallback folder is ${esc(FALLBACK)}/`
     : t.kind === 'other' ? `${md(t.name)} is unknown here: ask before the first write there; local fallback folder ${esc(FALLBACK)}/ meanwhile`
@@ -352,7 +416,7 @@ function contractBlock(a, opts) {
     '',
     `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
     a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
-    writesLine(a),
+    writesLine(a, opts),
     files ? `Read first: ${a.read_first.map(md).join(' → ')}.` : null,
     `Directness: ${label(Q.tone, a.tone)}. Length: ${label(Q.length, a.length)}. When wrong: ${label(Q.mistakes, a.mistakes)}. When unsure: ${youLabel(Q.unsure, a.unsure)}.`,
     `Open with ${label(Q.lead_with, a.lead_with)}; ${label(Q.structure, a.structure)}; evidence ${label(Q.evidence, a.evidence)}.${a.signature === 'yes' ? ' Sign every edit to a note (one `Last edited by:` line, overwritten).' : ''}`,
@@ -372,4 +436,4 @@ function compactProfile(a) {
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, asks, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
+module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, NOTES_PENDING_MARK, notesPending, asks, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
