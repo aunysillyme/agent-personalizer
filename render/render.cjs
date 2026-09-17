@@ -578,5 +578,8 @@ function preflightSources(root) {
   loadProfile(root);
 }
 
-module.exports = { main, fenceMap, markerState, splice, between, preflightSources, Refusal, DIE_THROWS: false };
+/* parseFrontmatter and parseSections are exported so another renderer can read the same rule-file
+   format with the same validation (for example one that renders CLAUDE.md sections and session-start
+   hook bodies from rules in this format). Set DIE_THROWS to get a Refusal instead of an exit. */
+module.exports = { main, fenceMap, markerState, splice, between, preflightSources, parseFrontmatter, parseSections, Refusal, DIE_THROWS: false };
 if (require.main === module) main();

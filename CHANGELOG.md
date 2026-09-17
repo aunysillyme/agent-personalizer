@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+### Added
+
+- **The rule parser is a library.** `parseFrontmatter` and `parseSections` are exported from `render/render.cjs`, so another renderer can read the same rule-file format with the same validation instead of re-implementing it. The first consumer renders one person's CLAUDE.md sections and session-start hook bodies from rule files (the maintainer's own stack). Check 90 asserts both exports parse a shipped rule and refuse a bad section as a `Refusal`. The harness is 90 checks now.
+
 ## [0.5.1] - 2026-09-12
 
 Issue #25, filed on a recheck of 0.5.0 by the same outside reader as #19 to #24. Reproduced, then fixed, then handed to Codex as one adversarial read-only round against `AUDIT_BRIEF.md`, which returned six findings. All six were reproduced by hand and fixed here, and every fix has a harness assertion inside check 89 that goes red when the fix is backed out. The harness is 89 checks now.
