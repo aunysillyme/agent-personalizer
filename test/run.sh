@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 89 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 90 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -1214,5 +1214,19 @@ node bin/agent-personalizer.js --dir "$S" --ai claude --level 2 --yes > "$S/up.t
 grep -qF 'kept   USER.md' "$S/up.txt" || fail "an edited USER.md was not kept"
 grep -qF 'you edited USER.md while it still said there is no local notes folder' "$S/up.txt" || fail "editing the one sentence the notice keyed on silenced the notice"
 pass "(#25) USER.md, AGENT_ONBOARDING.md and the contract name no notes path level 1 does not create; level 2 restores them and keeps an edited USER.md"
+
+# 90. the rule parser is a library: parseFrontmatter and parseSections are exported, read a shipped rule,
+#     and refuse a bad section as a Refusal (not an exit) when DIE_THROWS is set
+node -e '
+const r = require("./render/render.cjs"); const fs = require("fs");
+if (typeof r.parseFrontmatter !== "function" || typeof r.parseSections !== "function") { console.error("parser not exported"); process.exit(1); }
+const { meta, body } = r.parseFrontmatter(fs.readFileSync("rules/30-folder-index-is-part-of-the-change.md", "utf8"), "rule 30");
+const s = r.parseSections(body, "rule 30");
+if (meta.id !== "30-folder-index-is-part-of-the-change" || !s.universal || !s["binding:claude"]) { console.error("parsed rule is wrong"); process.exit(1); }
+r.DIE_THROWS = true;
+try { r.parseSections("## bogus\ntext\n", "bad"); console.error("a bad section was accepted"); process.exit(1); }
+catch (e) { if (!(e instanceof r.Refusal)) { console.error("not a Refusal: " + e.message); process.exit(1); } }
+' || fail "the rule parser is not usable as a library"
+pass "(library) parseFrontmatter and parseSections are exported, parse a shipped rule, and refuse a bad section"
 
 echo; echo "all checks passed"
