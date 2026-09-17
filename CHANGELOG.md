@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-17
+
+One Codex read-only round covered the export together with its first consumer. It returned no finding against the export: check 90 passed and the shared `DIE_THROWS` state produced no failure in the installer's call path.
+
 ### Added
 
 - **The rule parser is a library.** `parseFrontmatter` and `parseSections` are exported from `render/render.cjs`, so another renderer can read the same rule-file format with the same validation instead of re-implementing it. The first consumer renders one person's CLAUDE.md sections and session-start hook bodies from rule files (the maintainer's own stack). Check 90 asserts both exports parse a shipped rule and refuse a bad section as a `Refusal`. The harness is 90 checks now.
@@ -163,7 +167,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.2...v0.4.3
