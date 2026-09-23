@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 90 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 91 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -1228,5 +1228,9 @@ try { r.parseSections("## bogus\ntext\n", "bad"); console.error("a bad section w
 catch (e) { if (!(e instanceof r.Refusal)) { console.error("not a Refusal: " + e.message); process.exit(1); } }
 ' || fail "the rule parser is not usable as a library"
 pass "(library) parseFrontmatter and parseSections are exported, parse a shipped rule, and refuse a bad section"
+
+# 91. uninstall keeps user data, checks the complete plan before deleting, and previews without writes.
+node test/uninstall.test.js || fail "uninstall regressions"
+pass "uninstall: clean levels, edited files, shared home files, notes, dry-run and hostile paths"
 
 echo; echo "all checks passed"

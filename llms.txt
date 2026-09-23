@@ -1,0 +1,26 @@
+# agent-personalizer
+
+> One interview writes a profile and rule files for Claude Code, Codex, Cursor, Gemini and ChatGPT, kept in sync from one source.
+
+Install with Node 18 or later: `npx agent-personalizer`. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
+
+The installer writes USER.md, AGENT_ONBOARDING.md and each selected AI's instruction files. Level 2 adds local notes scaffolds for local and fallback notes tools. Level 3 adds editable rules, a renderer, a session-start hook, a drift check and a forbidden-string gate. Preview removal with `npx agent-personalizer --uninstall --dir . --dry`.
+
+## Docs
+
+- [Documentation index](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/README.md): Start here.
+- [Install and use](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/install.md): Flags, scripted answers, updates and uninstall.
+- [Instruction tiers](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/tiers.md): Where each instruction belongs.
+- [Paste guide](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/paste-guide.md): The file each AI reads and how to load it.
+- [Companion tools](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/companions.md): Notes connectors and enforcement tools.
+- [Guarantees](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/guarantees.md): What the code enforces and how instructions reach the AI.
+
+## Optional
+
+- [Agent contributor instructions](https://github.com/aunysillyme/agent-personalizer/blob/main/AGENTS.md): Repository rules and verification.
+- [Contributing](https://github.com/aunysillyme/agent-personalizer/blob/main/CONTRIBUTING.md): Add targets, notes tools, examples and regression fixes.
+- [Rule format](https://github.com/aunysillyme/agent-personalizer/blob/main/rules/README.md): Universal, personal, binding and origin sections.
+- [Worked example](https://github.com/aunysillyme/agent-personalizer/tree/main/examples/freelance-illustrator): An invented illustrator's profile and rendered files.
+- [Changelog](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md): Release history.
+- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Route tasks to the model suited to the work.
+- [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security.

@@ -1,7 +1,7 @@
 {
   "name": "agent-personalizer",
-  "version": "0.5.2",
-  "description": "Personalize any AI with dynamic instructions. One profile, one rule source, rendered for Claude, Codex, Cursor, Gemini and ChatGPT.",
+  "version": "0.6.0",
+  "description": "One interview writes a profile and rule files every AI you use reads: CLAUDE.md, AGENTS.md, GEMINI.md and ChatGPT, kept in sync from one source.",
   "author": "aunysillyme (https://github.com/aunysillyme)",
   "license": "MIT",
   "repository": "github:aunysillyme/agent-personalizer",
@@ -26,8 +26,8 @@
     "agent-personalizer": "bin/agent-personalizer.js"
   },
   "scripts": {
-    "render": "node render/render.cjs",
-    "check": "node render/render.cjs --check",
+    "render": "node render/render.cjs --dir examples/freelance-illustrator",
+    "check": "node render/render.cjs --dir examples/freelance-illustrator --check",
     "gate": "node check/gate.cjs",
     "test": "sh test/run.sh"
   },
@@ -45,6 +45,7 @@
     "docs",
     "examples",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "llms.txt"
   ]
 }

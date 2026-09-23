@@ -6,6 +6,31 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-23
+
+Presentation and safe removal from the repository presentation plan.
+
+### Added
+
+- `--uninstall --dir <folder>` compares generated files with the current render of stored answers and sources. Edited files are kept and named. Pre-existing home files retain their own bytes while an unchanged generated block is removed.
+- `--dry` previews the removal plan. Uninstall preflights tracked paths, refuses symlinks and traversal, removes only unchanged scaffold and tool copies, and removes the configuration last while keeping it for retained tracked files. The hook registration cleanup is printed as a manual step.
+- Original home ownership is recorded in `.agent-personalizer.json` as `preservedTargets`. Content is checked by rendering and byte comparison. Older configurations retain files whose ownership cannot be established from an exact generated-file match.
+- An uninstall regression runner covers clean levels, edited files, pre-existing homes, reinstallation, local rule changes, user notes, path refusals, dry runs and missing configuration. The shell harness now reports 91 checks.
+- `llms.txt`, a documentation index, installation and guarantees guides, and a published-package demo recording script.
+
+### Changed
+
+- README leads with the interview and generated files, shows real example excerpts, documents AI loading paths, links both sibling tools and explains removal. Detailed flags and instruction tiers have their own guides.
+- npm description names the generated profile and rule files. `llms.txt` joins the published files list.
+- Contribution and maintenance guidance names the actions readers can take.
+
+### Fixed
+
+- Repository `npm run render` and `npm run check` target the maintained example. Contributor instruction files at the repository root remain hand-written.
+- Installation copy accurately describes file selection, conditional interview questions, local and cloud notes, signature opt-in and the mechanisms level.
+- Install now records a SHA-256 of the exact bytes it writes for each tracked file, and of the marker block alone for a pre-existing home file, in `.agent-personalizer.json` under `installed`. `--uninstall` compares against that record first, so a later release of this very package (an unpinned `npx agent-personalizer --uninstall` after an upgrade) can no longer make an untouched file read as edited and get kept forever; a configuration from before this field existed still falls back to the previous comparison (code-reviewer audit, `AUDIT_BRIEF.md`).
+- The former routing placeholder now links to model-orchestrator. `--level 4` continues to install the same files as level 3 for existing scripts.
+
 ## [0.5.2] - 2026-09-17
 
 One Codex read-only round covered the export together with its first consumer. It returned no finding against the export: check 90 passed and the shared `DIE_THROWS` state produced no failure in the installer's call path.
@@ -167,7 +192,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.4.3...v0.5.0

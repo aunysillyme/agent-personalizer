@@ -34,23 +34,31 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+// CLAUDE.md and AGENTS.md are written here as a pointer template only; render.cjs (run at the
+// end of main()) splices in the rendered block and records the final bytes it wrote, so their
+// hash is recorded there, once, against the complete file.
+const HOME_NAMES = new Set(['CLAUDE.md', 'AGENTS.md']);
 
 const PKG = path.resolve(__dirname, '..');
 const onboarding = require(path.join(PKG, 'render', 'onboarding.cjs'));
 const markers = require(path.join(PKG, 'render', 'render.cjs'));   // markerState, for the preflight; render.cjs runs nothing on require
+const { installPlan } = require('./install-plan.cjs');
 const AIS = ['claude', 'agents', 'gemini', 'chatgpt', 'prompt'];
 const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex / Cursor / anything that reads AGENTS.md', gemini: 'Gemini', chatgpt: 'ChatGPT custom instructions', prompt: 'a plain system prompt (shareable, no profile)' };
 
 function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--full', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
                                             [--answers <file.json> | --answers - | --defaults] [--full] [--yes]
                                             [--help | -h] [--version | -v]
+  npx agent-personalizer --uninstall --dir <folder> [--dry]
 
   Interactive when flags are missing and stdin is a terminal; the onboarding interview runs then.
   The interview is SHORT by default: the seven questions that change behaviour (name, tone, length,
@@ -62,6 +70,8 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   --defaults   the ANSWER SOURCE: accept every default without being asked. With or without --yes.
   --yes        NON-INTERACTIVE MODE, not an answer source. It needs --dir, --ai and --level, and with no
                --answers it falls back to the defaults.
+  --uninstall  remove unchanged installed files; keep and name edited files and user text.
+  --dry        preview --uninstall without changing files.
   Levels: 1 profile, onboarding and home file(s); nothing else (the rules render from the package)
           2 + the notes folder: its README, a weekly session log, a decisions log and an inbox
           3 + the renderer, the session-start hook, the gate and a copy of rules/ to edit
@@ -146,6 +156,13 @@ function copyIfAbsent(src, root, rel) {
 }
 
 async function main() {
+  if (ARGS['--uninstall']) {
+    if (!ARGS['--dir']) die('--uninstall needs --dir <folder>');
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full'])
+      if (opt in ARGS) die(`${opt} is an install option; --uninstall reads the stored config`);
+    return require('./uninstall.cjs').uninstall(ARGS['--dir'], { dry: !!ARGS['--dry'] });
+  }
+  if (ARGS['--dry']) die('--dry needs --uninstall');
   const interactive = process.stdin.isTTY && !!!ARGS['--yes'];
   let dir = arg('--dir', null);
   let ais = arg('--ai', null);
@@ -163,9 +180,8 @@ async function main() {
   if (!dir || !ais || !level) die('non-interactive run needs --dir, --ai and --level (and --yes)');
   if (!/^[1-4]$/.test(String(level))) die('level must be exactly 1, 2 or 3');
   level = Number(level);
-  // 4 was once offered as a peer of 1-3 and installed exactly what 3 installs: the hand-off layer is
-  // reading material, not files. It is no longer offered, and still accepted so older scripts run.
-  if (level === 4) console.log('note: --level 4 installs exactly what --level 3 installs. The hand-off layer (routing, task bundles, verified CLI runs) is reading material until it ships, so 3 is the top install level.');
+  // Keep the former level accepted so existing scripts run. Routing has its own package.
+  if (level === 4) console.log('note: --level 4 installs exactly what --level 3 installs. For model routing, see https://github.com/aunysillyme/model-orchestrator');
   const targets = String(ais).split(',').map(s => s.trim()).filter(Boolean);
   const bad = targets.filter(t => !AIS.includes(t));
   if (bad.length) die(`unknown AI: ${bad.join(', ')} (known: ${AIS.join(', ')})`);
@@ -194,7 +210,7 @@ async function main() {
     console.log('\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.');
     console.log(full
       ? `Full interview: up to ${onboarding.QUESTIONS.length} questions, some of which apply only to certain notes tools.\n`
-      : `Short interview: the ${onboarding.QUICK.length} questions that change behaviour, plus any the notes tool you pick makes apply. Every other answer takes its default; --full asks all ${onboarding.QUESTIONS.length}.\n`);
+      : `Short interview: the ${onboarding.QUICK.length} questions that change behaviour, plus any the notes tool you pick makes apply. Every other answer takes its default; --full asks up to ${onboarding.QUESTIONS.length}, skipping questions that do not apply to your notes tool.\n`);
     const raw = {};
     for (const q of onboarding.QUESTIONS) {
       if (!onboarding.asks(q, raw, full)) continue;
@@ -233,6 +249,10 @@ async function main() {
       if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
     }
     if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`.agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
+    markers.DIE_THROWS = true;
+    try { markers.validatePreservedTargets(cfg); }
+    catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
+    finally { markers.DIE_THROWS = false; }
     if (cfg.onboarding) {
       try { prevAnswers = onboarding.validate(cfg.onboarding); } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
       if (!answersFile && answersSource.startsWith('defaults')) { answers = prevAnswers; answersSource = 'kept from .agent-personalizer.json'; }
@@ -241,67 +261,19 @@ async function main() {
   const allTargets = [...new Set([...(Array.isArray(cfg.targets) ? cfg.targets : []), ...targets, 'onboarding'])];
   const base = onboarding.baseFor(answers);              // the folder scaffolds and home-file pointers use
   const kind = onboarding.kindOf(answers);
+  // Bytes actually written, by tracked path, so --uninstall never has to re-derive them from
+  // whatever package version happens to be running at removal time. Carried forward across runs;
+  // only ever added to here, never pruned (a config predating this field has none, and falls
+  // back to the older comparison; see uninstall.cjs).
+  const installedHashes = { ...(cfg.installed && typeof cfg.installed === 'object' ? cfg.installed : {}) };
 
   console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\nOnboarding answers: ${answersSource}\n`);
 
   // ---- PLAN: every file this run would create, computed before anything is written ----
-  const plan = [];                                        // { rel, src | text }
-  // signature=no: the signature rule file is not installed (a `requires:` rule that is absent cannot drift back in),
-  // and every copied markdown loses its `Last edited by:` template line and its pointer to the rule.
-  const noSig = answers.signature === 'no';
-  const stripSig = (t) => noSig ? t.split('\n').filter(l => !l.includes('40-sign-every-edit.md') && !/^`?Last edited by:/.test(l)).join('\n') : t;
-  const mdCopy = (rel, src) => plan.push({ rel, text: stripSig(fs.readFileSync(src, 'utf8')) });
-  // rules/ is copied at level 3, where it becomes yours to edit; levels 1 and 2 render from the package's rules
-  if (level >= 3) for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
-    if (noSig && f === '40-sign-every-edit.md') continue;
-    mdCopy(`rules/${f}`, path.join(PKG, 'rules', f));
-  }
-  // The home templates carry four `notes/...` pointer lines. They collapse to ONE line whenever the
-  // folder they name will not be there to read: a cloud notes tool has no local folder at all, and no
-  // level below 2 creates one, so a level-1 install used to hand the first session four broken
-  // pointers. NOTES_ONE_LINE is also what the level-2 upgrade looks for, byte for byte.
-  const NOTES_ONE_LINE = (why) => `- Notes: see \`AGENT_ONBOARDING.md\` § Where you may write (${why})`;
-  const NOTES_LATER = `no local notes folder at level 1; level 2 creates \`${base}/\``;
-  // Is the folder every notes pointer names going to be there to read? The README is the file the AI
-  // is told to read before it writes, and the level-2 scaffold creates it with the folder. The LEVEL
-  // alone is a proxy that is wrong in both directions: a level-1 install can land beside a notes
-  // folder that already exists, and a re-run at a lower level does not delete what a higher one made
-  // (round 1, findings 4 and 5). One boolean drives the home-file collapse and both rendered files,
-  // so they can never disagree about the same folder.
   const scaffoldExists = (() => { try { return fs.statSync(path.join(root, base, 'README.md')).isFile(); } catch (_) { return false; } })();
   const willScaffold = level >= 2 && kind !== 'cloud';    // this run's own scaffold, written further down
   const notesScaffolded = kind !== 'cloud' && (scaffoldExists || willScaffold);
-  const notesWhy = kind === 'cloud' ? 'reached through its connector, no local files'
-    : !notesScaffolded ? NOTES_LATER
-    : kind !== 'disk' ? 'local fallback folder `notes/`'
-    : null;                                               // disk, scaffold present: the four paths, retargeted at notes_path
-  const home = (name) => {
-    let t = fs.readFileSync(path.join(PKG, 'templates', name), 'utf8');
-    if (level < 3) {
-      // no local rules/: the pointers point at the rendered block below, which carries the full text
-      t = t.split('\n').filter(l => !/Rules, one file each, the owning copy/.test(l)).join('\n');
-      t = t.replace(/`\[owner: rules\/[^\]]+\]`/g, '`[owner: the rendered block below]`');
-    }
-    if (notesWhy) {
-      let done = false;
-      t = t.split('\n').filter(l => { if (!/`notes\//.test(l)) return true; if (done) return false; done = true; return true; })
-        .map(l => /`notes\//.test(l) ? NOTES_ONE_LINE(notesWhy) : l).join('\n');
-    } else if (base !== 'notes') t = t.replace(/\bnotes\//g, `${base}/`);
-    return stripSig(t);
-  };
-  const POINTER = 'pointer file; the renderer fills its block below';
-  if (targets.includes('claude')) plan.push({ rel: 'CLAUDE.md', text: home('CLAUDE.md'), note: POINTER });
-  if (targets.includes('agents')) plan.push({ rel: 'AGENTS.md', text: home('AGENTS.md'), note: POINTER });
-  if (level >= 2 && kind !== 'cloud') {                   // a cloud tool's notes are not local files; no folder named after a workspace
-    mdCopy(`${base}/README.md`, path.join(PKG, 'templates', 'FOLDER_README.md'));
-    mdCopy(`${base}/sessions/TEMPLATE-week.md`, path.join(PKG, 'templates', 'session-log.md'));
-    mdCopy(`${base}/decisions.md`, path.join(PKG, 'templates', 'decisions-log.md'));
-    mdCopy(`${base}/inbox/README.md`, path.join(PKG, 'templates', 'INBOX_README.md'));
-  }
-  if (level >= 3) {
-    for (const rel of ['render/render.cjs', 'render/targets.json', 'render/onboarding.cjs', 'hooks/README.md', 'hooks/claude-code/session-start.sh', 'check/gate.cjs', 'check/forbidden.example.txt'])
-      plan.push({ rel, src: path.join(PKG, rel) });
-  }
+  const { plan, stripSig, notesWhy, NOTES_ONE_LINE, NOTES_LATER } = installPlan({ answers, level, targets, notesScaffolded });
 
   // ---- PREFLIGHT: refuse now, with nothing written, everything the renderer would refuse later ----
   for (const p of plan) probe(root, p.rel);              // symlinks and non-directories on the way
@@ -311,10 +283,12 @@ async function main() {
   catch (e) { if (e instanceof markers.Refusal) die(`${e.message}. The renderer would refuse this folder; nothing was written`); throw e; }
   finally { markers.DIE_THROWS = false; }
   const TARGETS = JSON.parse(fs.readFileSync(path.join(PKG, 'render', 'targets.json'), 'utf8'));
+  const preservedTargets = new Set(cfg.preservedTargets || []);
   for (const t of allTargets) {
     const rel = TARGETS[t].file;
     const { full, exists } = probe(root, rel);
     if (exists) {
+      if (!cfgExists || !(cfg.targets || []).includes(t)) preservedTargets.add(t);
       const st = fs.lstatSync(full);
       if (!st.isFile()) die(`${rel} exists and is not a regular file; nothing was written`);
       let text; try { text = new TextDecoder('utf-8', { fatal: true }).decode(fs.readFileSync(full)); } catch (_) { die(`${rel} is not valid UTF-8; the renderer would refuse it. Nothing was written`); }
@@ -390,9 +364,14 @@ async function main() {
 
   // ---- WRITE ----
   for (const u of upgrades) { fs.writeFileSync(u.full, u.text); console.log(`update ${u.name} (${u.why.join('; ')})`); }
-  if (userAction === 'create') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded }), { flag: 'wx' }); console.log('wrote  USER.md (from your answers)'); }
-  else if (userAction === 'regenerate') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded })); console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`); }
-  else if (userAction === 'relevel') { fs.writeFileSync(user.full, onboarding.renderUser(answers, { notesScaffolded })); console.log(`update USER.md (notes pointers now name ${base}/, which is there; it matched the render that said it was not, byte for byte)`); }
+  if (userAction === 'create' || userAction === 'regenerate' || userAction === 'relevel') {
+    const rendered = onboarding.renderUser(answers, { notesScaffolded });
+    fs.writeFileSync(user.full, rendered, userAction === 'create' ? { flag: 'wx' } : undefined);
+    installedHashes['USER.md'] = sha256(Buffer.from(rendered));
+    if (userAction === 'create') console.log('wrote  USER.md (from your answers)');
+    else if (userAction === 'regenerate') console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`);
+    else console.log(`update USER.md (notes pointers now name ${base}/, which is there; it matched the render that said it was not, byte for byte)`);
+  }
   else if (userAction === 'conflict') {
     console.log(`kept   USER.md (you edited it, so it was not regenerated)`);
     console.log(`       ANSWERS CHANGED: ${changedKeys.join(', ')}. USER.md still carries the old value(s) and the rendered profile sections come from USER.md.`);
@@ -402,11 +381,18 @@ async function main() {
     if (staleNotesInUser) console.log(`       NOTE: you edited USER.md while it still said there is no local notes folder. ${base}/ exists now. Fix the two "Where things live" lines by hand, or delete USER.md and re-run.`);
   }
   for (const p of plan) {
-    if (p.src) copyIfAbsent(p.src, root, p.rel);
-    else {
+    if (p.src) {
+      if (copyIfAbsent(p.src, root, p.rel)) installedHashes[p.rel] = sha256(fs.readFileSync(p.src));
+    } else {
       const { full, exists } = safeDest(root, p.rel);
       if (exists) console.log(`kept   ${p.rel} (exists)`);
-      else { fs.writeFileSync(full, p.text, { flag: 'wx' }); console.log(`wrote  ${p.rel}${p.note ? ` (${p.note})` : ''}`); }
+      else {
+        fs.writeFileSync(full, p.text, { flag: 'wx' });
+        console.log(`wrote  ${p.rel}${p.note ? ` (${p.note})` : ''}`);
+        // CLAUDE.md/AGENTS.md are only a pointer template here; render.cjs below splices in the
+        // rendered block and records the finished file's hash itself.
+        if (!HOME_NAMES.has(p.rel)) installedHashes[p.rel] = sha256(Buffer.from(p.text));
+      }
     }
   }
   if (level >= 3) {
@@ -415,7 +401,7 @@ async function main() {
     if (!st.isFile() || st.isSymbolicLink()) die('hook file changed underneath the installer; not chmod-ing it');
     fs.chmodSync(hp, 0o755);
   }
-  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: onboarding.sparse(answers) };   // only what differs from the defaults
+  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets], installed: installedHashes };   // sparse answers, original home ownership, and the bytes written so far (render.cjs below adds the home files)
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
   console.log(`${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})`);
 

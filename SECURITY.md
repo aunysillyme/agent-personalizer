@@ -14,4 +14,4 @@ In scope: `bin/agent-personalizer.js`, `render/`, `check/gate.cjs`, `hooks/`, th
 
 ## What is already done
 
-Every release passes an adversarial read-only audit (see `CHANGELOG.md`, each entry names its round) and a 90-check harness with exact exit codes, on Linux and macOS in CI. The deferred residuals are stated in the code headers: TOCTOU between check and write, unicode look-alikes in the gate, the named `--dir` being followed once via realpath, and a hard process kill between two renames.
+Every release passes an adversarial read-only audit (see `CHANGELOG.md`, each entry names its round) and a 91-check harness with exact exit codes, on Linux and macOS in CI. The deferred residuals are stated in the code headers: TOCTOU between check and write, unicode look-alikes in the gate, the named `--dir` being followed once via realpath, and a hard process kill between two renames. On Windows, `O_NOFOLLOW` is unavailable to the flag the uninstaller opens tracked files with; nothing depends on it there, because the delete loop re-probes every path with `lstat` immediately before each unlink, so no destructive path exists without it.
