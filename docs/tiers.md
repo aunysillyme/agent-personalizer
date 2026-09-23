@@ -2,7 +2,16 @@
 
 Instructions to an AI live in five places. Each has one job and prevents one failure. Put a rule in the wrong tier and it either decays, drifts, or gets ignored. Put it in the right one and it holds.
 
-Read bottom-up. Tier 1 is the most present, tier 5 the most durable.
+Read bottom-up. Tier 1 is the most present, tier 5 the most durable. Install levels select the files you receive; these tiers explain where the resulting instructions belong.
+
+| Tier | What | Prevents |
+|---|---|---|
+| 1 | Style in the system prompt | rules decaying over a long chat |
+| 2 | One always-loaded home file | the AI not knowing where anything is |
+| 3 | Session-start injection | a tool's own instructions beating yours at the moment of decision |
+| 4 | One owning document per rule | the same rule drifting in five copies |
+| 5 | Memory with a status on every fact | the AI treating its own guess as your ruling |
+
 
 A word on the stories below: each is one setup's experience of what held and what did not. They explain why the tiers are shaped this way. They are not measurements, and placing a rule in a tier puts it in front of the model; it does not make the model obey. Instruction precedence differs by host and model.
 

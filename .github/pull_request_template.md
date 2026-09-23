@@ -14,6 +14,6 @@
 - [ ] If a rule changed: its `origin` block still names the failure
 - [ ] No private identifiers of mine in this diff; no em dashes in prose
 
-## Not done, on purpose
+## Kept for a later change
 
 <!-- Anything you deferred, and why. Empty is a fine answer. -->

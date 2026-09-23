@@ -59,8 +59,8 @@ Use `system-prompt.md`. It carries only the universal blocks: no profile, no per
 2. Files that are read automatically (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) are done.
 3. Files that were pasted (claude.ai, ChatGPT, any system prompt) must be pasted again. Nothing can detect a stale paste for you; put "re-paste after re-render" in your own checklist.
 
-## What not to do
+## Keep it working
 
-- Do not edit inside the marker block of a rendered file; edit `USER.md`, `rules/`, or your answers, and re-render. The next render overwrites the block.
-- Do not paste `AGENT_ONBOARDING.md` into a shared bot. It names your off-limits topics and your working habits. `system-prompt.md` is the shareable one.
-- Do not keep a hand-edited copy of a rule in two places. One owner, everything else points to it. [tiers.md](tiers.md), tier 4.
+- **Edit the source:** change `USER.md`, `rules/`, or your answers, then re-render. The next render replaces the generated block.
+- **Share the universal rules:** use `system-prompt.md` for a shared bot. Keep `AGENT_ONBOARDING.md` in your own setup because it names your off-limits topics and working habits.
+- **Keep one rule owner:** link other files to the owning rule, or generate and check their copies. See [tiers.md](tiers.md), tier 4.

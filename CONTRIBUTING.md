@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking. Two kinds of contribution land well here: a **failure you hit** (with the steps), and a **rule you wrote from one** (with its origin story). Feature ideas without a failure behind them usually turn into a discussion first.
+Contributions are welcome: a **new AI target**, a **notes tool**, an **example user**, or a **failure you hit** with the steps to reproduce it. A rule contribution should include the failure that produced it in its origin story.
 
 ## Before you open anything
 
@@ -10,7 +10,7 @@ Thanks for looking. Two kinds of contribution land well here: a **failure you hi
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 90 checks, exact exit codes, Linux and macOS
+npm test            # sh test/run.sh: 91 checks, exact exit codes, Linux and macOS
 node test/rollback.test.js "$(mktemp -d)"   # after copying examples/freelance-illustrator into it
 node check/gate.cjs --self-test
 ```
