@@ -48,5 +48,10 @@
     ],
     "notes_tool": "obsidian",
     "obsidian_tc": "yes"
+  },
+  "installed": {
+    "CLAUDE.md": "7c4206a8cd904266c9c559c745c865fc97d9f852e270f0d1c51da52ac1d364e2",
+    "AGENTS.md": "e2d2c9fe612a7868c1dcdb51e7181215371e394b76aee2774784798c318f26d8",
+    "AGENT_ONBOARDING.md": "2bb8e3ba7da6971ed44b5ae7fa822d4445c925c77a6fa94532af19d4e4c62ec0"
   }
 }

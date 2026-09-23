@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-23
+
+### Changed
+
+- README install note drops the GitHub-source command; the npm command is the install path. `docs/install.md` shows the standard way to run one release: `npx agent-personalizer@<version>`.
+
 ## [0.6.0] - 2026-09-23
 
 Presentation and safe removal from the repository presentation plan.
@@ -193,6 +199,7 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
 [Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...HEAD
+[0.6.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.0...v0.5.1
