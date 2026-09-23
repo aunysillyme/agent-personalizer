@@ -3,7 +3,7 @@
 # Run after publication: sh scripts/record-demo.sh [version] [output.gif]
 # Defaults: package.json version, docs/demo.gif. Requires Node/npm, Python 3,
 # asciinema 3 and agg. The package fetch is the only network step.
-# Work, npm cache and the recording stay in .test-work/ until cleanup. An
+# Work, npm cache and the recording stay in a temp folder until cleanup. An
 # unsuccessful interview or render leaves an existing output GIF unchanged.
 set -eu
 
@@ -22,8 +22,9 @@ node -e 'if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(pr
 }
 OUTPUT=${2:-"$ROOT/docs/demo.gif"}
 case "$OUTPUT" in /*) ;; *) OUTPUT="$PWD/$OUTPUT" ;; esac
-mkdir -p "$ROOT/.test-work"
-AP_DEMO_WORK=$(mktemp -d "$ROOT/.test-work/demo.XXXXXX")
+# Work outside the repository: inside it, npx resolves agent-personalizer to this
+# checkout (same package name) and finds no installed bin.
+AP_DEMO_WORK=$(mktemp -d "${TMPDIR:-/tmp}/agent-personalizer-demo.XXXXXX")
 trap 'rm -rf "$AP_DEMO_WORK"' EXIT
 trap 'exit 130' HUP INT TERM
 AP_DEMO_PACKAGE="agent-personalizer@$VERSION"
