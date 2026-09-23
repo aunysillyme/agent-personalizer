@@ -30,7 +30,7 @@ For the full interview, asking up to 23 questions, only the ones that apply to y
 npx agent-personalizer --full
 ```
 
-Requires Node 18 or later. The npm package is published with provenance from this repository's workflow. To pin the GitHub source to this release, use `npx github:aunysillyme/agent-personalizer#v0.6.0`. See [installation](docs/install.md) for scripted answers, the npm cache fix, manual copying, and every flag.
+Requires Node 18 or later. Published on npm with provenance. See [installation](docs/install.md) for scripted answers, the npm cache fix, manual copying, and every flag.
 
 Privacy:
 

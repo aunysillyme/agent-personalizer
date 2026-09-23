@@ -22,10 +22,10 @@ npx agent-personalizer --full
 
 This asks up to 23 questions; questions that do not apply to your notes tool are skipped. `--quick` explicitly selects the short interview, which is already the default. Both interview flags require a terminal and the interactive answer source.
 
-To pin a GitHub tag:
+To run one specific release, add the version:
 
 ```bash
-npx github:aunysillyme/agent-personalizer#v0.6.0
+npx agent-personalizer@<version>
 ```
 
 ## Answer sources and headless runs
