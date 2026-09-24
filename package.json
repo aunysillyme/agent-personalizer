@@ -1,6 +1,6 @@
 {
   "name": "agent-personalizer",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "One interview writes a profile and rule files every AI you use reads: CLAUDE.md, AGENTS.md, GEMINI.md and ChatGPT, kept in sync from one source.",
   "author": "aunysillyme (https://github.com/aunysillyme)",
   "license": "MIT",
@@ -20,7 +20,16 @@
     "chatgpt",
     "personalization",
     "agent-onboarding",
-    "dynamic-instructions"
+    "dynamic-instructions",
+    "claude-md",
+    "gemini-md",
+    "system-prompt",
+    "ai-memory",
+    "llm",
+    "cli",
+    "mcp",
+    "obsidian",
+    "prompt-engineering"
   ],
   "bin": {
     "agent-personalizer": "bin/agent-personalizer.js"
