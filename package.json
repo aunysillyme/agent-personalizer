@@ -1,6 +1,6 @@
 {
   "name": "agent-personalizer",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "One interview writes a profile and rule files every AI you use reads: CLAUDE.md, AGENTS.md, GEMINI.md and ChatGPT, kept in sync from one source.",
   "author": "aunysillyme (https://github.com/aunysillyme)",
   "license": "MIT",

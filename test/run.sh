@@ -958,7 +958,7 @@ for f in rules/[0-9]*.md; do
 done
 pass "every rule carries an In practice line"
 
-# 80. workflows: the publish workflow is manual, provenance-enabled, OIDC-scoped; the harness matrix covers Node 18/20/22 and a Windows smoke job; .gitattributes pins LF
+# 80. workflows: publishing is manual, provenance-enabled, OIDC-scoped; CI has the Node matrix, Windows smoke and packed consumer installs; .gitattributes pins LF
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
 grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
@@ -967,8 +967,9 @@ grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep 
 grep -q 'ref: \${{ inputs.tag }}' .github/workflows/publish.yml && fail "publish.yml checks out the raw input as a ref"
 grep -q 'node: \[18, 20, 22\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22"
 grep -q 'smoke-windows:' .github/workflows/harness.yml && grep -q 'windows-latest' .github/workflows/harness.yml || fail "no Windows smoke job"
+grep -q '^  consumer-install:' .github/workflows/harness.yml && grep -q 'run: sh test/consumer-install.sh' .github/workflows/harness.yml || fail "no packed consumer-install job"
 grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
-pass "publish workflow dormant and provenance-ready; matrix and Windows smoke present; LF pinned"
+pass "publish workflow dormant and provenance-ready; matrix, Windows smoke and consumer install present; LF pinned"
 
 # 81. the quoted check count matches the number of checks, everywhere it is quoted
 n="$(grep -c '^[[:space:]]*pass "' test/run.sh)"

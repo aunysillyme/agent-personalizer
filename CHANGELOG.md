@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-24
+
+### Added
+
+- CI installs the packed tarball in a fresh consumer project on Linux and macOS, checking levels 1 and 2, ChatGPT paste files and the installed version ([#26](https://github.com/aunysillyme/agent-personalizer/issues/26)).
+
 ## [0.6.2] - 2026-09-24
 
 ### Changed
@@ -204,7 +210,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...v0.6.0
