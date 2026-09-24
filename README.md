@@ -8,6 +8,8 @@
 
 **What you get:** one profile and one rule source, rendered into the exact file each AI reads, with a check that fails when a copy drifts and a status on every remembered fact.
 
+CI installs the packed tarball as a consumer at levels 1 and 2 and checks the ChatGPT paste path.
+
 ## Quick start
 
 ```bash
