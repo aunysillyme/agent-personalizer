@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-24
+
+### Changed
+
+- npm keywords now match the GitHub topics, so npm search finds the package by the same terms: `claude-md`, `gemini-md`, `system-prompt`, `ai-memory`, `llm`, `cli`, `mcp`, `obsidian` and `prompt-engineering` added (11 to 20). No code or output changes.
+
 ## [0.6.1] - 2026-09-23
 
 ### Changed
@@ -198,7 +204,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.5.1...v0.5.2
