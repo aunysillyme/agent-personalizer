@@ -138,7 +138,7 @@ Three open-source tools that work on their own and fit together:
 | Repo | What it gives you |
 |---|---|
 | **agent-personalizer** | One interview writes the profile and rules every AI you use reads, kept in sync from one source. |
-| [model-orchestrator](https://github.com/aunysillyme/model-orchestrator) | Routing rules that tell your agent which model handles each task, so frontier models do the hard work and cheaper tiers do the rest. |
+| [model-orchestrator](https://github.com/aunysillyme/model-orchestrator) | Model router for AI coding agents: installs routing rules, 8 subagents, hooks and a CLI runner so your AI picks model and effort per task and saves tokens. |
 | [website-build-skill](https://github.com/aunysillyme/website-build-skill) | A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security. |
 
 ## Companion tools
