@@ -22,5 +22,5 @@ The installer writes USER.md, AGENT_ONBOARDING.md and each selected AI's instruc
 - [Rule format](https://github.com/aunysillyme/agent-personalizer/blob/main/rules/README.md): Universal, personal, binding and origin sections.
 - [Worked example](https://github.com/aunysillyme/agent-personalizer/tree/main/examples/freelance-illustrator): An invented illustrator's profile and rendered files.
 - [Changelog](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md): Release history.
-- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Route tasks to the model suited to the work.
+- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: installs routing rules, 8 subagents, hooks and a CLI runner so your AI picks model and effort per task and saves tokens.
 - [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security.
