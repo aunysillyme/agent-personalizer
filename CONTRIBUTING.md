@@ -33,7 +33,11 @@ The privacy gate (`check/gate.cjs` against a real list) needs a local `check/for
 - One concern per PR. The harness must be green on both OSes.
 - If you touched `render/render.cjs`, `bin/agent-personalizer.js` or `check/gate.cjs`, say what you attacked: a symlink, a traversal, a malformed marker, a bad answer. The PR template asks.
 - No em dashes in prose you add. Yes, really; it is a house rule the tooling checks.
-- Keep the two real names that appear in this repo to the two places they already are (LICENSE and the README footer). Everything else is generic by design.
+- Keep owner names in the license, CLA and contribution guidance, changelog, and existing README footer. Other prose stays generic by design.
+
+## Contributor License Agreement
+
+Outside contributors tick the Contributor License Agreement box in the PR description. You keep the copyright in what you wrote and grant Auny LLC the licenses in [CLA.md](CLA.md). The `cla` check passes once the box is ticked.
 
 ## Releases
 
