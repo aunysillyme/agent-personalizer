@@ -10,6 +10,14 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 - LICENSE names Auny LLC as copyright holder; outside contributions now require the CLA in CLA.md.
 
+## [0.6.4] - 2026-09-30
+
+### Changed
+
+- CLAUDE.md now imports AGENTS.md so Claude Code loads the same contributor rules as every other agent from one file.
+- The feature form asks for an observable success check.
+- AGENTS.md names the re-render command.
+
 ## [0.6.3] - 2026-09-24
 
 ### Added
@@ -214,7 +222,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.0...v0.6.1
