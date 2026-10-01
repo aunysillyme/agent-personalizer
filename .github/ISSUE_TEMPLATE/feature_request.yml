@@ -26,3 +26,10 @@ body:
     attributes:
       label: Proposal
       description: The smallest change that prevents the failure. If it is a rule, draft the universal block here.
+  - type: textarea
+    id: success
+    attributes:
+      label: Observable success check
+      description: What command, output or behaviour shows that the change works?
+    validations:
+      required: true
