@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+### Changed
+
+- LICENSE names Auny LLC as copyright holder; outside contributions now require the CLA in CLA.md.
+
 ## [0.6.4] - 2026-09-30
 
 ### Changed

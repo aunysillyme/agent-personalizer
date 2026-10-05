@@ -17,3 +17,7 @@
 ## Kept for a later change
 
 <!-- Anything you deferred, and why. Empty is a fine answer. -->
+
+## Contributor License Agreement
+
+- [ ] I agree to the Contributor License Agreement in CLA.md

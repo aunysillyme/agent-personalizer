@@ -959,6 +959,7 @@ done
 pass "every rule carries an In practice line"
 
 # 80. workflows: publishing is manual, provenance-enabled, OIDC-scoped; CI has the Node matrix, Windows smoke and packed consumer installs; .gitattributes pins LF
+expect 0 "CLA workflow and template agreement" node test/cla.test.js
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
 grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"

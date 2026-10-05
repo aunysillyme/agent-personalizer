@@ -1,0 +1,31 @@
+# Checks agreement to CLA.md for outside contributors using only the PR event payload.
+# What it proves: the PR description contains the checked Contributor License Agreement box.
+# Accepted box: - [x] I agree to the Contributor License Agreement in CLA.md
+# Owner, member, collaborator and bot PRs skip the check. No repository code or actions run.
+name: cla
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  cla:
+    if: "!contains(fromJSON('[\"OWNER\", \"MEMBER\", \"COLLABORATOR\"]'), github.event.pull_request.author_association) && github.event.pull_request.user.type != 'Bot'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Contributor License Agreement
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          node <<'NODE'
+          // Hidden HTML comments (closed or left open) never count as agreement.
+          const body = (process.env.PR_BODY || '').replace(/<!--[\s\S]*?(?:-->|$)/g, '');
+          const agreed = body.split(/\r?\n/).some(line =>
+            /^[-*] \[[xX]\] I agree to the Contributor License Agreement in CLA\.md$/.test(line.trim()));
+          if (!agreed) {
+            console.error('::error::Tick the Contributor License Agreement box in the PR description to agree to [CLA.md](CLA.md).');
+            process.exit(1);
+          }
+          NODE
