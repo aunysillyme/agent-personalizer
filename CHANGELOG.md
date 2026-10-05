@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Th
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-04
+
 ### Changed
 
 - LICENSE names Auny LLC as copyright holder; outside contributions now require the CLA in CLA.md.
@@ -222,7 +224,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.1...v0.6.2
