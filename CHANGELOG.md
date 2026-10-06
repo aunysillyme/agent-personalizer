@@ -6,6 +6,13 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-06
+
+### Changed
+
+- The README opens with a 14-second promo trailer in the same format as the sibling repos. The terminal recording of the interview moves to the install guide.
+- Both GIFs load from GitHub, and GIFs no longer ship in the npm package.
+
 ## [0.7.0] - 2026-10-06
 
 ### Fixed
@@ -251,7 +258,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...v0.7.0
 [0.6.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...v0.6.4

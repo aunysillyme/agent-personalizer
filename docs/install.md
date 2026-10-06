@@ -12,6 +12,8 @@ Node 22 or 24 (active LTS) is recommended; 18 or later runs. The installer, rend
 npx agent-personalizer
 ```
 
+![Terminal recording of the short interview, its answers, and the profile, onboarding and AI instruction files it writes.](https://raw.githubusercontent.com/aunysillyme/agent-personalizer/main/docs/demo.gif)
+
 Choose the destination folder, AI targets and install level. The default interview asks seven questions that change behaviour, plus any question that applies to your notes tool. Enter accepts the displayed default.
 
 For the full interview:
@@ -59,7 +61,7 @@ Use [`examples/answers.json`](../examples/answers.json) as a complete example, i
 
 ## Interview recording
 
-The [README recording](../README.md#quick-start) shows the short interview and the files it creates. Follow the commands here for your own folder and answers.
+The recording under [Interactive setup](#interactive-setup) shows the short interview and the files it creates. Follow the commands here for your own folder and answers.
 
 ## Installer flags
 
