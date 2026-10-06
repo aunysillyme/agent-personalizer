@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-06
+
 ### Fixed
 
 - An interactive re-run shows your saved answers as the defaults and keeps saved values for questions it does not ask, so Enter no longer resets answers or clears the off-limits list (found 2026-10-05).
@@ -249,7 +251,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...v0.7.0
 [0.6.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.2...v0.6.3
