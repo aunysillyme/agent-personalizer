@@ -6,6 +6,13 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-06
+
+### Changed
+
+- The Contributor License Agreement defines a Contribution as work submitted through a pull request, matching the pull request checkbox that records agreement.
+- The README Contributing section links the Contributor License Agreement and explains how agreement is recorded.
+
 ## [0.7.1] - 2026-10-06
 
 ### Changed
@@ -258,7 +265,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...v0.7.0
 [0.6.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.4...v0.6.5
