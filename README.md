@@ -14,7 +14,7 @@
 npx agent-personalizer
 ```
 
-![Terminal recording of the short interview, its answers, and the profile, onboarding and AI instruction files it writes.](docs/demo.gif)
+![A 14-second tour: answer a few questions once, one profile and rule source becomes each AI's own file, the drift check keeps them in sync, and the closing card shows the install command.](https://raw.githubusercontent.com/aunysillyme/agent-personalizer/main/docs/trailer.gif)
 
 ## What it sets up
 
