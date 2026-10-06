@@ -86,7 +86,8 @@ function quote(text) {
 }
 function label(text, terms = []) {
   const clean = String(text).replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').replace(/agent-personalizer:/g, 'agent-personalizer&#58;');
-  return terms.some(term => clean.toLowerCase().includes(term.toLowerCase())) ? '[private path]' : clean;
+  const folded = clean.normalize('NFC').toLowerCase();
+  return terms.some(term => folded.includes(String(term).normalize('NFC').toLowerCase())) ? '[private path]' : clean;
 }
 function shownFile(file, home, terms) {
   const relative = path.relative(home, file);
@@ -155,6 +156,7 @@ async function learn({ dir = '.', yes = false, consented = false } = {}) {
   console.log(`Files checked: ${data.filesChecked}. Files read: ${data.filesRead.length}. Sessions: ${data.sessions.length}. Memory notes: ${data.memories.length}.`);
   console.log(`Skipped by reason: ${Object.entries(data.skipped).map(([reason, count]) => `${reason}: ${count}`).join(', ') || 'none'}`);
   console.log(`Digest: ${path.join(root, DIGEST)}`);
+  console.log('Next: open your AI in this folder. It asks up to 5 questions from this digest, one at a time (in Claude Code, /personalize starts them).');
   return true;
 }
 

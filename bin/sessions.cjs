@@ -13,8 +13,11 @@ function bump(state, reason) {
   state.skipped[reason] = (state.skipped[reason] || 0) + 1;
 }
 
+/* Both sides are compared in NFC and lower case: macOS often stores accents decomposed (NFD),
+   which would otherwise let a listed name through. Audit 0.8.0 F2. */
+const fold = (text) => String(text).normalize('NFC').toLowerCase();
 function privateMatch(text, terms) {
-  const lower = text.toLowerCase();
+  const lower = fold(text);
   return terms.some(term => lower.includes(term));
 }
 
@@ -38,7 +41,7 @@ function cutContextBlocks(text) {
 function typedText(items, state) {
   if (!items.length) { bump(state, 'non_typed'); return null; }
   // A private match drops the whole message, including its other text items.
-  if (privateMatch(items.join('\n'), state.privateTerms)) { bump(state, 'private_match'); return null; }
+  if (privateMatch(items.join('\n'), state.privateTerms) || privateMatch(items.join(''), state.privateTerms)) { bump(state, 'private_match'); return null; }
   const kept = [];
   for (const item of items) {
     let text = item.trim();
@@ -56,7 +59,7 @@ function typedText(items, state) {
 }
 
 function textItems(content, type) {
-  if (typeof content === 'string') return type === 'text' ? [content] : [];
+  if (typeof content === 'string') return [content];
   if (!Array.isArray(content)) return [];
   return content.filter(item => item && typeof item === 'object' && item.type === type && typeof item.text === 'string').map(item => item.text);
 }
@@ -355,7 +358,7 @@ async function readSessions({ home = os.homedir(), sources = [], limit = 20, pri
   const maximum = Number.isInteger(limit) && limit >= 0 ? Math.min(limit, 20) : 20;
   const state = {
     home: path.resolve(home), candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
-    privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && term).map(term => term.toLowerCase()) : []
+    privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && term).map(fold) : []
   };
   await discover(state.home, selectedSources, state);
   state.candidates.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));
