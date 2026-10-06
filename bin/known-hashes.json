@@ -1,0 +1,881 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    "check/forbidden.example.txt": {
+      "v0.1.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.2.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.3.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.4.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.4.1": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.4.2": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.4.3": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.5.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.5.1": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.5.2": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.0": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.1": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.2": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.3": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.4": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.6.5": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      }
+    },
+    "check/gate.cjs": {
+      "v0.3.0": {
+        "original": "471265da46761adb9079c3fffeec0583b8dd154709c630cd5bb6763ffb8b5442"
+      },
+      "v0.4.0": {
+        "original": "471265da46761adb9079c3fffeec0583b8dd154709c630cd5bb6763ffb8b5442"
+      },
+      "v0.4.1": {
+        "original": "471265da46761adb9079c3fffeec0583b8dd154709c630cd5bb6763ffb8b5442"
+      },
+      "v0.4.2": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.4.3": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.5.0": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.5.1": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.5.2": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.0": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.1": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.2": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.3": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.4": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.6.5": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      }
+    },
+    "hooks/README.md": {
+      "v0.1.0": {
+        "original": "24cd6a6a76753476f0b0e8d5940445ee909aa48d86db0c02172e48ac59a6a3a4",
+        "withoutSignature": "24cd6a6a76753476f0b0e8d5940445ee909aa48d86db0c02172e48ac59a6a3a4"
+      },
+      "v0.2.0": {
+        "original": "24cd6a6a76753476f0b0e8d5940445ee909aa48d86db0c02172e48ac59a6a3a4",
+        "withoutSignature": "24cd6a6a76753476f0b0e8d5940445ee909aa48d86db0c02172e48ac59a6a3a4"
+      },
+      "v0.3.0": {
+        "original": "48590493a873678e2eff7512c533ed426d9c1696c732fa675a087aea9bfddc28",
+        "withoutSignature": "48590493a873678e2eff7512c533ed426d9c1696c732fa675a087aea9bfddc28"
+      },
+      "v0.4.0": {
+        "original": "7a891799cc6ddaa017e7dd1aac7116c77bc5e9cd204cf340c35c0f951b5305fc",
+        "withoutSignature": "7a891799cc6ddaa017e7dd1aac7116c77bc5e9cd204cf340c35c0f951b5305fc"
+      },
+      "v0.4.1": {
+        "original": "99aed405ce08d6add9e57f0c0886585645b41762c992dfd7ef52b0f8490d3b45",
+        "withoutSignature": "99aed405ce08d6add9e57f0c0886585645b41762c992dfd7ef52b0f8490d3b45"
+      },
+      "v0.4.2": {
+        "original": "e8d6c449357a49fc674f562d9aa55184a14f17e7ed828003664507c84114d1f6",
+        "withoutSignature": "e8d6c449357a49fc674f562d9aa55184a14f17e7ed828003664507c84114d1f6"
+      },
+      "v0.4.3": {
+        "original": "c47e4e1f6602df941ebbf4f5bfaccfc567c5006eb9eb7d95190487853c370668",
+        "withoutSignature": "c47e4e1f6602df941ebbf4f5bfaccfc567c5006eb9eb7d95190487853c370668"
+      },
+      "v0.5.0": {
+        "original": "f3193758875f5121d9d5d6d096fd8d621371fcab8551dda6b18467a64fce4b83",
+        "withoutSignature": "f3193758875f5121d9d5d6d096fd8d621371fcab8551dda6b18467a64fce4b83"
+      },
+      "v0.5.1": {
+        "original": "ed053474b6175ddcfaeb76cfd05ef8ef6275c8be4d4c731eeefa2a7b5dcd55ad",
+        "withoutSignature": "ed053474b6175ddcfaeb76cfd05ef8ef6275c8be4d4c731eeefa2a7b5dcd55ad"
+      },
+      "v0.5.2": {
+        "original": "8013b985d9ea6c9c73d461940ed609187672c91c34fd3f5b60a92c558e8ff7c9",
+        "withoutSignature": "8013b985d9ea6c9c73d461940ed609187672c91c34fd3f5b60a92c558e8ff7c9"
+      },
+      "v0.6.0": {
+        "original": "ede7d0daa1101644e3c8c4528009e39192e5c49dfb5b5a439bfe6f3042d5d5e9",
+        "withoutSignature": "ede7d0daa1101644e3c8c4528009e39192e5c49dfb5b5a439bfe6f3042d5d5e9"
+      },
+      "v0.6.1": {
+        "original": "4c65927bcdface773c55af4a9d38912afe848425bc4dddb23c69780aaf93a967",
+        "withoutSignature": "4c65927bcdface773c55af4a9d38912afe848425bc4dddb23c69780aaf93a967"
+      },
+      "v0.6.2": {
+        "original": "083bb4d0a8a011cd5a628db73639769a68f6a58f3a7533fb8fbce7b6fb85944a",
+        "withoutSignature": "083bb4d0a8a011cd5a628db73639769a68f6a58f3a7533fb8fbce7b6fb85944a"
+      },
+      "v0.6.3": {
+        "original": "b61cf528a63d0f3148af4d489d4678f544c91ca1898120b81bbd0f94a1d65c14",
+        "withoutSignature": "b61cf528a63d0f3148af4d489d4678f544c91ca1898120b81bbd0f94a1d65c14"
+      },
+      "v0.6.4": {
+        "original": "5a7e5ce73ab6c3c9025537221e5725fbaaff0938561379c41d6b0ee38ed134e3",
+        "withoutSignature": "5a7e5ce73ab6c3c9025537221e5725fbaaff0938561379c41d6b0ee38ed134e3"
+      },
+      "v0.6.5": {
+        "original": "93801d3e0d111653259d73a400fd72e5f70fca0fb12b41603ef372d817ce32fb",
+        "withoutSignature": "93801d3e0d111653259d73a400fd72e5f70fca0fb12b41603ef372d817ce32fb"
+      }
+    },
+    "hooks/claude-code/session-start.sh": {
+      "v0.1.0": {
+        "original": "2421a648ca5cd669603b7f4a8e32f35c62fe3a25527940c7d553b1aef5a4d734"
+      },
+      "v0.2.0": {
+        "original": "2421a648ca5cd669603b7f4a8e32f35c62fe3a25527940c7d553b1aef5a4d734"
+      },
+      "v0.3.0": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.4.0": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.4.1": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.4.2": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.4.3": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.5.0": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.5.1": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.5.2": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.0": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.1": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.2": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.3": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.4": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.6.5": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      }
+    },
+    "render/onboarding.cjs": {
+      "v0.3.0": {
+        "original": "91df9d0bc1cf224ead68237c47a0e26c89af585af3d13b8b0c889c5047110042"
+      },
+      "v0.4.0": {
+        "original": "07715edd6bfada0df1c91919494fb71b5f3adf00ef679bb3f7780104dd462e4d"
+      },
+      "v0.4.1": {
+        "original": "cc0b68cd1755c592b2557b41ee4b93726a218ce0c194d01e08a518a95a2ef441"
+      },
+      "v0.4.2": {
+        "original": "9affd6b2a9cdfaa71758715b1640a140b9d89aad89bafb9b071318fe7bfca06d"
+      },
+      "v0.4.3": {
+        "original": "59b2fe9f3d9bd12fdba057636e848bc1524dfb2e4d76ba2553f73aae45cfadda"
+      },
+      "v0.5.0": {
+        "original": "e73caaa7f03269298e6b139c0d843e0d6d96784ac6e87c62e37bd3aa142c0a1c"
+      },
+      "v0.5.1": {
+        "original": "cc5506a7ea6f912b5ea456fbd7aa98be44bbd12b41f392b490864b3aa15eedb1"
+      },
+      "v0.5.2": {
+        "original": "217889319d252b3c4ac8acdb5c0dc89f5767916c5d26c11bcd884d389aaca417"
+      },
+      "v0.6.0": {
+        "original": "6c2be131a50756a5b65865597471ab68d28837a33a7d4986e5a887611371ca46"
+      },
+      "v0.6.1": {
+        "original": "85fb2745602fb99afc6d82ae7e71ab4169f601cae6ec9a9f540b13eb7c437316"
+      },
+      "v0.6.2": {
+        "original": "402db7563bacddf9c58af49a0eafcf7915b3b964a1abc2b9d4240d69b5af7e1a"
+      },
+      "v0.6.3": {
+        "original": "38d65ca41a4df0f2b2fd858fdf90d96070606bbceee4d4ed45d294a729bce8fb"
+      },
+      "v0.6.4": {
+        "original": "53b5ed9b2f66f64dfff458beeb669cc3efe7cccce3c2ad05a53d9c4e0225a350"
+      },
+      "v0.6.5": {
+        "original": "55bfb0679d1d5264195be409b7f0bb7ed929263bd440daf4ff7b7eea05039c43"
+      }
+    },
+    "render/render.cjs": {
+      "v0.3.0": {
+        "original": "3e0423b255112547a783b29ed04dca0b7859fc2114388c05b5832fe288c9de24"
+      },
+      "v0.4.0": {
+        "original": "6eafa0ed213311bbef2c76f877e2d3bfbdb50728f9cc787f724894d21217737c"
+      },
+      "v0.4.1": {
+        "original": "6eafa0ed213311bbef2c76f877e2d3bfbdb50728f9cc787f724894d21217737c"
+      },
+      "v0.4.2": {
+        "original": "f56c192627f9bf7ebbd27c601dbec95be05e15425802f44d7957f928b8cc99bc"
+      },
+      "v0.4.3": {
+        "original": "f56c192627f9bf7ebbd27c601dbec95be05e15425802f44d7957f928b8cc99bc"
+      },
+      "v0.5.0": {
+        "original": "b4616b315c1ae2ca4ee2d35a211aa8342560a3f130e8eb5937a991457db40112"
+      },
+      "v0.5.1": {
+        "original": "2d1443118a85942389ce311987f05952ef852fbcfca3e5eaf729afc15cdf784f"
+      },
+      "v0.5.2": {
+        "original": "d1af3513bacc43edb4541b8339de935b791c32d71e3184ad5c18a6bd505a67d8"
+      },
+      "v0.6.0": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.6.1": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.6.2": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.6.3": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.6.4": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.6.5": {
+        "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      }
+    },
+    "render/targets.json": {
+      "v0.1.0": {
+        "original": "41c962c037b641d768753ae2abfa19246606e1731a1617a3f26ca392a14ce399"
+      },
+      "v0.2.0": {
+        "original": "a8d41ce65586f8835781689a159379d6dac3a7657338f838aea7a1f4a96f3694"
+      },
+      "v0.3.0": {
+        "original": "a8d41ce65586f8835781689a159379d6dac3a7657338f838aea7a1f4a96f3694"
+      },
+      "v0.4.0": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.4.1": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.4.2": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.4.3": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.5.0": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.5.1": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.5.2": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.0": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.1": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.2": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.3": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.4": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.6.5": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      }
+    },
+    "rules/00-read-the-profile-first.md": {
+      "v0.1.0": {
+        "original": "ba8fdcf6734a71d100c8a0987d72f4694e0d3a6ee8df51dadda7096c32cc843d",
+        "withoutSignature": "ba8fdcf6734a71d100c8a0987d72f4694e0d3a6ee8df51dadda7096c32cc843d"
+      },
+      "v0.2.0": {
+        "original": "5d3de4b6a6639377b7e4fa3edf513da540de18d0816b2c9c47e93998ad31052d",
+        "withoutSignature": "5d3de4b6a6639377b7e4fa3edf513da540de18d0816b2c9c47e93998ad31052d"
+      },
+      "v0.3.0": {
+        "original": "171c90ea09277f2ca9a523b0f9a09987345aab07a411a6d08c061de7b95505fd",
+        "withoutSignature": "171c90ea09277f2ca9a523b0f9a09987345aab07a411a6d08c061de7b95505fd"
+      },
+      "v0.4.0": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.4.1": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.4.2": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.4.3": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.5.0": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.5.1": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.5.2": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.0": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.1": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.2": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.3": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.4": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.6.5": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      }
+    },
+    "rules/10-evidence-before-assertion.md": {
+      "v0.1.0": {
+        "original": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f",
+        "withoutSignature": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f"
+      },
+      "v0.2.0": {
+        "original": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f",
+        "withoutSignature": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f"
+      },
+      "v0.3.0": {
+        "original": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f",
+        "withoutSignature": "7679d4f92c3ebf17933d4d65e8e5454f7e16d2e3882c4a43aba428618151f13f"
+      },
+      "v0.4.0": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.4.1": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.4.2": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.4.3": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.5.0": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.5.1": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.5.2": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.0": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.1": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.2": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.3": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.4": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.6.5": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      }
+    },
+    "rules/20-one-owner-per-rule.md": {
+      "v0.1.0": {
+        "original": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6",
+        "withoutSignature": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6"
+      },
+      "v0.2.0": {
+        "original": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6",
+        "withoutSignature": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6"
+      },
+      "v0.3.0": {
+        "original": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6",
+        "withoutSignature": "d67ef929f288a6c3979dea555f9a0e841267dc36da7a5ee1a5552abaac1c2da6"
+      },
+      "v0.4.0": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.4.1": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.4.2": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.4.3": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.5.0": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.5.1": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.5.2": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.0": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.1": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.2": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.3": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.4": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.6.5": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      }
+    },
+    "rules/30-folder-index-is-part-of-the-change.md": {
+      "v0.1.0": {
+        "original": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402",
+        "withoutSignature": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402"
+      },
+      "v0.2.0": {
+        "original": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402",
+        "withoutSignature": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402"
+      },
+      "v0.3.0": {
+        "original": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402",
+        "withoutSignature": "4efa10a2030a0a8a365dfdfb50200686d09bd7b3d80a346dede4531a3e56c402"
+      },
+      "v0.4.0": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.4.1": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.4.2": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.4.3": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.5.0": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.5.1": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.5.2": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.0": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.1": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.2": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.3": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.4": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.6.5": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      }
+    },
+    "rules/40-sign-every-edit.md": {
+      "v0.1.0": {
+        "original": "5baf99528f7e5de92322f68088680a99cff25e73dd8bcd88eed27e26a83b9a6b",
+        "withoutSignature": "5baf99528f7e5de92322f68088680a99cff25e73dd8bcd88eed27e26a83b9a6b"
+      },
+      "v0.2.0": {
+        "original": "5baf99528f7e5de92322f68088680a99cff25e73dd8bcd88eed27e26a83b9a6b",
+        "withoutSignature": "5baf99528f7e5de92322f68088680a99cff25e73dd8bcd88eed27e26a83b9a6b"
+      },
+      "v0.3.0": {
+        "original": "4d90dcb8893651c904cfeac254c5c5b173984de0500c606657c1cf66b4e26a14",
+        "withoutSignature": "4d90dcb8893651c904cfeac254c5c5b173984de0500c606657c1cf66b4e26a14"
+      },
+      "v0.4.0": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.4.1": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.4.2": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.4.3": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.5.0": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.5.1": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.5.2": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.0": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.1": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.2": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.3": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.4": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.6.5": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      }
+    },
+    "rules/50-output-style.md": {
+      "v0.1.0": {
+        "original": "a496198af4524e5a8348869ed5e424f7518e00746895ccffddf03113cea0462a",
+        "withoutSignature": "a496198af4524e5a8348869ed5e424f7518e00746895ccffddf03113cea0462a"
+      },
+      "v0.2.0": {
+        "original": "a496198af4524e5a8348869ed5e424f7518e00746895ccffddf03113cea0462a",
+        "withoutSignature": "a496198af4524e5a8348869ed5e424f7518e00746895ccffddf03113cea0462a"
+      },
+      "v0.3.0": {
+        "original": "96d8a9cbc13a66783258c739411eff0d409080efa71b7d9f9fad05ab3e5a9c22",
+        "withoutSignature": "96d8a9cbc13a66783258c739411eff0d409080efa71b7d9f9fad05ab3e5a9c22"
+      },
+      "v0.4.0": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.4.1": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.4.2": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.4.3": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.5.0": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.5.1": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.5.2": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.0": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.1": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.2": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.3": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.4": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.6.5": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      }
+    },
+    "rules/60-act-or-ask.md": {
+      "v0.1.0": {
+        "original": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d",
+        "withoutSignature": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d"
+      },
+      "v0.2.0": {
+        "original": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d",
+        "withoutSignature": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d"
+      },
+      "v0.3.0": {
+        "original": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d",
+        "withoutSignature": "cf0c7afad572b4faa548ce5618792135dec4762dd3b668006dc4a277947f429d"
+      },
+      "v0.4.0": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.4.1": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.4.2": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.4.3": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.5.0": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.5.1": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.5.2": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.0": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.1": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.2": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.3": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.4": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.6.5": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      }
+    },
+    "rules/README.md": {
+      "v0.1.0": {
+        "original": "5a7436358366cd3f25e28632626b6e2219e4e29f448628f77d071750f4e7f231",
+        "withoutSignature": "68efc09e6f630d8c03ea7b829533821502ae3356e5120b30df38792c46a3a6f1"
+      },
+      "v0.2.0": {
+        "original": "5a7436358366cd3f25e28632626b6e2219e4e29f448628f77d071750f4e7f231",
+        "withoutSignature": "68efc09e6f630d8c03ea7b829533821502ae3356e5120b30df38792c46a3a6f1"
+      },
+      "v0.3.0": {
+        "original": "548663889e73df04226c557bcfc6ea0a00535ad916d090502fe7808ab6aa370f",
+        "withoutSignature": "d43b1847f369b80edccb60c99334393d63b77073ed3052dd90784b61312296e4"
+      },
+      "v0.4.0": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.4.1": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.4.2": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.4.3": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.5.0": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.5.1": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.5.2": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.0": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.1": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.2": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.3": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.4": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.6.5": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      }
+    }
+  }
+}

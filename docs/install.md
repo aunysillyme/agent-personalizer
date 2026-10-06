@@ -4,7 +4,7 @@ The installer writes a profile, an onboarding manual and the instruction files f
 
 ## Requirements
 
-Use Node 18 or later. The installer, renderer and gate run on macOS, Linux and Windows. The shell harness and session-start hook need a POSIX shell; use WSL or Git Bash on Windows.
+Node 22 or 24 (active LTS) is recommended; 18 or later runs. The installer, renderer and gate run on macOS, Linux and Windows. The shell harness and session-start hook need a POSIX shell; use WSL or Git Bash on Windows.
 
 ## Interactive setup
 
@@ -55,7 +55,11 @@ Answers from stdin:
 npx agent-personalizer --dir . --ai claude,agents --level 2 --yes --answers - < my-answers.json
 ```
 
-Use [`test/fixtures/answers.json`](../test/fixtures/answers.json) as a complete example. Partial answer objects take defaults for the remaining fields. Unknown keys, invalid types and unknown choices are refused before writing files. Choose either `--answers` or `--defaults` for a run. A rerun using defaults preserves previously stored onboarding answers.
+Use [`examples/answers.json`](../examples/answers.json) as a complete example, included in the npm package. Partial answer objects take defaults for the remaining fields. Unknown keys, invalid types and unknown choices are refused before writing files. Choose either `--answers` or `--defaults` for a run. A rerun using defaults preserves previously stored onboarding answers.
+
+## Interview recording
+
+The [README recording](../README.md#quick-start) shows the short interview and the files it creates. Follow the commands here for your own folder and answers.
 
 ## Installer flags
 
@@ -84,13 +88,18 @@ Installer exit codes: `0` completed, `1` unexpected error, `2` refused or invali
 - **Level 2:** a local notes scaffold with `README.md`, `sessions/TEMPLATE-week.md`, `decisions.md` and `inbox/README.md`. Disk tools use your `notes_path`; read-only and other tools use the local `notes/` fallback. Cloud tools get connector pointers and keep their notes in their service.
 - **Level 3:** your editable `rules/` copy, `render/` tools, the Claude Code session-start hook and the forbidden-string gate. [Register the hook](../hooks/README.md) in your AI settings and [configure the gate](guarantees.md#forbidden-string-gate).
 
-An existing local notes scaffold is detected at any level. Existing notes and rule files stay yours. A `signature: no` answer omits the signature rule and its template lines; answering yes includes the signature line.
+An existing local notes scaffold is detected at any level. Edited notes and rule files stay yours and are named in the install log. Untouched installer copies update on re-runs. A `signature: no` answer omits the signature rule and its template lines; answering yes includes the signature line.
 
 ## Updating an install
 
-Re-run the installer with your destination, AI selection and level. An interview or `--answers` file supplies new onboarding answers. Existing targets remain in the stored selection, so the renderer updates them together.
+Re-run the installer with your destination, AI selection and level. The interview starts from your saved answers. Enter keeps each one, and questions it does not ask keep their saved values. Type a new answer or use an `--answers` file to change onboarding answers. Existing targets remain in the stored selection, so the renderer updates them together.
 
-`AGENT_ONBOARDING.md` and rendered blocks regenerate from the answers. `USER.md` regenerates only when its bytes still match the previous answers. An edited profile stays; the installer names changed answers so you can update the profile by hand. Home-file text outside the markers is preserved, with installer-owned pointer lines updated when you add notes or local rules.
+`AGENT_ONBOARDING.md` and rendered blocks regenerate from the answers. `USER.md` regenerates only while it is an untouched installer profile. An edited or pre-existing profile stays; the installer names changed answers so you can update the profile by hand. Every profile-bearing target, including ChatGPT's profile export, uses that `USER.md`.
+
+- **Re-runs:** untouched installer files converge to the files a fresh install with the new answers would create. Current notes templates and rule copies update together. An obsolete file, such as the signing rule after `signature: no`, is removed only while it is untouched.
+- **Home pointers:** each line outside the markers that exactly matches the previous install template is updated or removed to match the new answers. An edited line stays byte for byte and the log names its file and line for manual review. Other text outside the markers stays byte for byte.
+- **Notes path:** when you change `notes_path`, the old folder stays where it is. The log names the old and new folders once. Previously installed files remain in the uninstall inventory; your own notes stay yours.
+- **Upgrades:** re-running a newer package refreshes untouched installed tools and rule copies. Recorded hashes establish ownership; older installs without hashes can be recognized from shipped release hashes. Edited copies stay byte for byte. The log identifies the edited file, its known origin version and how to take the new copy. Previously installed levels and targets remain available on a re-run.
 
 At level 3, render your edited profile and rules:
 
@@ -99,9 +108,9 @@ node render/render.cjs --dir .
 node render/render.cjs --dir . --check
 ```
 
-The check returns `0` for current files, `1` for drift, and `2` for invalid inputs. `--targets claude,agents` selects specific renders; `--rules <folder>` selects a rule source. `--strict` returns `1` and writes nothing when a ChatGPT box is over the configured budget. Run `node render/render.cjs --help` for contract and target options.
+The check returns `0` silently for current files, `1` for drift, and `2` for invalid inputs. `--targets claude,agents` selects specific renders; `--rules <folder>` selects a rule source. `--strict` returns `1` and writes nothing when a ChatGPT box is over the configured budget. Run `node render/render.cjs --help` for contract and target options.
 
-Re-paste changed text into chat apps. See the [paste guide](paste-guide.md) for the files each app needs.
+Re-paste changed text into chat apps. In ChatGPT, open Settings → Personalization and enable customization. Copy `chatgpt-box1.txt` (profile) and `chatgpt-box2.txt` (response instructions) into the fields your current interface provides, checking its displayed limits. See the [paste guide](paste-guide.md) for the files each app needs.
 
 ## npm cache permissions
 
@@ -126,15 +135,15 @@ npx agent-personalizer --uninstall --dir /path/to/project --dry
 npx agent-personalizer --uninstall --dir /path/to/project
 ```
 
-The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares tracked files with what the stored answers and current sources would produce. Install records the exact bytes it wrote for each tracked file, so uninstall recognizes them correctly even after the package itself has moved on to a newer release.
+The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares files with their recorded install hashes. Its inventory includes every path recorded by any install run, including files under a previous notes path and rules omitted by later answers. Files absent from that inventory are left alone. Configurations from before hashes were recorded use the legacy comparison for their known recipe.
 
 - **Generated files:** removed when unchanged. Edited files are kept and named in the output.
 - **Existing home files:** user text stays; only an unchanged generated block is removed.
-- **`USER.md`:** removed only when it still matches the render of the stored answers.
-- **Notes scaffold:** unchanged template files are removed. Your notes stay, and folders are removed only when empty.
+- **`USER.md`:** removed only when it matches its recorded install hash. Edited and pre-existing profiles stay.
+- **Notes scaffold:** unchanged historically installed templates are removed. Edited templates are kept and named; user-written notes stay byte for byte. A directory is removed only when the install recorded that it created it and it is empty.
 - **Rules and tools:** unchanged installed copies are removed file by file, including the session-start hook. Edited copies stay.
 - **Hook registration:** remove the matching `SessionStart` entry from `.claude/settings.json` or `~/.claude/settings.json` yourself. The uninstaller prints this step; it never edits settings outside the installation.
-- **Paths:** the uninstaller never follows symlinks or removes a path outside the named folder. A refused path leaves the removal plan unapplied.
+- **Paths:** the whole removal plan is preflighted before the first unlink, and each path is re-probed before it is unlinked. The uninstaller never follows symlinks, deletes recursively or removes a path outside the named folder. A refused preflight leaves the removal plan unapplied.
 - **Configuration:** `.agent-personalizer.json` is removed last, only after every path it tracks is gone. A retained file, including a pre-existing home file with its block removed, keeps the configuration available for review.
 
 `--dry` previews the same decisions without writing. A missing configuration exits `2` and names the expected path. Keep the configuration while reviewing any edited files the uninstaller retained.

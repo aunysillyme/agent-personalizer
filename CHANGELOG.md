@@ -2,9 +2,34 @@
 
 All notable changes to this repo. Format after [Keep a Changelog](https://keepachangelog.com/en/2.0.0/) 2.0.0; versions follow [SemVer](https://semver.org/). Dates are the day the change was pushed.
 
-Every entry names the adversarial audit round that produced it where one did. The audits are Codex read-only passes against `AUDIT_BRIEF.md`; every finding was reproduced before its fix.
+Every entry names the adversarial audit round that produced it where one did. Audits are read-only passes against `AUDIT_BRIEF.md`; every finding is reproduced before its fix.
 
 ## [Unreleased]
+
+### Fixed
+
+- An interactive re-run shows your saved answers as the defaults and keeps saved values for questions it does not ask, so Enter no longer resets answers or clears the off-limits list (found 2026-10-05).
+- ChatGPT's profile export now follows edited and pre-existing USER.md files. Profiles byte-identical to the default generated profile keep their compact bytes; changed generated identity fields compact conservatively, and custom text stays in full with the existing budget warning (Codex audit 2026-10-04, F1).
+- Re-runs migrate untouched home-file pointer lines to the new notes path. Edited lines stay byte for byte and are named for manual review; the previous notes folder stays in place and in the uninstall inventory (Codex audit 2026-10-04, F2).
+- Changed answers refresh untouched notes templates and rule copies. Turning signing off removes unchanged signing pointers, template lines and the copied rule; edited copies stay and are named (Codex audit 2026-10-04, F3).
+- Uninstall checks every path recorded by any install run, including earlier notes paths and conditional rules. Recorded hashes decide removal, edited files and user notes stay, only recorded install-created empty directories are removed, and the configuration goes last (Codex audit 2026-10-04, F4).
+- Newer installers refresh untouched runtime tools and rules. Recorded hashes or a shipped table of earlier release hashes recognize untouched copies; edited tools stay and the log gives their known origin and replacement step. The configuration records tooling versions (Codex audit 2026-10-04, F5).
+- Installer writes and removals are planned together before commit. A failed install restores changed files, permissions and new empty directories (Codex audit 2026-10-04, F2 to F5).
+- Relative links in shipped Markdown resolve inside the npm package. Root contributor, security, maintenance, release and support pages now ship, and the install guide links a shipped answers example (Codex audit 2026-10-04, F9).
+- A successful renderer `--check` is silent, matching the documented bundled-example verification command. Drift and refusal diagnostics retain their exit codes (Codex audit 2026-10-04, F10).
+
+### Added
+
+- Harness checks 92 to 96 reproduce the five installer findings, including edited profiles, pointers, notes and tools. Check 97 verifies packed Markdown links (Codex audit 2026-10-04, F1 to F5 and F9).
+- Uninstall unit regressions cover historical inventory, symlink refusal, unrecorded files and directories, invalid ownership records and installer rollback. Package-copy fixtures exclude the private forbidden list (Codex audit 2026-10-04, F4 regression work).
+- CI tests Node 24 alongside 18, 20 and 22. Its stable aggregate job, `Repository checks`, requires every other workflow job to succeed; Windows also exercises re-runs and uninstall (Codex audit 2026-10-04, F7 and F8).
+- npm funding links to GitHub Sponsors. MAINTAINERS.md, SUPPORT.md and a question form provide the owner, release and support routes (Codex audit 2026-10-04, F9).
+
+### Changed
+
+- The first screen uses the selected profile-and-rules wording, a parts table and activation steps. Common questions precede the docs index; update and removal summaries describe ownership and history, and llms.txt follows the same lead (Codex audit 2026-10-04, F6 and F10).
+- Codex guidance describes root-to-working-directory merging, override files and the default guidance cap, with a current official source. ChatGPT activation uses the current interface's fields and displayed limits. Installation recommends Node 22 or 24 while retaining 18-or-later compatibility (Codex audit 2026-10-04, F7).
+- The npm description names the interview, profile, rules and supported targets. The custom social-preview image is removed in favor of GitHub's default link preview (Codex audit 2026-10-04, F9).
 
 ## [0.6.5] - 2026-10-04
 

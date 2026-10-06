@@ -112,8 +112,8 @@ const QUESTIONS = [
 ];
 
 const IDS = new Set(QUESTIONS.map(q => q.id));
-/* the short interview, which is what a bare `npx agent-personalizer` runs; every other answer takes
-   its default. --full asks the rest as well. */
+/* the short interview, which is what a bare `npx agent-personalizer` runs; other answers keep saved
+   values, or take defaults on the first install. --full asks the rest as well. */
 const QUICK = ['name', 'tone', 'length', 'notes_tool', 'notes_path', 'write_policy', 'always_ask'];
 /* Does this interview ask question q, given the answers so far? A question with a `when` is
    CONDITIONAL: it is asked exactly when its condition holds, short interview or long, so nobody
@@ -135,6 +135,15 @@ function defaults() {
   const a = {};
   for (const q of QUESTIONS) a[q.id] = Array.isArray(q.default) ? [...q.default] : q.default;
   return a;
+}
+
+/* Interview defaults preserve even an empty saved answer. Asked answers override saved values;
+   package defaults fill only missing keys. Validation remains the caller's final step. */
+function interviewDefault(q, saved) {
+  return saved && Object.hasOwn(saved, q.id) ? saved[q.id] : q.default;
+}
+function interviewAnswers(saved, asked = {}) {
+  return { ...defaults(), ...saved, ...asked };
 }
 
 /* Strict validation: unknown keys, wrong types and unknown choices are errors, never defaults.
@@ -436,4 +445,38 @@ function compactProfile(a) {
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, NOTES_PENDING_MARK, notesPending, asks, defaults, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, kindOf, baseFor };
+/* Compact an edited generated profile only when all its other bytes still match the scaffold.
+   The four captured values come from USER.md and are already Markdown-escaped, so they are not
+   escaped again or split on punctuation that could be part of a name or an off-limits topic.
+   A changed firmness rule, extra paragraph or custom profile is kept in full instead of silently
+   dropping the edit. The caller's usual budget warning then names any overflow, without cutting.
+   opts admits the generated level-1 notes placeholder as well as the default ready scaffold. */
+function compactProfileFromUser(text, answers, opts) {
+  if (text === renderUser(answers)) return compactProfile(answers);
+  const fields = ['Name and pronouns', 'What I do', 'Current focus', 'Off limits'];
+  const parse = (source) => {
+    const values = {};
+    let scaffold = source;
+    for (const field of fields) {
+      const prefix = `- **${field}:** `;
+      const lines = source.split('\n').filter(line => line.startsWith(prefix));
+      if (lines.length !== 1 || !lines[0].slice(prefix.length)) return null;
+      values[field] = lines[0].slice(prefix.length);
+      scaffold = scaffold.replace(lines[0], `${prefix}<${field}>`);
+    }
+    return { values, scaffold };
+  };
+  const profile = parse(text);
+  const generated = [renderUser(answers), renderUser(answers, opts)].map(parse);
+  if (!profile || !generated.some(item => item && item.scaffold === profile.scaffold)) return text;
+  const v = profile.values;
+  return [
+    `Call me ${v['Name and pronouns']}.`,
+    v['What I do'] !== '(fill in)' ? `I do: ${v['What I do']}.` : null,
+    v['Current focus'] !== '(fill in)' ? `Current focus: ${v['Current focus']}.` : null,
+    v['Off limits'] !== 'nothing declared yet' ? `Off limits, never surfaced in any reply: ${v['Off limits']}.` : null,
+    'How firmly I mean things: "kind of" or a made-up word is a gesture; "I like" is a preference; "I always" is a practice; "never" or "I have to" is a rule. When unsure read one rung looser, never tighter; never loosen a stated prohibition.',
+  ].filter(Boolean).join('\n');
+}
+
+module.exports = { QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, NOTES_PENDING_MARK, notesPending, asks, defaults, interviewDefault, interviewAnswers, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, compactProfileFromUser, kindOf, baseFor };

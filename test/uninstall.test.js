@@ -73,7 +73,7 @@ function config(dir, edit) {
 const PKG_PARTS = ['bin', 'render', 'rules', 'templates', 'check', 'hooks'];
 function copyPackage(dst) {
   fs.mkdirSync(dst, { recursive: true });
-  for (const name of PKG_PARTS) fs.cpSync(path.join(ROOT, name), path.join(dst, name), { recursive: true });
+  for (const name of PKG_PARTS) fs.cpSync(path.join(ROOT, name), path.join(dst, name), { recursive: true, filter: source => path.basename(source) !== 'forbidden.local.txt' });
   fs.copyFileSync(path.join(ROOT, 'package.json'), path.join(dst, 'package.json'));
   return path.join(dst, 'bin', 'agent-personalizer.js');
 }
@@ -285,6 +285,84 @@ const cases = {
       code(r, 0);
       assert.deepEqual(fs.readdirSync(dir), [], `answer variant ${i} leaves an empty directory`);
     }
+  },
+  'historical-inventory'(root) {
+    for (const edited of [false, true]) {
+      const dir = path.join(root, edited ? 'edited' : 'clean');
+      fs.mkdirSync(dir);
+      install(dir, 3, { notes_tool: 'folder', notes_path: 'journal' });
+      const rel = 'journal/decisions.md';
+      if (edited) fs.appendFileSync(path.join(dir, rel), '\nMy recorded decision.\n');
+      const before = read(dir, rel);
+      install(dir, 3, { notes_tool: 'folder', notes_path: 'new-notes', signature: 'no' });
+      const cfg = JSON.parse(read(dir, CONFIG));
+      assert.ok(cfg.installed[rel], 'the old notes file remains in the ownership inventory');
+      assert.ok(cfg.installed['rules/40-sign-every-edit.md'], 'retired rules stay recorded, including after removal');
+      const r = uninstall(dir);
+      code(r, 0);
+      if (edited) { kept(r, dir, rel, before); assert.match(r.output, /journal\/decisions\.md \(edited\)/); }
+      else assert.deepEqual(fs.readdirSync(dir), [], 'uninstall covers both notes folders and the retired rule');
+    }
+  },
+  'historical-symlink'(root) {
+    const dir = path.join(root, 'install'), outside = path.join(root, 'outside');
+    fs.mkdirSync(dir); fs.mkdirSync(outside);
+    install(dir, 3, { notes_tool: 'folder', notes_path: 'journal' });
+    install(dir, 3, { notes_tool: 'folder', notes_path: 'new-notes' });
+    const rel = 'journal/decisions.md';
+    write(outside, 'mine.md', 'Keep this outside note.\n');
+    fs.unlinkSync(path.join(dir, rel));
+    fs.symlinkSync(path.join(outside, 'mine.md'), path.join(dir, rel));
+    refusedUnchanged(dir, rel, /symlink/i, outside);
+  },
+  'unrecorded-files'(dir) {
+    fs.mkdirSync(path.join(dir, 'notes'));
+    fs.mkdirSync(path.join(dir, 'rules'));
+    write(dir, 'notes/README.md', '# Existing notes index\n');
+    write(dir, 'USER.md', '# Existing profile\n');
+    install(dir, 3);
+    const cfg = JSON.parse(read(dir, CONFIG));
+    assert.ok(!Object.hasOwn(cfg.installed, 'notes/README.md'));
+    assert.ok(!Object.hasOwn(cfg.installed, 'USER.md'));
+    const before = Object.fromEntries(['notes/README.md', 'USER.md'].map(rel => [rel, read(dir, rel)]));
+    const r = uninstall(dir);
+    code(r, 0);
+    for (const [rel, bytes] of Object.entries(before)) assert.deepEqual(read(dir, rel), bytes, `${rel} was never recorded and is kept`);
+    assert.ok(fs.statSync(path.join(dir, 'notes')).isDirectory(), 'pre-existing notes directory remains');
+    assert.ok(fs.statSync(path.join(dir, 'rules')).isDirectory(), 'pre-existing empty rules directory remains');
+  },
+  'invalid-inventory'(root) {
+    const variants = [
+      cfg => { cfg.installed = []; },
+      cfg => { cfg.installed['../outside/mine.md'] = 'a'.repeat(64); },
+      cfg => { cfg.installed['USER.md'] = 'invalid'; },
+      cfg => { cfg.createdDirectories = ['../outside']; },
+      cfg => { cfg.createdDirectories = ['notes', 'notes']; }
+    ];
+    for (const [i, edit] of variants.entries()) {
+      const dir = path.join(root, `inventory-${i}`);
+      fs.mkdirSync(dir); install(dir, 3); config(dir, edit);
+      refusedUnchanged(dir, CONFIG, /installed|createdDirectories/i);
+      const before = snapshot(dir);
+      const r = run(['--dir', dir, '--ai', 'claude', '--level', '3', '--yes']);
+      code(r, 2);
+      assert.deepEqual(snapshot(dir), before, 'installer refuses the same malformed inventory without a write');
+    }
+  },
+  'installer-rollback'(root) {
+    const pkg = path.join(root, 'pkg'), cli = copyPackage(pkg), dir = path.join(root, 'install');
+    fs.mkdirSync(dir);
+    install(dir, 3, { notes_tool: 'folder', notes_path: 'journal' });
+    const before = snapshot(dir);
+    const source = path.join(pkg, 'render/render.cjs');
+    fs.writeFileSync(source, fs.readFileSync(source, 'utf8').replace('if (require.main === module) main();', 'if (require.main === module) process.exit(2);'));
+    const r = runCli(cli, ['--dir', dir, '--ai', ALL, '--level', '3', '--answers', '-', '--yes'], JSON.stringify({ notes_tool: 'folder', notes_path: 'new-notes', signature: 'no' }));
+    code(r, 2);
+    assert.match(r.output, /every changed file was restored/);
+    const after = snapshot(dir);
+    for (const entry of Object.values(before)) delete entry.mtime;
+    for (const entry of Object.values(after)) delete entry.mtime;
+    assert.deepEqual(after, before, 'renderer failure restores migrated lines, removed rules, runtime copies, profile, config and created directories');
   },
   'help'() {
     const r = run(['--help']);

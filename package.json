@@ -1,9 +1,10 @@
 {
   "name": "agent-personalizer",
   "version": "0.6.5",
-  "description": "One interview writes a profile and rule files every AI you use reads: CLAUDE.md, AGENTS.md, GEMINI.md and ChatGPT, kept in sync from one source.",
+  "description": "AI custom instructions from one interview: a profile and rules for Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, kept in sync from one source.",
   "author": "aunysillyme (https://github.com/aunysillyme)",
   "license": "MIT",
+  "funding": "https://github.com/sponsors/aunysillyme",
   "repository": "github:aunysillyme/agent-personalizer",
   "homepage": "https://github.com/aunysillyme/agent-personalizer#readme",
   "bugs": {
@@ -56,6 +57,14 @@
     "README.md",
     "LICENSE",
     "CLA.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "AGENTS.md",
+    "MAINTAINERS.md",
+    "SUPPORT.md",
+    "RELEASING.md",
     "llms.txt"
   ]
 }

@@ -1,8 +1,8 @@
 # Runs the harness (test/run.sh) on every push and pull request, on Linux and macOS.
-# Matrix: two OSes x Node 18, 20, 22 (the `engines` field says >=18, so every supported major runs), plus a
+# Matrix: Linux and macOS on Node 18, 20, 22 and 24, covering the minimum runtime and current LTS choices, plus a
 # Windows smoke job that runs the Node entry points (installer, renderer, gate, ESM install) without the sh harness.
 # What it proves: the renderer, installer, gate logic, hook and rollback paths behave exactly as
-# the 91 checks assert, with exact exit codes, on a clean machine that is not the author's.
+# the 98 checks assert, with exact exit codes, on a clean machine that is not the author's.
 # The consumer-install job installs an npm pack tarball on Linux and macOS, then verifies
 # first runs at levels 1 and 2, the ChatGPT paste files, and the installed bin version.
 # What it does NOT run: the privacy gate against the real forbidden list (check 6). That list is
@@ -29,10 +29,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: [18, 20, 22]
+        node: [18, 20, 22, 24]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # F5 exercises actual tagged installers, including pre-hash releases.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
@@ -46,9 +48,11 @@ jobs:
           node --check render/onboarding.cjs
           node --check bin/agent-personalizer.js
           node --check check/gate.cjs
+          node --check test/ap-regressions.cjs
+          node --check test/package-links.cjs
           sh -n test/run.sh
           sh -n test/consumer-install.sh
-      - name: harness (91 checks, exact exit codes)
+      - name: harness (98 checks, exact exit codes)
         run: sh test/run.sh
       - name: rollback fault injection (cases A-K)
         run: |
@@ -97,9 +101,23 @@ jobs:
           node -e "require('fs').mkdirSync('esm'); require('fs').writeFileSync('esm/package.json', '{\"type\":\"module\"}\n')"
           node bin/agent-personalizer.js --dir esm --ai agents --level 3 --yes
           node esm/render/render.cjs --dir esm --check
+      - name: profile edits, reruns and historical uninstall
+        run: node test/ap-regressions.cjs core
       - name: misuse exits 2
         shell: bash
         run: |
           rc=0; node bin/agent-personalizer.js --dir bad --ai claude --level 7 --yes || rc=$?; test "$rc" -eq 2
           rc=0; node bin/agent-personalizer.js --dir bad --ai bing --level 1 --yes || rc=$?; test "$rc" -eq 2
           test ! -e bad
+
+  repository-checks:
+    name: Repository checks
+    needs: [harness, consumer-install, smoke-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: require every repository job to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const needs = JSON.parse(process.env.NEEDS_JSON); if (!Object.values(needs).every(job => job.result === "success")) process.exit(1);'

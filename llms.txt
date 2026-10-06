@@ -1,10 +1,12 @@
 # agent-personalizer
 
-> One interview writes a profile and rule files for Claude Code, Codex, Cursor, Gemini and ChatGPT, kept in sync from one source.
+> Answer a few questions once, and every AI you use gets the same profile and the rules it can carry: Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
 
-Install with Node 18 or later: `npx agent-personalizer`. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
+Install with `npx agent-personalizer`. Node 22 or 24 (active LTS) is recommended; 18 or later runs. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
 
 The installer writes USER.md, AGENT_ONBOARDING.md and each selected AI's instruction files. Level 2 adds local notes scaffolds for local and fallback notes tools. Level 3 adds editable rules, a renderer, a session-start hook, a drift check and a forbidden-string gate. Preview removal with `npx agent-personalizer --uninstall --dir . --dry`.
+
+Re-runs update untouched installed files and pointer lines to the new answers. Edited copies stay and are named, old notes folders stay in place, and upgrades refresh untouched tools. USER.md supplies every profile export, including ChatGPT. Uninstall checks the history of recorded installed paths and keeps edited files and user-written notes.
 
 ## Docs
 
@@ -22,5 +24,8 @@ The installer writes USER.md, AGENT_ONBOARDING.md and each selected AI's instruc
 - [Rule format](https://github.com/aunysillyme/agent-personalizer/blob/main/rules/README.md): Universal, personal, binding and origin sections.
 - [Worked example](https://github.com/aunysillyme/agent-personalizer/tree/main/examples/freelance-illustrator): An invented illustrator's profile and rendered files.
 - [Changelog](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md): Release history.
+- [Support](https://github.com/aunysillyme/agent-personalizer/blob/main/SUPPORT.md): Where to ask questions, report bugs, request features and report security issues privately.
+- [Maintainers](https://github.com/aunysillyme/agent-personalizer/blob/main/MAINTAINERS.md): Who owns reviews, releases and support routes.
+- [Releasing](https://github.com/aunysillyme/agent-personalizer/blob/main/RELEASING.md): Version sites, checks, tags, provenance and publication steps.
 - [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: installs routing rules, 8 subagents, hooks and a CLI runner so your AI picks model and effort per task and saves tokens.
 - [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security.
