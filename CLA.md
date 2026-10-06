@@ -7,7 +7,7 @@ To agree, tick the Contributor License Agreement box in your pull request descri
 ## 1. Definitions
 
 - **"You"** means the person or legal entity submitting a Contribution.
-- **"Contribution"** means any original work of authorship, including any changes or additions to existing work, that You intentionally submit to Auny LLC for inclusion in this project, through a pull request, an issue, a comment or any other channel Auny LLC uses to discuss or manage the project.
+- **"Contribution"** means any original work of authorship, including any changes or additions to existing work, that You intentionally submit to Auny LLC for inclusion in this project through a pull request.
 - **"Auny LLC"** means Auny LLC, a New York limited liability company, the owner and maintainer of this project.
 
 ## 2. Copyright license
