@@ -10,4 +10,4 @@ agent-personalizer turns an interview into a profile and the instruction files e
 | [Companion tools](companions.md) | Notes connectors, access controls and approval mechanisms. |
 | [Guarantees](guarantees.md) | Rendering, drift detection, preflight, local operation and the forbidden-string gate. |
 
-For contributors, read [CONTRIBUTING.md](../CONTRIBUTING.md), [the rule format](../rules/README.md) and [AGENTS.md](../AGENTS.md). Agents can use [llms.txt](../llms.txt) as the entry point.
+For contributors, read [CONTRIBUTING.md](../CONTRIBUTING.md), [the rule format](../rules/README.md) and [AGENTS.md](../AGENTS.md). [SUPPORT.md](../SUPPORT.md) routes questions, bugs, features and security reports; [MAINTAINERS.md](../MAINTAINERS.md) names the owner and release responsibilities. Agents can use [llms.txt](../llms.txt) as the entry point.

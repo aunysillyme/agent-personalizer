@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 91 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 98 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -18,9 +18,12 @@ mk() { MK="$(mktemp -d)" || fail "mktemp -d failed"; [ -n "$MK" ] && [ -d "$MK" 
 # run <expected-exit> <label> cmd... ; asserts the exact exit code
 expect() { want="$1"; label="$2"; shift 2; "$@" >/dev/null 2>&1; got=$?; [ "$got" -eq "$want" ] || fail "$label: expected exit $want, got $got"; }
 
-# 1. the example renders clean
-expect 0 "example render --check" node render/render.cjs --dir examples/freelance-illustrator --check
-pass "example render --check is clean"
+# 1. the example renders clean and a successful check prints nothing (0.7.0 scope item 9).
+mk; T="$MK"
+node render/render.cjs --dir examples/freelance-illustrator --check > "$T/check.out" 2>&1; got=$?
+[ "$got" -eq 0 ] || fail "example render --check: expected exit 0, got $got"
+[ ! -s "$T/check.out" ] || fail "example render --check printed output despite being clean"
+pass "example render --check is clean and silent"
 
 # 2. render --check exits exactly 1 on seeded drift
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
@@ -369,6 +372,7 @@ expect 1 "gate walk mode symlink target" node check/gate.cjs --dir "$W" --list "
 pass "gate scans index blobs, differing working-tree copies, and symlink target text"
 
 # 42. ChatGPT target rerenders and checks clean when USER.md and a rule carry fenced examples
+#     F1 makes edited profile prose authoritative even with stored answers; fences therefore reach box 1.
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
 printf '\n## Example\n\n```js\nexample()\n```\n\n````md\n```\nnested\n```\n````\n' >> "$T/USER.md"
 printf -- '---\nid: 95-fenced-rule\ntitle: Fenced rule\ninject: false\nsurfaces: [claude, chatgpt]\n---\n\n## universal\nA rule with an example:\n```\ncode in a rule\n```\n' > "$T/rules/95-fenced-rule.md"
@@ -379,8 +383,9 @@ for f in CLAUDE.md; do
   grep -q 'code in a rule' "$T/$f" || fail "fenced rule content missing from $f"
   grep -q '^````md$' "$T/$f" || fail "four-backtick fence not preserved in $f"
 done
-grep -q 'example()' "$T/chatgpt-custom-instructions.md" && fail "chatgpt box 1 with answers should be the compact profile, not USER.md"
-grep -q 'Call me Mara' "$T/chatgpt-custom-instructions.md" || fail "chatgpt compact profile missing"
+grep -q 'example()' "$T/chatgpt-custom-instructions.md" || fail "chatgpt box 1 with answers dropped the edited USER.md example"
+grep -q 'Name and pronouns.*Mara' "$T/chatgpt-custom-instructions.md" || fail "chatgpt edited profile missing"
+grep -q '^`````$' "$T/chatgpt-custom-instructions.md" || fail "chatgpt edited-profile wrapper fence is not longer than the content fence"
 expect 0 "chatgpt rerender" node render/render.cjs --dir "$T" --targets chatgpt,claude
 expect 0 "chatgpt check" node render/render.cjs --dir "$T" --targets chatgpt,claude --check
 # no answers: the full profile (fences included) is the fallback, and the wrapper fence outruns the content's longest run
@@ -676,6 +681,7 @@ expect 2 "unknown notes tool" node bin/agent-personalizer.js --dir "$T/x" --ai c
 pass "notes_tool: disk tools get filesystem rules, cloud tools get connector rules and no paths, read-only and other get the fallback folder; unknown refused"
 
 # 61. (#3) answers drive the rules: signature=no removes the signature rule and its pointer everywhere; a prose answer is not overridden by a bullets default
+#     F3 adds the changed-answer journey: the same promise applies after an untouched yes install.
 mk; T="$MK"; mk; F="$MK"
 printf '{"signature":"no","structure":"prose","lead_with":"context","mistakes":"full"}' > "$F/a.json"
 expect 0 "nondefault install" node bin/agent-personalizer.js --dir "$T" --ai claude,agents,chatgpt --level 3 --answers "$F/a.json" --yes
@@ -699,14 +705,19 @@ grep -q 'rules/40-sign-every-edit.md' "$T/AGENTS.md" && fail "pointer to the sig
 [ ! -e "$T/rules/40-sign-every-edit.md" ] || fail "signature rule file installed despite signature=no"
 grep -rl -e 'Last edited by:' -e '40-sign-every-edit' "$T" --include='*.md' | grep -v '^$' && fail "a signature template line or pointer survived signature=no"
 [ -f "$D/rules/40-sign-every-edit.md" ] || fail "default answers did not install the signature rule"
+printf '{"signature":"no"}' > "$F/off.json"
+expect 0 "signature disabled on rerun" node bin/agent-personalizer.js --dir "$D" --ai agents --level 3 --answers "$F/off.json" --yes
+[ ! -e "$D/rules/40-sign-every-edit.md" ] || fail "signature rule survived the changed answer"
+grep -q 'Sign every edit\|40-sign-every-edit.md' "$D/AGENTS.md" && fail "the old signing pointer survived the changed answer"
 pass "(#3) answers drive the rules: signature=no removes the rule, its pointer and every template line, prose is not overridden, defaults keep both"
 
 # 62. (#4) re-run with changed answers: an untouched USER.md is regenerated, an edited one is kept and the conflict is named; --check clean both ways
+#     F1 makes the kept USER.md the ChatGPT profile too, so the answer-change fixture includes that target.
 mk; T="$MK"; mk; F="$MK"
 printf '{"name":"AuditPerson","structure":"prose"}' > "$F/a.json"
-expect 0 "first install" node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --answers "$F/a.json" --yes
+expect 0 "first install" node bin/agent-personalizer.js --dir "$T" --ai agents,chatgpt --level 3 --answers "$F/a.json" --yes
 printf '{"name":"ChangedPerson","structure":"tables-when-comparing"}' > "$F/a.json"
-node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --answers "$F/a.json" --yes > "$F/out.txt" || fail "rerun"
+node bin/agent-personalizer.js --dir "$T" --ai agents,chatgpt --level 3 --answers "$F/a.json" --yes > "$F/out.txt" || fail "rerun"
 grep -q 'update USER.md (regenerated' "$F/out.txt" || fail "untouched USER.md was not regenerated"
 grep -q 'ChangedPerson' "$T/USER.md" && ! grep -q 'AuditPerson' "$T/USER.md" || fail "USER.md kept the old name"
 grep -q 'ChangedPerson' "$T/AGENTS.md" && ! grep -q 'AuditPerson' "$T/AGENTS.md" || fail "AGENTS.md profile kept the old name"
@@ -714,10 +725,12 @@ grep -q 'ChangedPerson' "$T/AGENT_ONBOARDING.md" || fail "onboarding missing the
 expect 0 "rerun check" node render/render.cjs --dir "$T" --check
 printf '\nMY HAND EDIT\n' >> "$T/USER.md"; cp "$T/USER.md" "$T/USER.expected"
 printf '{"name":"ThirdPerson","structure":"tables-when-comparing"}' > "$F/a.json"
-node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --answers "$F/a.json" --yes > "$F/out2.txt" || fail "rerun after edit"
+node bin/agent-personalizer.js --dir "$T" --ai agents,chatgpt --level 3 --answers "$F/a.json" --yes > "$F/out2.txt" || fail "rerun after edit"
 cmp -s "$T/USER.md" "$T/USER.expected" || fail "an edited USER.md was rewritten"
 grep -q 'ANSWERS CHANGED: name' "$F/out2.txt" || fail "conflict not named"
 grep -q 'ThirdPerson' "$T/AGENT_ONBOARDING.md" || fail "onboarding missing the third name"
+grep -qF 'MY HAND EDIT' "$T/chatgpt-box1.txt" || fail "ChatGPT did not receive the edited profile"
+grep -q 'ThirdPerson' "$T/chatgpt-box1.txt" && fail "ChatGPT used the new answers instead of the kept profile"
 expect 0 "conflict check" node render/render.cjs --dir "$T" --check
 # same answers again: nothing regenerated, nothing named
 node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --yes > "$F/out3.txt" || fail "rerun same"
@@ -959,6 +972,7 @@ done
 pass "every rule carries an In practice line"
 
 # 80. workflows: publishing is manual, provenance-enabled, OIDC-scoped; CI has the Node matrix, Windows smoke and packed consumer installs; .gitattributes pins LF
+#     F7 adds Node 24 and a stable aggregate required-check name; test its failure logic as well as its wiring.
 expect 0 "CLA workflow and template agreement" node test/cla.test.js
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
@@ -966,11 +980,35 @@ grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml
 grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
 grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep -q 'rev-parse "refs/tags/\$TAG^{commit}"' .github/workflows/publish.yml || fail "publish.yml does not resolve the input through refs/tags"
 grep -q 'ref: \${{ inputs.tag }}' .github/workflows/publish.yml && fail "publish.yml checks out the raw input as a ref"
-grep -q 'node: \[18, 20, 22\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22"
+grep -q 'node: \[18, 20, 22, 24\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22/24"
 grep -q 'smoke-windows:' .github/workflows/harness.yml && grep -q 'windows-latest' .github/workflows/harness.yml || fail "no Windows smoke job"
 grep -q '^  consumer-install:' .github/workflows/harness.yml && grep -q 'run: sh test/consumer-install.sh' .github/workflows/harness.yml || fail "no packed consumer-install job"
+node -e '
+const fs = require("fs"), vm = require("vm");
+const yaml = fs.readFileSync(".github/workflows/harness.yml", "utf8").split(/^jobs:\n/m)[1];
+if (!yaml) throw new Error("workflow has no jobs");
+const jobs = [...yaml.matchAll(/^  ([A-Za-z0-9_-]+):\n([\s\S]*?)(?=^  [A-Za-z0-9_-]+:\n|(?![\s\S]))/gm)];
+const aggregate = jobs.find(([, , body]) => /^    name: Repository checks$/m.test(body));
+if (!aggregate) throw new Error("stable Repository checks job missing");
+const body = aggregate[2], needs = body.match(/^    needs: \[([^\]]+)\]$/m);
+if (!/^    if: always\(\)$/m.test(body) || !needs) throw new Error("aggregate must always run and name its needs");
+const declared = needs[1].split(",").map(s => s.trim()).sort();
+const expected = jobs.map(([, id]) => id).filter(id => id !== aggregate[1]).sort();
+if (JSON.stringify(declared) !== JSON.stringify(expected)) throw new Error("aggregate does not need every other job");
+if (!/NEEDS_JSON: \$\{\{ toJSON\(needs\) \}\}/.test(body)) throw new Error("aggregate does not receive real job results");
+const script = body.match(/node -e '\''([^'\'']+)'\''/);
+if (!script) throw new Error("aggregate result check missing");
+for (const status of ["success", "failure", "cancelled", "skipped"]) {
+  const values = Object.fromEntries(expected.map(id => [id, {result: "success"}]));
+  values[expected[0]].result = status;
+  let exit = 0;
+  vm.runInNewContext(script[1], {process: {env: {NEEDS_JSON: JSON.stringify(values)}, exit(code) {exit = code;}}});
+  if (exit !== (status === "success" ? 0 : 1)) throw new Error(`aggregate accepts ${status} incorrectly`);
+}
+' || fail "Repository checks wiring or success requirement is wrong"
+grep -q 'run: node test/ap-regressions.cjs core' .github/workflows/harness.yml || fail "Windows does not exercise reruns and uninstall"
 grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
-pass "publish workflow dormant and provenance-ready; matrix, Windows smoke and consumer install present; LF pinned"
+pass "publish workflow dormant and provenance-ready; Node 18/20/22/24, Windows journeys and consumer install present; Repository checks gates every job; LF pinned"
 
 # 81. the quoted check count matches the number of checks, everywhere it is quoted
 n="$(grep -c '^[[:space:]]*pass "' test/run.sh)"
@@ -982,11 +1020,12 @@ grep -q "a $n-check harness" SECURITY.md || fail "SECURITY.md does not say $n ch
 pass "the check count ($n) is quoted consistently"
 
 # 82. upgrading a level-1 folder to level 3 repoints the installer's own pointer lines at rules/; a user-edited line is left alone
+#     F2 generalizes migration to previous-answer lines; the old level-only message is no longer the interface.
 mk; T="$MK"
 expect 0 "level 1 first" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
 printf -- '- My own rule. `[owner: the rendered block below]`\n' >> "$T/CLAUDE.md"
 node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 3 --yes > "$T/out.txt" || fail "level 3 upgrade"
-grep -q 'update CLAUDE.md (rule pointers now name rules/' "$T/out.txt" || fail "upgrade did not report the repoint"
+grep -q 'update CLAUDE.md' "$T/out.txt" || fail "upgrade did not report the repoint"
 grep -q 'Sign every edit.*\[owner: rules/40-sign-every-edit.md\]' "$T/CLAUDE.md" || fail "pointer not repointed at rules/"
 grep -q 'Rules, one file each, the owning copy' "$T/CLAUDE.md" || fail "rules/ line not restored in Where things live"
 grep -q 'My own rule. `\[owner: the rendered block below\]`' "$T/CLAUDE.md" || fail "a user-written line was touched"
@@ -1005,6 +1044,7 @@ pass "workflow files parse as YAML (or the parser is absent and says so)"
 
 # 84. (#19) a level-1 home file names no notes folder, because level 1 creates none; level 2 restores the
 #     four pointers and leaves a user-written line alone; a cloud tool never gets a local folder at all
+#     F2 uses one previous-template migration for level and answer changes, so assert the update and final bytes.
 mk; T="$MK"
 expect 0 "level 1 notes pointers" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
 [ ! -e "$T/notes" ] || fail "level 1 created a notes folder"
@@ -1015,7 +1055,7 @@ for f in CLAUDE.md AGENTS.md; do
 done
 printf -- '- My own line: `notes/mine.md`\n' >> "$T/CLAUDE.md"
 node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 2 --yes > "$T/up.txt" || fail "level 2 upgrade"
-grep -qF 'update CLAUDE.md (notes pointers now name notes/' "$T/up.txt" || fail "the level 2 upgrade did not report the notes repoint"
+grep -qF 'update CLAUDE.md' "$T/up.txt" || fail "the level 2 upgrade did not report the notes repoint"
 for f in CLAUDE.md AGENTS.md; do
   grep -qF -- '- Session log (one note per week): `notes/sessions/`' "$T/$f" || fail "$f: the notes pointers were not restored at level 2"
   grep -qF 'no local notes folder at level 1' "$T/$f" && fail "$f: the level-1 placeholder survived the upgrade"
@@ -1030,14 +1070,14 @@ grep -qF 'reached through its connector, no local files' "$C/CLAUDE.md" || fail 
 pass "(#19) level 1 names no notes folder it does not create; level 2 restores the pointers and leaves user lines alone"
 
 # 85. (#20) one verb per file, and it is the verb that is true of THAT file: the installer creates the
-#     pointer file, the renderer fills its block, and a re-run says kept and ok, never "wrote" twice
+#     pointer file, the renderer fills its block, and a re-run says ok, never "wrote" twice.
+#     F2's migration delegates an unchanged home file to the renderer, which owns the final ok message.
 mk; T="$MK"
 node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes > "$T/first.txt" || fail "first install"
 grep -qF 'wrote  CLAUDE.md (pointer file' "$T/first.txt" || fail "the first install does not name CLAUDE.md as the pointer file"
 grep -qF 'update CLAUDE.md (rendered block)' "$T/first.txt" || fail "the first install does not say the block was rendered"
 [ "$(grep -c '^wrote  CLAUDE\.md' "$T/first.txt")" = "1" ] || fail "CLAUDE.md was reported as written more than once"
 node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes > "$T/again.txt" || fail "re-run"
-grep -qF 'kept   CLAUDE.md (exists)' "$T/again.txt" || fail "the re-run did not report the kept file"
 grep -qF 'ok     CLAUDE.md (rendered block already current)' "$T/again.txt" || fail "the re-run does not say the block was already current"
 grep -q '^wrote  CLAUDE\.md' "$T/again.txt" && fail "a re-run that changed nothing still says it wrote CLAUDE.md"
 node render/render.cjs --dir "$T" --targets claude,prompt > "$T/r.txt" || fail "render a target that does not exist yet"
@@ -1047,6 +1087,7 @@ pass "(#20) one verb per file: wrote a new file, update a changed block, ok an u
 
 # 86. (#21) the rerun command names the folder that was installed, in full, not "."; the success text
 #     separates what an AI reads by itself from what a human still pastes, and links the paste guide
+#     F7 names both exported files beside their purpose and follows the current interface activation step.
 mk; T="$MK"; RT="$(cd "$T" && pwd -P)" || fail "resolve temp dir"
 node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes > "$T/one.txt" || fail "single-AI install"
 grep -qF -- "--dir $RT --ai claude" "$T/one.txt" || fail "the rerun command does not name the installed folder"
@@ -1058,7 +1099,9 @@ grep -qF 'Several agents?' "$T/one.txt" && fail "the companions line printed for
 mk; T2="$MK"
 node bin/agent-personalizer.js --dir "$T2" --ai claude,agents,chatgpt --level 1 --yes > "$T2/many.txt" || fail "multi-AI install"
 grep -qF 'Several agents?' "$T2/many.txt" || fail "the companions line is missing from a multi-AI install"
-grep -qF 'chatgpt-box1.txt and chatgpt-box2.txt' "$T2/many.txt" || fail "the ChatGPT paste step is missing"
+grep -qF 'chatgpt-box1.txt' "$T2/many.txt" && grep -qF 'chatgpt-box2.txt' "$T2/many.txt" || fail "the ChatGPT paste files are missing"
+grep -qF 'Settings → Personalization and enable customization' "$T2/many.txt" || fail "the ChatGPT activation step is missing"
+grep -qF 'fields your current interface provides, checking its displayed limits' "$T2/many.txt" || fail "the ChatGPT paste step assumes fixed interface fields"
 pass "(#21) the Next block names the installed folder, splits automatic from paste, links the paste guide, companions only for several agents"
 
 # 87. (#22, #23) level 4 is no longer offered and still installs level 3; the interview is SHORT by default
@@ -1117,6 +1160,8 @@ pass "(#24) the AI-facing renders use the second person; no templates/ placehold
 #     still named notes/README.md, notes/sessions/, notes/decisions.md and notes/inbox/ at level 1.
 #     Mechanical loud negative: at level 1 every line naming a path under the notes base must also say
 #     the folder is not there yet, so a future line cannot quietly reintroduce a dead pointer.
+#     F2/F3 refresh untouched scaffolds but retain an existing notes folder on a lower-level rerun;
+#     the disk probe still decides whether those pointers are live.
 mk; T="$MK"; mk; F="$MK"
 expect 0 "level 1 rendered files" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes --defaults
 [ ! -e "$T/notes" ] || fail "level 1 created a notes folder"
@@ -1232,7 +1277,37 @@ catch (e) { if (!(e instanceof r.Refusal)) { console.error("not a Refusal: " + e
 pass "(library) parseFrontmatter and parseSections are exported, parse a shipped rule, and refuse a bad section"
 
 # 91. uninstall keeps user data, checks the complete plan before deleting, and previews without writes.
+#     F4 adds historical inventory journeys in check 95; these existing hostile-path cases remain the safety floor.
 node test/uninstall.test.js || fail "uninstall regressions"
 pass "uninstall: clean levels, edited files, shared home files, notes, dry-run and hostile paths"
 
-echo; echo "all checks passed"
+# 92. Codex audit 2026-10-04, F1: USER.md supplies every profile, including both ChatGPT edit paths.
+node test/ap-regressions.cjs F1 || fail "F1 canonical profile regressions"
+pass "F1: untouched compact bytes, edited and pre-existing USER.md, both box checks and over-budget fidelity"
+
+# 93. Codex audit 2026-10-04, F2: notes-path reruns converge; edited pointers and old notes stay exact.
+node test/ap-regressions.cjs F2 || fail "F2 notes-path migration regressions"
+pass "F2: fresh-install convergence, old notes inventory and edited pointer byte fidelity with manual review"
+
+# 94. Codex audit 2026-10-04, F3: answer changes remove untouched signing copies and keep edited content.
+node test/ap-regressions.cjs F3 || fail "F3 signature transition regressions"
+pass "F3: signing transitions converge, untouched copies refresh, edited rules, notes and pointers are kept and named"
+
+# 95. Codex audit 2026-10-04, F4: uninstall uses every recorded path, retains real notes and previews the same files.
+node test/ap-regressions.cjs F4 || fail "F4 historical uninstall regressions"
+pass "F4: historical notes and rules removed, dry-run faithful, edited and unrecorded notes and existing directories kept"
+
+# 96. Codex audit 2026-10-04, F5: real tagged pre-hash and recorded-hash installs refresh untouched tools.
+#     git archive reads local tags only; CI fetches history so these historical fixtures are reproducible.
+node test/ap-regressions.cjs F5 || fail "F5 runtime upgrade regressions (the v0.5.1 and v0.6.4 tags must be available)"
+pass "F5: tagged historical installs refresh every untouched tool and rule; edited gate bytes and version guidance stay"
+
+# 97. Codex audit 2026-10-04, F9: every relative Markdown navigation target ships in npm's actual inventory.
+node test/package-links.cjs || fail "packed Markdown links do not resolve offline"
+pass "packed Markdown relative links resolve inside npm pack --dry-run inventory"
+
+# 98. Interactive re-runs keep saved defaults and skipped answers, including off-limits boundaries.
+node test/ap-regressions.cjs RERUN || fail "interactive saved-answer regressions"
+pass "interactive re-runs keep saved defaults, skipped answers and off-limits; first installs and answer sources unchanged"
+
+echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

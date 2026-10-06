@@ -6,9 +6,10 @@ agent-personalizer is an installer and renderer. Its checks enforce file consist
 
 Each render comes from `USER.md`, the selected rule source and the onboarding answers in `.agent-personalizer.json`. At level 3, `rules/` is your local editable source; lower levels use the package's rules.
 
-- **One source:** edit the profile, rule files or onboarding answers, then regenerate the selected AI files together.
+- **One profile source:** edit `USER.md`, then regenerate. Every profile-bearing target uses it, including `chatgpt-box1.txt`. Untouched generated profiles retain the compact ChatGPT export. Edited generated identity fields can still compact; custom text or structure falls back to the profile's own text, with the same budget warning.
+- **Rule and onboarding sources:** edit the rule files or onboarding answers, then regenerate the selected AI files together. Each target receives the rules selected for its format and budget.
 - **Byte fidelity:** the renderer preserves bytes outside generated markers, including line endings.
-- **Drift detection:** `node render/render.cjs --dir . --check` compares the current generated blocks with what the sources would render now. It exits `1` when they differ.
+- **Drift detection:** `node render/render.cjs --dir . --check` compares the current generated blocks and both ChatGPT paste files with what the sources would render now. Success is silent with exit `0`; it exits `1` and names drift when they differ.
 - **Paste updates:** re-paste regenerated files into chat-app instruction fields. The check compares files on disk.
 - **ChatGPT budget:** each box reports its character count against the limit in `render/targets.json`. Over-budget text is preserved and flagged. `--strict` exits `1` before writing when a box exceeds that limit.
 
@@ -21,11 +22,21 @@ The installer validates answers, configuration, source files and target marker s
 - **Paths:** paths beneath the installation root must be real files and directories. Symlinks and paths outside the root are refused.
 - **Markers:** each target may have one correctly ordered generated block or be ready for its first block. Malformed blocks are refused.
 - **Encoding:** sources and targets must contain valid UTF-8; invalid bytes are refused instead of re-encoded.
-- **Existing work:** the installer keeps existing notes and rules. It regenerates `USER.md` only while the profile matches the previous answers byte for byte.
-- **Renderer recovery:** target writes are staged, existing files are backed up, and a write failure triggers rollback. An incomplete restore keeps and names its backup with exit `2`.
+- **Existing work:** edited and pre-existing profiles, notes templates, rules and tools are kept and named. Untouched installer-owned files update to the current answers and package. Obsolete untouched copies are removed; edited copies stay and are named.
+- **Recovery:** the installer validates its complete plan before writing and restores changed files on failure. The renderer stages target writes with backups and rolls back a failed write. An incomplete restore keeps and names its backup with exit `2`.
 - **Local operation:** the tool makes no network calls, sends no telemetry and reads no environment variables. `npx` fetches the package before execution.
 
-The installer's upgrades can replace its own unchanged pointer lines as you add notes or local rules. The renderer's byte-fidelity promise applies to everything outside its marked block.
+On a re-run, each home-file line that byte-matches the previous template is migrated to the new template or removed when obsolete. An edited pointer stays byte for byte and is named with its file and line for manual review. Other outer text stays byte for byte. The renderer owns only the marked block.
+
+## Re-runs, upgrades and removal
+
+- **Convergence:** after a re-run over untouched installer files, their bytes match a fresh install with the new answers, apart from the accumulated configuration and a previous notes folder kept in place.
+- **Notes history:** changing the notes path creates the new scaffold and keeps the old folder. The log names both paths once; the recorded files from both remain available to uninstall.
+- **Tool updates:** a recorded install hash recognizes untouched tools and rules. For older installs without hashes, a shipped table of earlier release hashes recognizes untouched verbatim copies. Edited tools remain intact; the log names the known origin version and the replacement step. The configuration records the installed tooling version.
+- **Removal inventory:** uninstall checks the union of recorded installed paths across all runs. A matching hash permits removal, a changed file is kept and named, and a missing file is skipped. An unrecorded file is left alone. Legacy configurations without hashes use their known install recipe.
+- **Removal paths:** every tracked path is validated before the first unlink and re-probed before each unlink. Removal is file by file. Only recorded install-created, empty directories are removed.
+- **Configuration last:** the configuration is removed after tracked files are gone. Retained tracked files are named and keep the configuration for review.
+- **Preview and manual steps:** `--uninstall --dry` makes the same decisions as removal and changes no files. A missing configuration exits `2` naming its path. Hook registration and pasted instructions are printed as manual cleanup steps.
 
 ## Forbidden-string gate
 

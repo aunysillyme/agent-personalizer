@@ -17,11 +17,11 @@
   (level 2 creates it, and level 2+ repoints them). Level 3 copies rules/ (yours to edit from
   then on) with the renderer, hook and gate. .agent-personalizer.json stores only the answers that
   differ from the defaults.
-  Writes only the files for the chosen AIs and level. Never overwrites a file that exists
-  (except the marker block inside rendered files it owns, .agent-personalizer.json, which
-  is its own record and is merged, never blindly replaced, and USER.md when, and only when,
-  the answers changed and the file still equals the render of the previous answers byte for
-  byte; an edited USER.md is kept and the changed answers are named as a conflict).
+  Writes only the chosen AIs and the highest installed level. Re-runs replace untouched
+  installer-owned copies using recorded hashes, with a static release-hash fallback for older
+  installs. Edited files and pointer lines are kept and named. Previous notes folders stay in
+  place and in the uninstall inventory. The config is merged; USER.md is regenerated only
+  when it still equals the previous answer render. All writes roll back if rendering fails.
   PREFLIGHT: every path is probed and every existing rendered target is decoded and its marker
   block checked BEFORE the first write, so a refusal leaves the folder as it was. The notes
   folder the scaffold creates and the home files point at is your notes_path (disk tools) or
@@ -45,11 +45,12 @@ const HOME_NAMES = new Set(['CLAUDE.md', 'AGENTS.md']);
 const PKG = path.resolve(__dirname, '..');
 const onboarding = require(path.join(PKG, 'render', 'onboarding.cjs'));
 const markers = require(path.join(PKG, 'render', 'render.cjs'));   // markerState, for the preflight; render.cjs runs nothing on require
-const { installPlan } = require('./install-plan.cjs');
+const { installPlan, validateInventory, knownVersions, ownership, migrateHome, recordedHash } = require('./install-plan.cjs');
 const AIS = ['claude', 'agents', 'gemini', 'chatgpt', 'prompt'];
 const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex / Cursor / anything that reads AGENTS.md', gemini: 'Gemini', chatgpt: 'ChatGPT custom instructions', prompt: 'a plain system prompt (shareable, no profile)' };
 
-function die(msg) { console.error(`agent-personalizer: ${msg}`); process.exit(2); }
+let committing = false;
+function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
 const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
@@ -63,7 +64,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   Interactive when flags are missing and stdin is a terminal; the onboarding interview runs then.
   The interview is SHORT by default: the seven questions that change behaviour (name, tone, length,
   notes tool and path, write policy, always-ask), plus any question the notes tool you pick makes
-  apply. Every other answer takes its default.
+  apply. Other answers keep their saved values, or take defaults on the first install.
   --full       ask every question instead of the short set. Interactive only.
   --quick      the short interview. It is now the default; the flag is kept so older commands still work.
   --answers    a JSON file of answers, or "-" to read the JSON from stdin. Unknown keys and values are refused.
@@ -100,11 +101,11 @@ function arg(name, dflt) { return name in ARGS ? ARGS[name] : dflt; }
 if (ARGS['--help'] || ARGS['-h']) { process.stdout.write(USAGE); process.exit(0); }
 if (ARGS['--version'] || ARGS['-v']) { process.stdout.write(require(path.join(PKG, 'package.json')).version + '\n'); process.exit(0); }
 
-async function ask(q, dflt) {
+async function ask(q, dflt, saved = false) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const a = await new Promise(res => rl.question(`${q}${dflt ? ` [${dflt}]` : ''}: `, res));
+  const a = await new Promise(res => rl.question(`${q}${dflt || saved ? ` [${dflt}]` : ''}: `, res));
   rl.close();
-  return (a || dflt || '').trim();
+  return saved ? a.trim() : (a || dflt || '').trim();
 }
 
 /* Resolve <root>/<rel> such that every existing component is a real directory (never a
@@ -147,12 +148,42 @@ function probe(root, rel) {
   die('unreachable');
 }
 
-function copyIfAbsent(src, root, rel) {
-  const { full, exists } = safeDest(root, rel);
-  if (exists) { console.log(`kept   ${rel} (exists)`); return false; }
-  fs.copyFileSync(src, full, fs.constants.COPYFILE_EXCL);
-  console.log(`wrote  ${rel}`);
-  return true;
+// Read the stored config once. The interview uses it before any directories or files are created;
+// non-interactive answer sources retain their existing handling below.
+function readConfig(root, level) {
+  const { full: cfgPath, exists: cfgExists } = probe(root, '.agent-personalizer.json');
+  let cfg = { targets: [], level };
+  let prevAnswers = null;
+  if (cfgExists) {
+    try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { die(`.agent-personalizer.json is not valid JSON (${e.message}); fix or remove it`); }
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
+    if ('targets' in cfg) {
+      if (!Array.isArray(cfg.targets)) die('.agent-personalizer.json "targets" must be a list');
+      const KNOWN = [...AIS, 'onboarding'];
+      const bad = cfg.targets.filter(t => !KNOWN.includes(t));
+      if (bad.length) die(`.agent-personalizer.json lists unknown target(s): ${bad.join(', ')} (known: ${KNOWN.join(', ')}); fix or remove them`);
+      if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
+    }
+    if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`.agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
+    try { validateInventory(cfg); } catch (e) { die(`.agent-personalizer.json: ${e.message}; nothing was written`); }
+    markers.DIE_THROWS = true;
+    try { markers.validatePreservedTargets(cfg); }
+    catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
+    finally { markers.DIE_THROWS = false; }
+    if (cfg.onboarding) {
+      try { prevAnswers = onboarding.validate(cfg.onboarding); } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
+    }
+  }
+  return { cfgPath, cfgExists, cfg, prevAnswers };
+}
+
+// Follow the requested folder once, without creating its missing tail.
+function resolveDestination(dir) {
+  const requested = path.resolve(String(dir));
+  let existing = requested; const missing = [];
+  while (!fs.existsSync(existing)) { missing.unshift(path.basename(existing)); const parent = path.dirname(existing); if (parent === existing) die(`cannot create ${requested}`); existing = parent; }
+  const realExisting = fs.realpathSync(existing);
+  return { requested, realExisting, missing, root: path.join(realExisting, ...missing) };
 }
 
 async function main() {
@@ -195,6 +226,7 @@ async function main() {
   if (arg('--quick', false) && arg('--full', false)) die('--quick and --full are exclusive; the short interview is the default');
   if (arg('--quick', false) && (answersFile || arg('--defaults', false) || !interactive)) die('--quick is the short interview; it needs a terminal and no --answers, --defaults or --yes');
   if (arg('--full', false) && (answersFile || arg('--defaults', false) || !interactive)) die('--full is the long interview; it needs a terminal and no --answers, --defaults or --yes');
+  let destination = null, stored = null;
   if (answersFile) {
     let raw;
     const label = answersFile === '-' ? 'stdin' : answersFile;
@@ -206,59 +238,50 @@ async function main() {
     if (!arg('--defaults', false) && !process.stdin.isTTY) console.error('agent-personalizer: stdin is not a terminal, so the interview cannot run; using the default answers (pass --answers <file.json>, --answers -, or --defaults to silence this)');
     answersSource = process.stdin.isTTY ? 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)' : 'defaults (stdin is not a terminal; pass --answers <file.json> or --answers - to script them)';
   } else {
+    destination = resolveDestination(dir);
+    const { requested, root, missing } = destination;
+    if (!missing.length && !fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
+    stored = readConfig(root, level);
+    const saved = stored.prevAnswers;
     const full = !!arg('--full', false);
-    console.log('\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.');
+    console.log(saved
+      ? '\nOnboarding: how should an AI work with you? Enter keeps the saved answer shown in brackets.'
+      : '\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.');
     console.log(full
       ? `Full interview: up to ${onboarding.QUESTIONS.length} questions, some of which apply only to certain notes tools.\n`
-      : `Short interview: the ${onboarding.QUICK.length} questions that change behaviour, plus any the notes tool you pick makes apply. Every other answer takes its default; --full asks up to ${onboarding.QUESTIONS.length}, skipping questions that do not apply to your notes tool.\n`);
-    const raw = {};
+      : `Short interview: the ${onboarding.QUICK.length} questions that change behaviour, plus any the notes tool you pick makes apply. ${saved ? 'Every other answer keeps its saved value' : 'Every other answer takes its default'}; --full asks up to ${onboarding.QUESTIONS.length}, skipping questions that do not apply to your notes tool.\n`);
+    const raw = saved ? onboarding.interviewAnswers(saved) : {};
     for (const q of onboarding.QUESTIONS) {
       if (!onboarding.asks(q, raw, full)) continue;
       if (q.options) for (const [v, l] of q.options) console.log(`    ${v.padEnd(30)} ${l}`);
-      const dflt = Array.isArray(q.default) ? q.default.join(', ') : q.default;
-      raw[q.id] = onboarding.parseAnswer(q, await ask(q.ask, dflt || ''));
+      const value = onboarding.interviewDefault(q, saved);
+      const dflt = Array.isArray(value) ? value.join(', ') : value;
+      raw[q.id] = onboarding.parseAnswer({ ...q, default: value }, await ask(q.ask, dflt || '', !!saved));
     }
     try { answers = onboarding.validate(raw); } catch (e) { die(`onboarding: ${e.message}`); }
-    answersSource = full ? 'your interview answers' : 'your short-interview answers (the rest are defaults)';
+    answersSource = full ? 'your interview answers' : `your short-interview answers (the rest are ${saved ? 'kept saved values' : 'defaults'})`;
   }
 
   // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
   // missing tail is created one level at a time, so nothing is ever created through a
   // symlink that did not exist when you ran the command. Everything beneath root is then
   // symlink-free by construction (safeDest refuses any).
-  const requested = path.resolve(String(dir));
-  let existing = requested; const missing = [];
-  while (!fs.existsSync(existing)) { missing.unshift(path.basename(existing)); const parent = path.dirname(existing); if (parent === existing) die(`cannot create ${requested}`); existing = parent; }
-  let root = fs.realpathSync(existing);
-  for (const part of missing) { root = path.join(root, part); fs.mkdirSync(root); }
+  const { requested, root, realExisting, missing } = destination || resolveDestination(dir);
+  let creating = realExisting;
+  for (const part of missing) { creating = path.join(creating, part); fs.mkdirSync(creating); }
   if (!fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
   // Config: the one file this installer rewrites. Read and VALIDATED here, before the first write, so a malformed
   // stored config refuses the whole run and leaves the folder untouched. Existing onboarding answers are kept unless
   // --answers or the interview supplied new ones; targets are merged; "onboarding" is always a target.
-  const { full: cfgPath, exists: cfgExists } = probe(root, '.agent-personalizer.json');
-  let cfg = { targets: [], level };
-  let prevAnswers = null;
-  if (cfgExists) {
-    try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { die(`.agent-personalizer.json is not valid JSON (${e.message}); fix or remove it`); }
-    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
-    if ('targets' in cfg) {
-      if (!Array.isArray(cfg.targets)) die('.agent-personalizer.json "targets" must be a list');
-      const KNOWN = [...AIS, 'onboarding'];
-      const bad = cfg.targets.filter(t => !KNOWN.includes(t));
-      if (bad.length) die(`.agent-personalizer.json lists unknown target(s): ${bad.join(', ')} (known: ${KNOWN.join(', ')}); fix or remove them`);
-      if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
-    }
-    if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`.agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
-    markers.DIE_THROWS = true;
-    try { markers.validatePreservedTargets(cfg); }
-    catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
-    finally { markers.DIE_THROWS = false; }
-    if (cfg.onboarding) {
-      try { prevAnswers = onboarding.validate(cfg.onboarding); } catch (e) { die(`.agent-personalizer.json onboarding answers: ${e.message}`); }
-      if (!answersFile && answersSource.startsWith('defaults')) { answers = prevAnswers; answersSource = 'kept from .agent-personalizer.json'; }
-    }
+  const storedConfig = stored || readConfig(root, level);
+  const { cfgPath, cfgExists, prevAnswers } = storedConfig;
+  let cfg = storedConfig.cfg;
+  if (prevAnswers && !answersFile && answersSource.startsWith('defaults')) {
+    answers = prevAnswers; answersSource = 'kept from .agent-personalizer.json';
   }
   const allTargets = [...new Set([...(Array.isArray(cfg.targets) ? cfg.targets : []), ...targets, 'onboarding'])];
+  const installedLevel = Math.max(level, cfg.level || 0);
+  const effectiveLevel = Math.min(installedLevel, 3);
   const base = onboarding.baseFor(answers);              // the folder scaffolds and home-file pointers use
   const kind = onboarding.kindOf(answers);
   // Bytes actually written, by tracked path, so --uninstall never has to re-derive them from
@@ -266,17 +289,39 @@ async function main() {
   // only ever added to here, never pruned (a config predating this field has none, and falls
   // back to the older comparison; see uninstall.cjs).
   const installedHashes = { ...(cfg.installed && typeof cfg.installed === 'object' ? cfg.installed : {}) };
+  const createdDirectories = new Set(cfg.createdDirectories || []);
+  const toolingVersions = { ...(cfg.toolingVersions || {}) };
+  const toolingVersion = require(path.join(PKG, 'package.json')).version;
+  const legacy = cfgExists && !!prevAnswers && !Object.hasOwn(cfg, 'installed');
 
   console.log(`\nInstalling level ${level} for ${targets.join(', ')} into ${root}\nOnboarding answers: ${answersSource}\n`);
 
   // ---- PLAN: every file this run would create, computed before anything is written ----
   const scaffoldExists = (() => { try { return fs.statSync(path.join(root, base, 'README.md')).isFile(); } catch (_) { return false; } })();
-  const willScaffold = level >= 2 && kind !== 'cloud';    // this run's own scaffold, written further down
+  const willScaffold = effectiveLevel >= 2 && kind !== 'cloud';
   const notesScaffolded = kind !== 'cloud' && (scaffoldExists || willScaffold);
-  const { plan, stripSig, notesWhy, NOTES_ONE_LINE, NOTES_LATER } = installPlan({ answers, level, targets, notesScaffolded });
+  const { plan } = installPlan({ answers, level: effectiveLevel, targets: allTargets, notesScaffolded });
+  const plannedBytes = new Map();
+  for (const p of plan) {
+    const bytes = p.src ? fs.readFileSync(p.src) : Buffer.from(p.text);
+    if (plannedBytes.has(p.rel) && !plannedBytes.get(p.rel).equals(bytes)) die(`${p.rel}: conflicting install paths; nothing was written`);
+    plannedBytes.set(p.rel, bytes);
+  }
+  const previousBase = prevAnswers ? onboarding.baseFor(prevAnswers) : null;
+  const previousNotesExists = previousBase && !!probe(root, `${previousBase}/README.md`).exists;
+  const previousNotesScaffolded = prevAnswers && onboarding.kindOf(prevAnswers) !== 'cloud' && ((cfg.level || 1) >= 2 || previousNotesExists);
+  const previousPlan = prevAnswers ? installPlan({ answers: prevAnswers, level: Math.min(cfg.level || 1, 3), targets: cfg.targets || [], notesScaffolded: previousNotesScaffolded }).plan : [];
 
   // ---- PREFLIGHT: refuse now, with nothing written, everything the renderer would refuse later ----
-  for (const p of plan) probe(root, p.rel);              // symlinks and non-directories on the way
+  for (const p of plan) {
+    const destination = probe(root, p.rel);
+    if (destination.exists && !fs.lstatSync(destination.full).isFile()) die(`${p.rel} exists and is not a regular file; nothing was written`);
+  }
+  for (const rel of Object.keys(installedHashes)) probe(root, rel);
+  for (const rel of createdDirectories) {
+    const destination = probe(root, rel);
+    if (destination.exists && !fs.lstatSync(destination.full).isDirectory()) die(`${rel} is not a directory; nothing was written`);
+  }
   // sources already in the folder (a kept rules/ file, a kept USER.md): parsed exactly as the renderer will parse them
   markers.DIE_THROWS = true;
   try { markers.preflightSources(root); }
@@ -327,46 +372,99 @@ async function main() {
     if (userAction === 'keep' && notesScaffolded && !current.includes(`\`${base}/README.md\``)) staleNotesInUser = true;
   }
 
-  // Upgrade from a lower level. Two repairs, each matched byte for byte against a line THIS installer
-  // wrote, so anything the user edited is left alone:
-  //   level 3: the pointer lines said "the rendered block below"; now that rules/ arrives they name it.
-  //   level 2: the one-line notes placeholder a level-1 install wrote becomes the real pointers, now
-  //            that the folder behind them exists.
+  // Previous answers identify the exact installer lines to migrate. Each unchanged line is
+  // replaced or removed on its own; all other outside-marker bytes stay exactly as read.
   const upgrades = [];
-  if (level >= 2) for (const name of ['CLAUDE.md', 'AGENTS.md']) {
-    if (!(name === 'CLAUDE.md' ? targets.includes('claude') : targets.includes('agents'))) continue;
+  const outside = (text, name) => {
+    const ms = markers.markerState(text, name);
+    return ms.kind === 'one' ? text.slice(0, ms.bStart) + text.slice(ms.eEnd) : text;
+  };
+  for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+    const prior = previousPlan.find(p => p.rel === name);
+    const next = plan.find(p => p.rel === name);
+    if (!prior || !next) continue;
     const { full, exists } = probe(root, name);
     if (!exists || !fs.lstatSync(full).isFile()) continue;
-    const tmpl = stripSig(fs.readFileSync(path.join(PKG, 'templates', name), 'utf8')).split('\n');
-    const lines = fs.readFileSync(full, 'utf8').split('\n');
-    const why = [];
-    if (level >= 3) {
-      let repointed = false;
-      for (const t of tmpl) {
-        if (!/`\[owner: rules\/[^\]]+\]`/.test(t)) continue;
-        const placeholder = t.replace(/`\[owner: rules\/[^\]]+\]`/g, '`[owner: the rendered block below]`');
-        for (let i = 0; i < lines.length; i++) if (lines[i] === placeholder) { lines[i] = t; repointed = true; }
-      }
-      const rulesLine = tmpl.find(l => /Rules, one file each, the owning copy/.test(l));
-      const anchorIdx = lines.findIndex(l => /AGENT_ONBOARDING\.md`$/.test(l) && /^- /.test(l));
-      if (rulesLine && !lines.includes(rulesLine) && anchorIdx !== -1 && repointed) lines.splice(anchorIdx + 1, 0, rulesLine);
-      if (repointed) why.push('rule pointers now name rules/, which this level installs');
+    const current = fs.readFileSync(full, 'utf8');
+    if (outside(current, name) !== outside(prior.text, name)) preservedTargets.add(name === 'CLAUDE.md' ? 'claude' : 'agents');
+    const migration = migrateHome(current, prior.text, next.text, text => markers.markerState(text, name));
+    for (const line of migration.edited) console.log(`kept   ${name} (edited pointer; manual review): ${line}`);
+    if (migration.changed) {
+      const why = effectiveLevel >= 3 && (cfg.level || 1) < 3 ? 'rule pointers now name rules/, which this level installs' : 'unchanged installer pointer lines migrated to the new answers';
+      upgrades.push({ rel: name, bytes: Buffer.from(migration.text), report: `update ${name} (${why})` });
     }
-    if (!notesWhy) {                                      // this run creates the folder the four lines name
-      const idx = lines.indexOf(NOTES_ONE_LINE(NOTES_LATER));
-      if (idx !== -1) {
-        lines.splice(idx, 1, ...tmpl.filter(l => /`notes\//.test(l)).map(l => base === 'notes' ? l : l.replace(/\bnotes\//g, `${base}/`)));
-        why.push(`notes pointers now name ${base}/, which this level installs`);
-      }
-    }
-    if (why.length) { try { fs.accessSync(full, fs.constants.W_OK); } catch (_) { die(`${name} is not writable; nothing was written`); } upgrades.push({ name, full, text: lines.join('\n'), why }); }
   }
 
-  // ---- WRITE ----
-  for (const u of upgrades) { fs.writeFileSync(u.full, u.text); console.log(`update ${u.name} (${u.why.join('; ')})`); }
+  const writes = [...upgrades], removals = [];
+  // Legacy installs have no hashes. Only an exact prior recipe or committed release hash
+  // can establish ownership; an existing file in a fresh folder is never adopted.
+  if (legacy) for (const p of previousPlan) {
+    if (HOME_NAMES.has(p.rel)) continue;
+    const destination = probe(root, p.rel);
+    if (!destination.exists || !fs.lstatSync(destination.full).isFile()) continue;
+    const bytes = fs.readFileSync(destination.full);
+    const expected = p.src ? fs.readFileSync(p.src) : Buffer.from(p.text);
+    if (ownership(cfg, p.rel, bytes, { legacy: true, expected }).unedited) installedHashes[p.rel] = sha256(bytes);
+  }
+  // Learn an old tool's origin from known untouched peer copies, never by executing them.
+  let previousToolingVersion = cfg.toolingVersion;
+  if (!previousToolingVersion && cfgExists) {
+    let candidates = null;
+    for (const p of previousPlan.filter(p => p.src)) {
+      const destination = probe(root, p.rel);
+      if (!destination.exists) continue;
+      const versions = knownVersions(p.rel, fs.readFileSync(destination.full));
+      if (versions.length) candidates = candidates === null ? versions : candidates.filter(version => versions.includes(version));
+    }
+    if (candidates?.length === 1) previousToolingVersion = candidates[0];
+  }
+  const editedCopy = (rel, version) => `kept   ${rel} (edited${version ? `; from version ${version}` : ''}; to take version ${toolingVersion}, save your edits, remove ${rel} and re-run)`;
+  for (const p of plan) {
+    const destination = probe(root, p.rel);
+    const bytes = p.src ? fs.readFileSync(p.src) : Buffer.from(p.text);
+    if (HOME_NAMES.has(p.rel)) {
+      if (!destination.exists) writes.push({ rel: p.rel, bytes, report: `wrote  ${p.rel} (${p.note})` });
+      continue;
+    }
+    if (destination.exists) {
+      const existing = fs.readFileSync(destination.full);
+      const old = previousPlan.find(prior => prior.rel === p.rel);
+      const expected = old && (old.src ? fs.readFileSync(old.src) : Buffer.from(old.text));
+      const owner = ownership(cfg, p.rel, existing, { legacy: legacy && !!old, expected });
+      if (!owner.unedited) {
+        const tracked = recordedHash(cfg, p.rel) || (legacy && old) || Object.hasOwn(cfg.toolingVersions || {}, p.rel);
+        const origin = (cfg.toolingVersions || {})[p.rel] || previousToolingVersion || owner.version;
+        if (tracked && origin && (p.src || p.rel.startsWith('rules/'))) toolingVersions[p.rel] = origin;
+        console.log(tracked ? editedCopy(p.rel, origin) : `kept   ${p.rel} (pre-existing; manual review)`);
+        continue;
+      }
+      if (existing.equals(bytes)) {
+        installedHashes[p.rel] = sha256(bytes);
+        if (p.src || p.rel.startsWith('rules/')) toolingVersions[p.rel] = toolingVersion;
+        console.log(`kept   ${p.rel} (unchanged)`);
+        continue;
+      }
+      writes.push({ rel: p.rel, bytes, report: `update ${p.rel} (untouched installer copy refreshed${p.src || p.rel.startsWith('rules/') ? ` to version ${toolingVersion}` : ''})` });
+    } else writes.push({ rel: p.rel, bytes, report: `wrote  ${p.rel}${p.note ? ` (${p.note})` : ''}` });
+    installedHashes[p.rel] = sha256(bytes);
+    if (p.src || p.rel.startsWith('rules/')) toolingVersions[p.rel] = toolingVersion;
+  }
+  // Retire only copied rules that the current answers omit. An old notes folder always
+  // stays, even when no current recipe mentions it; its hashes remain in the inventory.
+  const currentPaths = new Set(plan.map(p => p.rel));
+  for (const rel of Object.keys(installedHashes)) {
+    if (!rel.startsWith('rules/') || currentPaths.has(rel)) continue;
+    const destination = probe(root, rel);
+    if (!destination.exists) continue;
+    if (!fs.lstatSync(destination.full).isFile()) die(`${rel} is not a regular file; nothing was written`);
+    if (sha256(fs.readFileSync(destination.full)) === installedHashes[rel]) removals.push({ rel, report: `remove ${rel} (untouched installer copy; the new answers omit it)` });
+    else console.log(editedCopy(rel, toolingVersions[rel] || previousToolingVersion));
+  }
+  if (previousBase && previousBase !== base && previousNotesExists) console.log(`kept   ${previousBase}/ (previous notes folder; current notes folder: ${base}/; kept in the uninstall inventory)`);
+
   if (userAction === 'create' || userAction === 'regenerate' || userAction === 'relevel') {
     const rendered = onboarding.renderUser(answers, { notesScaffolded });
-    fs.writeFileSync(user.full, rendered, userAction === 'create' ? { flag: 'wx' } : undefined);
+    writes.push({ rel: 'USER.md', bytes: Buffer.from(rendered) });
     installedHashes['USER.md'] = sha256(Buffer.from(rendered));
     if (userAction === 'create') console.log('wrote  USER.md (from your answers)');
     else if (userAction === 'regenerate') console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`);
@@ -380,33 +478,89 @@ async function main() {
     console.log('kept   USER.md (exists)');
     if (staleNotesInUser) console.log(`       NOTE: you edited USER.md while it still said there is no local notes folder. ${base}/ exists now. Fix the two "Where things live" lines by hand, or delete USER.md and re-run.`);
   }
-  for (const p of plan) {
-    if (p.src) {
-      if (copyIfAbsent(p.src, root, p.rel)) installedHashes[p.rel] = sha256(fs.readFileSync(p.src));
-    } else {
-      const { full, exists } = safeDest(root, p.rel);
-      if (exists) console.log(`kept   ${p.rel} (exists)`);
-      else {
-        fs.writeFileSync(full, p.text, { flag: 'wx' });
-        console.log(`wrote  ${p.rel}${p.note ? ` (${p.note})` : ''}`);
-        // CLAUDE.md/AGENTS.md are only a pointer template here; render.cjs below splices in the
-        // rendered block and records the finished file's hash itself.
-        if (!HOME_NAMES.has(p.rel)) installedHashes[p.rel] = sha256(Buffer.from(p.text));
-      }
+  // Snapshot every possible output and check every parent before the first write. The
+  // renderer runs from this package, not from a potentially edited installed executable.
+  const outputPaths = new Set(['.agent-personalizer.json', ...writes.map(p => p.rel), ...removals.map(p => p.rel)]);
+  for (const target of allTargets.map(key => TARGETS[key])) {
+    outputPaths.add(target.file);
+    for (const rel of Object.values(target.boxFiles || {})) outputPaths.add(rel);
+  }
+  for (const rel of outputPaths) {
+    let parent = path.posix.dirname(rel);
+    while (parent !== '.') {
+      if (outputPaths.has(parent)) die(`${parent}: install path is both a file and a directory; nothing was written`);
+      parent = path.posix.dirname(parent);
     }
   }
-  if (level >= 3) {
-    const hp = path.join(root, 'hooks', 'claude-code', 'session-start.sh');
-    const st = fs.lstatSync(hp);
-    if (!st.isFile() || st.isSymbolicLink()) die('hook file changed underneath the installer; not chmod-ing it');
-    fs.chmodSync(hp, 0o755);
+  const saved = new Map(), newDirectories = new Set();
+  for (const rel of outputPaths) {
+    const destination = probe(root, rel);
+    if (destination.exists) {
+      const info = fs.lstatSync(destination.full);
+      if (!info.isFile()) die(`${rel} is not a regular file; nothing was written`);
+      saved.set(rel, { bytes: fs.readFileSync(destination.full), mode: info.mode & 0o777, dev: info.dev, ino: info.ino });
+    } else saved.set(rel, null);
+    let parent = path.posix.dirname(rel);
+    while (parent !== '.') {
+      if (!probe(root, parent).exists) newDirectories.add(parent);
+      parent = path.posix.dirname(parent);
+    }
+    let ancestor = path.dirname(destination.full);
+    while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
+    try { fs.accessSync(ancestor, fs.constants.W_OK); } catch (_) { die(`${rel}: parent is not writable; nothing was written`); }
   }
-  cfg = { ...cfg, targets: allTargets, level: Math.max(level, cfg.level || 0), onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets], installed: installedHashes };   // sparse answers, original home ownership, and the bytes written so far (render.cjs below adds the home files)
-  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
-  console.log(`${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})`);
-
-  // Render the FULL merged target list (what a plain `render.cjs --dir .` will use from now on), from the package's renderer.
-  execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
+  for (const rel of newDirectories) createdDirectories.add(rel);
+  cfg = { ...cfg, targets: allTargets, level: installedLevel, onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets], installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
+  writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
+  const replace = (rel, bytes, mode) => {
+    const destination = safeDest(root, rel);
+    const tmp = path.join(path.dirname(destination.full), `.${path.basename(rel)}.${crypto.randomBytes(8).toString('hex')}.agent-personalizer.tmp`);
+    try {
+      fs.writeFileSync(tmp, bytes, { flag: 'wx', ...(mode === undefined ? {} : { mode }) });
+      if (mode !== undefined) fs.chmodSync(tmp, mode);
+      probe(root, rel);
+      fs.renameSync(tmp, destination.full);
+    } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
+  };
+  const assertSaved = rel => {
+    const destination = probe(root, rel), before = saved.get(rel);
+    if (!!before !== destination.exists) die(`${rel} changed during preflight; nothing was written`);
+    if (before) {
+      const info = fs.lstatSync(destination.full);
+      if (info.dev !== before.dev || info.ino !== before.ino || !fs.readFileSync(destination.full).equals(before.bytes)) die(`${rel} changed during preflight; nothing was written`);
+    }
+  };
+  committing = true;
+  const touched = new Set();
+  try {
+    for (const rel of outputPaths) assertSaved(rel);
+    for (const p of removals) { assertSaved(p.rel); fs.unlinkSync(probe(root, p.rel).full); touched.add(p.rel); console.log(p.report); }
+    for (const p of writes) {
+      assertSaved(p.rel);
+      touched.add(p.rel);
+      const mode = p.rel === 'hooks/claude-code/session-start.sh' ? 0o755 : saved.get(p.rel)?.mode;
+      replace(p.rel, p.bytes, mode);
+      if (p.report) console.log(p.report);
+    }
+    // Include renderer outputs in rollback even when it committed before reporting a failure.
+    for (const rel of outputPaths) touched.add(rel);
+    execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
+  } catch (e) {
+    const incomplete = [];
+    for (const rel of [...touched].reverse()) {
+      try {
+        const before = saved.get(rel), destination = probe(root, rel);
+        if (before) replace(rel, before.bytes, before.mode);
+        else if (destination.exists) fs.unlinkSync(destination.full);
+      } catch (failure) { incomplete.push(`${rel}: ${failure.message}`); }
+    }
+    for (const rel of [...newDirectories].sort((a, b) => b.split('/').length - a.split('/').length)) {
+      try { const destination = probe(root, rel); if (destination.exists && fs.readdirSync(destination.full).length === 0) fs.rmdirSync(destination.full); }
+      catch (failure) { incomplete.push(`${rel}/: ${failure.message}`); }
+    }
+    console.error(incomplete.length ? `agent-personalizer: ROLLBACK INCOMPLETE\n${incomplete.join('\n')}` : 'agent-personalizer: install failed; every changed file was restored');
+    throw e;
+  } finally { committing = false; }
 
   const DOCS = onboarding.DOCS;
   // the rerun command a user can actually type: the npx form when this ran from npm's cache, else the local path that just worked
@@ -421,7 +575,7 @@ async function main() {
   const AUTO = { claude: 'CLAUDE.md (Claude Code)', agents: 'AGENTS.md (Codex, Cursor, anything that reads AGENTS.md)', gemini: 'GEMINI.md (Gemini CLI)' };
   const PASTE = {
     claude: 'claude.ai and the Claude apps read no files: paste the body of USER.md, then AGENT_ONBOARDING.md, into the project or profile instructions',
-    chatgpt: 'ChatGPT: paste chatgpt-box1.txt and chatgpt-box2.txt into its two custom-instruction boxes',
+    chatgpt: 'ChatGPT: open Settings → Personalization and enable customization. Copy the exported profile (chatgpt-box1.txt) and response instructions (chatgpt-box2.txt) into the fields your current interface provides, checking its displayed limits',
     prompt: 'system-prompt.md: paste it wherever you set a system prompt',
   };
   const auto = targets.filter(t => AUTO[t]).map(t => AUTO[t]);
@@ -430,7 +584,7 @@ async function main() {
   steps.push('Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer with new answers to change it.\n     USER.md is yours to edit freely; the onboarding file is regenerated from .agent-personalizer.json.');
   steps.push(level >= 3
     ? `Re-render after editing: node render/render.cjs --dir ${DIR}   (drift check: add --check)`
-    : `Re-render after editing by running this installer again (it keeps your files and only refreshes the rendered blocks):\n     ${SELF} --dir ${DIR} --ai ${targets.join(',')} --level ${level} --yes`);
+    : `Re-render after editing by running this installer again (it refreshes generated outputs and untouched installer copies, and keeps and names edited files):\n     ${SELF} --dir ${DIR} --ai ${targets.join(',')} --level ${level} --yes`);
   steps.push([
     auto.length ? `Read from ${root} automatically, nothing to paste: ${auto.join(', ')}.` : null,
     paste.length ? `Still needs a paste: ${paste.join('; ')}.` : null,
@@ -452,4 +606,4 @@ async function main() {
   console.log('\nIf this saved you time, a star helps people find it: https://github.com/aunysillyme/agent-personalizer');
 }
 
-main().catch(e => { if (e && e.status !== undefined) process.exit(e.status || 1); console.error(e.message); process.exit(1); });
+main().catch(e => { if (e && e.status !== undefined) process.exit(e.status || 1); console.error(e.message); process.exit(e instanceof markers.Refusal ? 2 : 1); });

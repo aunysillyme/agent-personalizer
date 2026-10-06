@@ -1,0 +1,30 @@
+name: Question
+description: Help with installation, updates, instruction files or removal.
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and where do you need help?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Include the command and output, or the guide you followed.
+  - type: input
+    id: env
+    attributes:
+      label: OS, Node version and AI client
+      placeholder: macOS / Node 22 / Codex CLI
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I read the install guide and searched open and closed issues.
+          required: true
+        - label: This question contains none of my private identifiers (names, paths, off-limits topics).
+          required: true

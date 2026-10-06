@@ -2,13 +2,11 @@
 
 [![npm](https://img.shields.io/npm/v/agent-personalizer.svg)](https://www.npmjs.com/package/agent-personalizer) [![harness](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml/badge.svg)](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml) [![release](https://img.shields.io/github/v/tag/aunysillyme/agent-personalizer?label=release)](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Answer a few questions once, and every AI you use gets the same profile and rules:** Claude Code, Codex, Cursor, Gemini and ChatGPT, rendered from one source and kept in sync.
+**Answer a few questions once, and every AI you use gets the same profile and the rules it can carry:** Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
 
-**The problem:** custom instructions live in each app separately, drift apart, fade over a long chat, and an AI's guesses about you start to read like your rules.
+**The problem:** Custom instructions live in each app separately, drift apart and fade over a long chat.
 
-**What you get:** one profile and one rule source, rendered into the exact file each AI reads, with a check that fails when a copy drifts and a status on every remembered fact.
-
-CI installs the packed tarball as a consumer at levels 1 and 2 and checks the ChatGPT paste path.
+**What you get:** One profile and one rule source, rendered into the exact file each AI reads, with a check that fails when a generated copy drifts.
 
 ## Quick start
 
@@ -16,120 +14,34 @@ CI installs the packed tarball as a consumer at levels 1 and 2 and checks the Ch
 npx agent-personalizer
 ```
 
-The installer asks for the folder, which AIs you use, and the level. The short interview asks seven questions by default, plus any that apply to your notes tool. Enter accepts each default.
-
 ![Terminal recording of the short interview, its answers, and the profile, onboarding and AI instruction files it writes.](docs/demo.gif)
 
-For a headless install with defaults:
+## What it sets up
 
-```bash
-npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
-```
+| Part | What it gives you |
+|---|---|
+| `USER.md` | Your profile, communication preferences and how firmly you mean things. It owns the profile in every profile export. |
+| `AGENT_ONBOARDING.md` | Your AI's reading order, writing policy, off-limits topics and approval steps. |
+| `CLAUDE.md` | Your profile and selected rules in Claude Code's project instruction file. |
+| `AGENTS.md` | Your profile and selected rules in the project file used by Codex and Cursor. |
+| `GEMINI.md` | Your profile and selected rules in Gemini CLI's instruction file. |
+| ChatGPT paste files | `chatgpt-box1.txt` for your profile and `chatgpt-box2.txt` for response instructions, plus a preview with counts. |
+| `system-prompt.md` | Shareable universal rules for another chat app, bot or API. |
+| Notes folder, level 2 | A folder index, weekly session template, decisions log and inbox for local or fallback notes tools. |
+| `rules/`, level 3 | Editable rule sources with universal, personal, AI-specific and origin sections. |
+| Renderer, level 3 | Regenerate the selected AI files from your profile, rules and onboarding answers. |
+| Drift check, level 3 | A failing check when a generated block or ChatGPT paste file differs from its source. |
+| Session-start contract, level 3 | Put your onboarding restrictions and selected rules into context at session start. |
+| Forbidden-string check, level 3 | Catch text and paths matching your private list before sharing files. |
+| `.agent-personalizer.json` | Your targets, level, answers and installed-file history for later runs and removal. |
 
-For the full interview, asking up to 23 questions, only the ones that apply to your notes tool:
+## After you install
 
-```bash
-npx agent-personalizer --full
-```
+Start your AI in the installed project folder. Ask it which instruction file loaded and what your writing policy is. Confirm those answers against AGENT_ONBOARDING.md before the first write.
 
-Requires Node 18 or later. Published on npm with provenance. See [installation](docs/install.md) for scripted answers, the npm cache fix, manual copying, and every flag.
+For ChatGPT, open Settings → Personalization and enable customization. Copy the exported profile (`chatgpt-box1.txt`) and response instructions (`chatgpt-box2.txt`) into the fields your current interface provides, checking its displayed limits. Re-paste after updates; the [paste guide](docs/paste-guide.md) covers each app.
 
-Privacy:
-
-- **Runs locally:** after `npx` fetches the package from npm or GitHub, the tool runs on your machine. That fetch is the one network step.
-- **No telemetry:** the installer and renderer make no network calls and read no environment variables.
-- **Writes only into the folder you name:** existing user files are preserved, and generated blocks update from their sources.
-
-## What it writes
-
-- **`USER.md`:** your profile, communication preferences, output shape, and the difference between your preferences and rules.
-- **`AGENT_ONBOARDING.md`:** the AI's manual, including what to read first, where it may write, and what needs your approval.
-- **AI instruction files:** your profile and rules in each selected AI's format.
-- **`.agent-personalizer.json`:** the selected targets, level, and onboarding answers used by later runs.
-
-Here is a real excerpt from the invented [freelance illustrator example](examples/freelance-illustrator/). The renderer copies the same profile into both home files.
-
-[`USER.md`](examples/freelance-illustrator/USER.md):
-
-```markdown
-## Who I am
-
-- **Name and pronouns:** Mara, she/her
-- **What I do:** freelance illustrator. Book covers and editorial work, some client branding on the side.
-```
-
-Inside the generated block in [`CLAUDE.md`](examples/freelance-illustrator/CLAUDE.md):
-
-```markdown
-## Who I am
-
-- **Name and pronouns:** Mara, she/her
-- **What I do:** freelance illustrator. Book covers and editorial work, some client branding on the side.
-```
-
-Inside the generated block in [`AGENTS.md`](examples/freelance-illustrator/AGENTS.md):
-
-```markdown
-## Who I am
-
-- **Name and pronouns:** Mara, she/her
-- **What I do:** freelance illustrator. Book covers and editorial work, some client branding on the side.
-```
-
-## Works with
-
-| AI | File | How it loads |
-|---|---|---|
-| Claude Code | `CLAUDE.md` | Reads it from the working folder automatically. |
-| Codex and Cursor | `AGENTS.md` | Read it from the project root automatically. |
-| Gemini CLI | `GEMINI.md` | Reads it from the folder automatically. |
-| claude.ai and Claude Projects | `USER.md` and `AGENT_ONBOARDING.md` | Paste their bodies into custom or project instructions. |
-| ChatGPT | `chatgpt-box1.txt` and `chatgpt-box2.txt` | Paste into the custom-instruction boxes; `chatgpt-custom-instructions.md` shows the same text with counts. |
-| Other chat apps, bots and APIs | `system-prompt.md` | Paste into the system-prompt field. It contains the shareable universal rules. |
-
-The [paste guide](docs/paste-guide.md) covers each app, ChatGPT's box budget, and what to re-paste after an update.
-
-## Levels
-
-Choose the files and tools you want the installer to add:
-
-| Level | What it gives you | What it writes |
-|---|---|---|
-| **1. Profile and home files** | The same profile and rules for the AIs you pick. | `USER.md`, `AGENT_ONBOARDING.md`, one home file per AI, and `.agent-personalizer.json`. ChatGPT also gets plain paste files for its boxes. |
-| **2. Dynamic docs** | A notes folder the AI keeps under your writing rules. | Everything in level 1, plus a folder index, weekly session-log template, decisions log and inbox for local notes tools. |
-| **3. Mechanisms** | Editable rules and tools that keep the generated files in sync. | Everything above, plus your own `rules/`, renderer, session-start hook, drift check and forbidden-string gate. |
-
-Level 2 creates a local notes folder for disk tools such as Obsidian, Logseq and plain markdown. OneNote, Evernote and other tools use a local fallback. Cloud tools such as Notion get connector pointers and keep their notes in the cloud. Existing local notes scaffolds are detected at any level.
-
-The notes templates give the AI a place for session notes, decisions and inbox items. When you answer yes to signing edits, its instructions include `Last edited by: <ai> <model> <date> · <ten words>`, overwritten on each edit. The AI maintains these notes according to your instructions.
-
-Level 3 adds four pieces:
-
-- **Rule source and renderer:** edit one file in `rules/`; render its universal, personal and AI-specific text into each target.
-- **Session-start contract:** put the onboarding restrictions and `inject: true` rules into context when a Claude Code session starts. [Register the hook](hooks/README.md), or generate a plain prompt for another AI.
-- **Drift check:** compare generated blocks with what their sources render now, and fail when they differ.
-- **Forbidden-string gate:** check file text and paths for strings in your private list before sharing. [Configure the gate](docs/guarantees.md#forbidden-string-gate).
-
-The [five instruction tiers](docs/tiers.md) explain where style, home files, session contracts, rule owners and memory belong. [Guarantees](docs/guarantees.md) explains what the code enforces and how the instructions reach the AI.
-
-## Keep it in sync
-
-Re-run the installer to change your answers. Use the interview or supply a JSON file:
-
-```bash
-npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json
-```
-
-`AGENT_ONBOARDING.md` and the selected rendered blocks update together. `USER.md` updates when it still matches the previous answers byte for byte. An edited profile stays yours; the installer names changed answers for you to carry over.
-
-At level 3, edit `USER.md` or `rules/`, then render and check:
-
-```bash
-node render/render.cjs --dir .
-node render/render.cjs --dir . --check
-```
-
-`--check` exits 0 when current, 1 on drift, and 2 on invalid input. Files your AI reads automatically are ready for the next session. Re-paste the updated text into chat apps. See [installation](docs/install.md#updating-an-install) for the full update flow.
+File generation, re-runs and uninstall run in CI on Linux, macOS and Windows; your client's context view confirms loading on your setup.
 
 ## Part of a set
 
@@ -141,62 +53,143 @@ Three open-source tools that work on their own and fit together:
 | [model-orchestrator](https://github.com/aunysillyme/model-orchestrator) | Model router for AI coding agents: installs routing rules, 8 subagents, hooks and a CLI runner so your AI picks model and effort per task and saves tokens. |
 | [website-build-skill](https://github.com/aunysillyme/website-build-skill) | A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security. |
 
+## Choose your setup
+
+The short interview asks seven base questions, plus any that apply to your notes tool. Enter accepts each default. For the full interview, which asks up to 23 applicable questions:
+
+```bash
+npx agent-personalizer --full
+```
+
+| Level | What you get |
+|---|---|
+| **1. Profile and home files** | The profile, onboarding and target-specific instructions for the AIs you pick. |
+| **2. Dynamic docs** | Everything above, plus local notes templates maintained under your writing policy. Cloud notes tools use connector pointers. |
+| **3. Mechanisms** | Everything above, plus local rule sources, the renderer, drift check, hook and forbidden-string gate. |
+
+For a headless install with defaults:
+
+```bash
+npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
+```
+
+Node 22 or 24 (active LTS) is recommended; 18 or later runs. Published on npm with provenance. [Installation](docs/install.md) covers scripted answers, every flag, notes tools and manual copying.
+
+The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls, send no telemetry and read no environment variables. Writes stay inside the folder you name, with edited files preserved and named.
+
+## Keep it in sync
+
+Re-run the installer to change answers or upgrade an install. Use the interview or supply a JSON file:
+
+```bash
+npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json
+```
+
+Untouched installer files update to what a fresh install with those answers would create. Edited files stay yours. Home pointer lines that still match the previous template update or disappear when obsolete; edited lines stay byte for byte and are named for manual review. Changing the notes path keeps the old folder and names it next to the new one. Upgrading refreshes untouched tools and rule copies; edited copies are kept with a replacement step.
+
+`USER.md` updates while it remains an untouched installer profile. An edited or pre-existing profile stays the source for every profile export, including ChatGPT. Changed onboarding answers are named so you can carry them into your profile by hand.
+
+At level 3, edit `USER.md` or a source in `rules/`, then render and check:
+
+```bash
+node render/render.cjs --dir .
+node render/render.cjs --dir . --check
+```
+
+`--check` exits 0 when current, 1 on drift and 2 on invalid input. Start a new client session to load changed files and re-paste exports into chat apps. Each rule's `origin` section explains the failure it prevents; keep that story when adding a rule. See [updating an install](docs/install.md#updating-an-install).
+
+## Put the contract in context
+
+At level 3, [register the Claude Code hook](hooks/README.md) to inject the onboarding restrictions and `inject: true` rules at session start. For another AI, generate a prompt to paste into its first message:
+
+```bash
+node render/render.cjs --dir . --contract > contract.txt
+```
+
+The [instruction tiers](docs/tiers.md) explain where style, home files, contracts, rule owners and memory belong. The contract puts your instructions in context; your host and model apply them.
+
+## Check for private strings
+
+At level 3, copy the example list, fill it with your identifiers and keep it in your project's `.gitignore`:
+
+```bash
+cp check/forbidden.example.txt check/forbidden.local.txt
+node check/gate.cjs --dir .
+```
+
+The gate checks file text and paths against that list. A missing or malformed list is refused. [Configure the gate](docs/guarantees.md#forbidden-string-gate) for your project before sharing it.
+
 ## Companion tools
 
-These optional tools turn onboarding answers into access controls and approval steps. [Companion setup](docs/companions.md) covers their configuration and how each notes tool is reached.
+Select your notes tool during the full interview:
+
+```bash
+npx agent-personalizer --full
+```
+
+[Companion setup](docs/companions.md) explains notes connectors and how to turn onboarding answers into tool permissions and approval steps.
 
 | Tool | What it gives you |
 |---|---|
 | [obsidian-tc](https://github.com/The-40-Thieves/obsidian-tc) | Governed Obsidian access: configure folder permissions from your off-limits answer and human approval from your always-ask answer. |
 | [The Context Layer](https://sierracatalina.com/context-layer) | Purpose-bound context with receipts; its decide and vault stages apply your write policy and off-limits boundaries. |
 
+## Common questions
+
+### How do I share custom instructions across Claude Code, Codex, Cursor and ChatGPT?
+
+Run `npx agent-personalizer` and select the AIs you use. One profile and rule source produce the instructions each target can carry; ChatGPT gets its profile and selected session rules as paste files.
+
+### Which instruction files does each AI use?
+
+Choose targets with `npx agent-personalizer --dir . --ai claude,agents,gemini,chatgpt --level 1 --yes --defaults`. It creates `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and the ChatGPT exports shown in [What it sets up](#what-it-sets-up); the [paste guide](docs/paste-guide.md) explains loading and activation.
+
+### How do I update my AI profile or change an answer?
+
+For answers, run `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json`. At level 3, edit `USER.md` or `rules/`, then run `node render/render.cjs --dir .`; re-paste changed chat exports.
+
+### How do I check generated instructions for drift?
+
+At level 3, run `node render/render.cjs --dir . --check`. Exit 0 means the generated blocks and paste files match their sources; exit 1 identifies drift and exit 2 names invalid input.
+
+### How do I upgrade installed tools safely?
+
+Re-run `npx agent-personalizer --dir . --ai claude,agents --level 3 --yes --defaults` with the newer package. Untouched tools refresh, edited copies stay and the log gives the replacement step.
+
+### How do I uninstall agent-personalizer and keep my notes?
+
+Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files and user-written notes stay, and the log names retained installed files.
+
 ## Uninstall
 
-Preview removal, then run it:
+Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files and notes, and lists any hook registration you must remove.
 
 ```bash
 npx agent-personalizer --uninstall --dir . --dry
 npx agent-personalizer --uninstall --dir .
 ```
 
-The uninstaller compares files with the current render and templates. Unchanged generated files are removed. Edited files and your notes stay, and kept files are named. Existing home files keep their own text; only an unchanged generated block is removed. Remove any session-start hook registration from your AI's settings when prompted. See [removal details](docs/install.md#uninstall).
+The inventory covers every path recorded by any install run, including earlier notes folders and rules omitted by later answers. Existing home files keep their own text while an unchanged generated block is removed. Only install-created empty folders are removed; the configuration goes last and stays while tracked files are retained. See [removal details](docs/install.md#uninstall).
 
-## For agents
-
-Read [`llms.txt`](llms.txt) for documentation links and [`AGENTS.md`](AGENTS.md) for contributor instructions. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
-
-## Every rule carries its story
-
-Each file in [`rules/`](rules/) ends with an `origin` block: the failure that produced the rule and the failure it prevents. Fill it in when you add a rule so a reader can see why it exists and when it applies.
-
-## Docs
+## Read next
 
 Start at the [documentation index](docs/README.md):
 
-- **[Install and uninstall](docs/install.md):** flags, scripted answers, updates and removal.
+- **[Install and uninstall](docs/install.md):** flags, scripted answers, re-runs, upgrades and removal.
 - **[Instruction tiers](docs/tiers.md):** where each kind of instruction belongs.
-- **[Paste guide](docs/paste-guide.md):** how each AI loads its files.
+- **[Paste guide](docs/paste-guide.md):** how each AI loads its files and how to activate exports.
 - **[Companions](docs/companions.md):** notes connectors and enforcement tools.
-- **[Guarantees](docs/guarantees.md):** rendering, checks, preflight and runtime safety.
+- **[Guarantees](docs/guarantees.md):** source ownership, drift checks, preflight and runtime safety.
 - **[Changelog](CHANGELOG.md):** release history.
+- **[Support](SUPPORT.md):** question, bug, feature and private security routes.
 
-## Common questions
-
-**How do I keep the same custom instructions across Claude Code, Codex, Cursor and ChatGPT?** One interview writes `USER.md` and `rules/` once, and the renderer copies that same profile and rules into every AI's own file. Run `npx agent-personalizer` and pick every AI you use, for example `--ai claude,agents,gemini,chatgpt,prompt`.
-
-**Which files does it write for each AI?** Claude Code reads `CLAUDE.md`, Codex and Cursor read `AGENTS.md`, Gemini CLI reads `GEMINI.md`, and ChatGPT takes `chatgpt-box1.txt` and `chatgpt-box2.txt` pasted into its two custom-instruction boxes. See [Works with](#works-with) for the full table and the [paste guide](docs/paste-guide.md) for every app.
-
-**How do I change an answer later?** Re-run the installer with the interview, or supply a JSON answers file: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json`. `AGENT_ONBOARDING.md` and the rendered blocks update together, and `USER.md` regenerates only when it still matches your previous answers byte for byte. See [updating an install](docs/install.md#updating-an-install).
-
-**How do I check that nothing drifted?** At level 3, run `node render/render.cjs --dir . --check`. It exits 0 when every generated file matches what its sources render now, and 1 when one has drifted.
-
-**How do I remove it?** Preview first with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Unchanged generated files are removed, while edited files, your notes and a pre-existing home file's own text stay. See [removal details](docs/install.md#uninstall).
+**For agents:** read [`llms.txt`](llms.txt) for documentation links and [`AGENTS.md`](AGENTS.md) for contributor instructions. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
 
 ## Contributing
 
-Contributions are welcome: a new AI target, a notes tool, an example user, or a failure you hit with steps to reproduce it. [CONTRIBUTING.md](CONTRIBUTING.md) covers the rule format and checks.
+Contributions are welcome: a new AI target, a notes tool, an example user, or a failure you hit with steps to reproduce it. [CONTRIBUTING.md](CONTRIBUTING.md) covers the rule format and checks; [MAINTAINERS.md](MAINTAINERS.md) names the owner and release responsibilities.
 
-The harness (`test/run.sh: 91 checks`) tests exact exit codes and adversarial fixtures. Every push and pull request runs it on Ubuntu and macOS; Windows CI smoke-tests the Node entry points. The shell harness and hook run under WSL or Git Bash on Windows. The real forbidden-list check stays local and prints a skip when the private list is absent.
+The harness (`test/run.sh: 98 checks`) tests exact exit codes and adversarial fixtures. The real forbidden-list check stays local and prints a skip when the private list is absent.
 
 ## License
 

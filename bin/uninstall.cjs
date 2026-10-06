@@ -1,5 +1,5 @@
 'use strict';
-// Plan every deletion from stored answers and current sources before changing anything.
+// Plan every deletion from the complete recorded ownership history before changing anything.
 // Installed JavaScript is compared as bytes, never loaded or executed.
 const fs = require('fs');
 const path = require('path');
@@ -7,13 +7,9 @@ const crypto = require('crypto');
 const renderer = require('../render/render.cjs');
 const onboarding = require('../render/onboarding.cjs');
 const TARGETS = require('../render/targets.json');
-const { installPlan } = require('./install-plan.cjs');
+const { installPlan, recordedHash, validateInventory } = require('./install-plan.cjs');
 const CONFIG = '.agent-personalizer.json';
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-// The recorded hash for a path, or undefined for a config written before this field existed
-// (0.5.x and earlier) or for a path install never recorded. undefined means: fall back to
-// recomputing the expected bytes from the currently running package, exactly as before.
-const recordedHash = (cfg, rel) => (cfg.installed && typeof cfg.installed === 'object' && !Array.isArray(cfg.installed)) ? cfg.installed[rel] : undefined;
 
 function refuse(message) { throw new renderer.Refusal(message); }
 function uninstall(dir, { dry = false } = {}) {
@@ -71,17 +67,14 @@ function run(dir, dry) {
     try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
     catch (_) { refuse(`${rel} is not valid UTF-8; nothing was removed`); }
   }
-  function parentDirs(rel) {
-    let parent = path.posix.dirname(rel);
-    while (parent !== '.') { dirs.add(parent); parent = path.posix.dirname(parent); }
-  }
-
   if (!read(CONFIG)) refuse(`missing config: expected ${path.join(root, CONFIG)}`);
   let cfg;
   try { cfg = renderer.readConfig(root); }
   catch (e) { if (e instanceof renderer.Refusal) refuse(`${CONFIG}: ${e.message}`); throw e; }
   if (!Array.isArray(cfg.targets) || !cfg.targets.length || !cfg.onboarding || !Number.isInteger(cfg.level))
     refuse(`${CONFIG} needs stored targets, level and onboarding answers for --uninstall`);
+  try { validateInventory(cfg); } catch (e) { refuse(`${CONFIG}: ${e.message}; nothing was removed`); }
+  const modern = Object.hasOwn(cfg, 'installed');
   const answers = cfg.onboarding;
   const level = Math.min(cfg.level, 3);
   const base = onboarding.baseFor(answers);
@@ -96,14 +89,17 @@ function run(dir, dry) {
     if (expected.has(p.rel) && !expected.get(p.rel).equals(bytes)) refuse(`${p.rel}: conflicting install paths; nothing was removed`);
     expected.set(p.rel, bytes);
   }
-  const tracked = new Set([CONFIG, 'USER.md', ...recipe.map(p => p.rel)]);
-  for (const key of cfg.targets) {
+  const tracked = new Set(modern ? [CONFIG, ...Object.keys(cfg.installed)] : [CONFIG, 'USER.md', ...recipe.map(p => p.rel)]);
+  if (!modern) for (const key of cfg.targets) {
     const target = TARGETS[key];
     tracked.add(target.file);
     for (const rel of Object.values(target.boxFiles || {})) tracked.add(rel);
   }
   // Check every tracked file first, including hook/runtime copies and raw paste files.
-  for (const rel of tracked) { read(rel); parentDirs(rel); }
+  for (const rel of tracked) read(rel);
+  // A file recipe says nothing about who created its parent. This applies to legacy
+  // configs too: absent creation records mean an empty directory stays in place.
+  for (const rel of cfg.createdDirectories || []) { dirs.add(rel); probe(rel, 'dir'); }
   // Custom local rules also influence the render. Validate and snapshot them, including
   // README.md which the rule loader skips, so a symlink there cannot hide from preflight.
   if (probe('rules', 'dir')) {
@@ -111,11 +107,17 @@ function run(dir, dry) {
       if (name.endsWith('.md')) read(`rules/${name}`);
     }
   }
-  const rendered = renderer.renderedContents(root, cfg);
+  const rendered = modern
+    ? cfg.targets.flatMap(key => {
+      const target = TARGETS[key];
+      return [{ key, rel: target.file }, ...Object.values(target.boxFiles || {}).map(rel => ({ key, rel, raw: true }))];
+    })
+    : renderer.renderedContents(root, cfg);
   const plan = [];
   const add = (rel, action, output, reason) => plan.push({ rel, action, output, reason });
   for (const entry of rendered) {
     const { rel, key, block, raw } = entry;
+    if (!tracked.has(rel)) continue;
     const bytes = read(rel);
     if (!bytes) continue;
     const recorded = recordedHash(cfg, rel);
@@ -129,7 +131,7 @@ function run(dir, dry) {
     if (ms.kind === 'malformed') refuse(`${rel}: malformed marker block; nothing was removed`);
     // Exact block bytes matter here. --check normalizes CRLF for drift reporting, but
     // uninstall treats even a line-ending edit inside the owned block as an edit.
-    const generated = renderer.splice(null, block, rel);
+    const generated = modern ? '' : renderer.splice(null, block, rel);
     const expectedBlock = generated.slice(0, -1);
     const matchesBlock = ms.kind === 'one' && existing.slice(ms.bStart, ms.eEnd) === expectedBlock;
     if (cfg.preservedTargets && cfg.preservedTargets.includes(key)) {
@@ -162,13 +164,14 @@ function run(dir, dry) {
     }
     add(rel, candidates.some(candidate => candidate.equals(bytes)) ? 'remove' : 'keep', null, 'edited or pre-existing content');
   }
-  const user = read('USER.md');
+  const user = tracked.has('USER.md') ? read('USER.md') : null;
   if (user) {
     const recordedUser = recordedHash(cfg, 'USER.md');
     const userUnedited = recordedUser ? sha256(user) === recordedUser : [false, true].some(ns => user.equals(Buffer.from(onboarding.renderUser(answers, { notesScaffolded: ns }))));
     add('USER.md', userUnedited ? 'remove' : 'keep', null, 'edited');
   }
   for (const [rel, bytes] of expected) {
+    if (!tracked.has(rel)) continue;
     const existing = read(rel);
     if (!existing) continue;
     const recorded = recordedHash(cfg, rel);
@@ -178,6 +181,14 @@ function run(dir, dry) {
     // to comparing against what the currently running package would write.
     const unedited = recorded ? sha256(existing) === recorded : existing.equals(bytes);
     add(rel, unedited ? 'remove' : 'keep', null, 'edited');
+  }
+  // Earlier notes folders, retired rules and all other recorded paths are inventory too.
+  // Current answers cannot erase history, and an unrecorded file is never adopted here.
+  const planned = new Set(plan.map(p => p.rel));
+  if (modern) for (const rel of Object.keys(cfg.installed)) {
+    if (planned.has(rel)) continue;
+    const bytes = read(rel);
+    if (bytes) add(rel, sha256(bytes) === recordedHash(cfg, rel) ? 'remove' : 'keep', null, 'edited');
   }
   if (new Set(plan.map(p => p.rel)).size !== plan.length) refuse('conflicting tracked paths; nothing was removed');
   const retained = plan.filter(p => p.action !== 'remove');

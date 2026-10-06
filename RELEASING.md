@@ -1,6 +1,6 @@
 # Releasing
 
-Maintainer notes. A release is one changelog edit, three version sites, one re-render and five commands. The harness pins what it can; the rest is written here.
+Maintainer notes. Follow the steps below for version sites, rendering, checks and publication. The harness pins what it can; the rest is written here.
 
 1. Every change in the release has a `CHANGELOG.md` line under `[Unreleased]`, naming the audit round or issue that produced it where one did.
 2. Move `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`, add the compare link at the bottom, and point the `[Unreleased]` link at `vX.Y.Z...HEAD`.
@@ -15,7 +15,7 @@ Maintainer notes. A release is one changelog edit, three version sites, one re-r
 
 **How `publish.yml` works.** Manual `workflow_dispatch` with the tag as its input, live since 0.4.1. 0.4.0 was published by hand from the tag checkout by a logged-in maintainer (`npm publish --access public`, no provenance is possible from a laptop), because npm only lets a trusted publisher be configured in the settings of a package that already exists. The job resolves the input through `refs/tags/` and checks out that commit by SHA, so a branch with a tag-like name cannot be published; the tag must equal the `package.json` version; it upgrades npm first (trusted publishing needs npm 11.5.1 or later and Node 22 bundles 10.x), runs the harness, then `npm publish --provenance --access public` with `id-token: write`. No npm token is stored anywhere. The trusted publisher on npm is GitHub Actions, this repository, workflow file `publish.yml`, direct publish allowed.
 
-**Two things GitHub will not tell you.** A workflow file it cannot parse is dropped silently: `gh workflow run` says the workflow has no `workflow_dispatch` trigger, and the workflow list shows the file path where its name should be. It happened here once over an unquoted `: ` in a step name; the harness now parses both workflow files. And a change to this file or to the workflows needs no release: neither ships in the tarball (`files` in `package.json`).
+**Two things GitHub will not tell you.** A workflow file it cannot parse is dropped silently: `gh workflow run` says the workflow has no `workflow_dispatch` trigger, and the workflow list shows the file path where its name should be. It happened here once over an unquoted `: ` in a step name; the harness now parses both workflow files. This guide ships in the tarball so its offline links work. Workflow-only changes can land without a package release.
 
 Optional hardening: put the publish job behind a protected GitHub environment with a required reviewer (a repository setting, not a file change).
 

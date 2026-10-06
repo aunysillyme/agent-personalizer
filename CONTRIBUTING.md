@@ -10,7 +10,7 @@ Contributions are welcome: a **new AI target**, a **notes tool**, an **example u
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 91 checks, exact exit codes, Linux and macOS
+npm test            # sh test/run.sh: 98 checks, exact exit codes, Linux and macOS
 node test/rollback.test.js "$(mktemp -d)"   # after copying examples/freelance-illustrator into it
 node check/gate.cjs --self-test
 ```
@@ -41,4 +41,4 @@ Outside contributors tick the Contributor License Agreement box in the PR descri
 
 ## Releases
 
-Maintainer-only for now: bump `package.json`, add the `CHANGELOG.md` section, tag `vX.Y.Z`, push with tags. The changelog entry names the audit round that produced each change.
+Maintainer-only for now: follow [RELEASING.md](RELEASING.md) for version sites, checks, tags and publication. The changelog entry names the audit round that produced each change.
