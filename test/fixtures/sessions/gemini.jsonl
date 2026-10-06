@@ -1,0 +1,4 @@
+{"sessionId":"gemini-human","projectHash":"invented-project","kind":"main"}
+{"$set":{"messages":[{"id":"old","type":"user","content":[{"text":"REPLACED_EXCLUDED"}]}]}}
+{"$set":{"messages":[{"id":"one","type":"user","content":[{"text":"Ask before changing the scope."}]},{"id":"assistant","type":"gemini","content":[{"text":"GEMINI_REPLY_EXCLUDED"}]}]}}
+{"$set":{"messages":[{"id":"one","type":"user","content":[{"text":"Ask before changing the scope."}]},{"id":"two","type":"user","content":[{"text":"Keep the scope small."}]},{"id":"image","type":"user","content":[{"type":"image","text":"GEMINI_IMAGE_EXCLUDED"}]}]}}

@@ -2,13 +2,18 @@
 
 *Who I am, how to talk to me, how firmly I mean things, how I want output shaped. Every AI reads this first. Edit this file, never the rendered ones.*
 
-## Who I am
+## About me
 
 - **Name and pronouns:** Mara, she/her
 - **What I do:** freelance illustrator. Book covers and editorial work, some client branding on the side.
 - **Current focus:** a 12-cover fantasy series for one publisher (due in November), and getting my own print shop live.
 - **What everything I do has in common:** I draw first, then build a system around whatever I had to do twice. The system is the product I sell to other illustrators.
 - **Off limits:** my health notes and my journal folder never appear in anything shareable. Client contract terms never leave the client's folder.
+
+## What I've taught my AI
+
+- Compare palettes in a table with a small swatch description.
+- Show one rough composition before polishing its details.
 
 ## How to talk to me
 

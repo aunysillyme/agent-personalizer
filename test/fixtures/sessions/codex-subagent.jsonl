@@ -1,0 +1,2 @@
+{"type":"session_meta","payload":{"id":"codex-subagent","source":{"subagent":{"other":"reviewer"}}}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"SUBAGENT_SESSION_EXCLUDED"}]}}

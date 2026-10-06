@@ -501,7 +501,8 @@ pass "nested --dir scans modified tracked files' working-tree copies"
 mk; T="$MK"
 expect 0 "installer with answers" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --answers test/fixtures/answers.json --yes
 for f in AGENT_ONBOARDING.md USER.md .agent-personalizer.json; do [ -f "$T/$f" ] || fail "onboarding: $f not written"; done
-grep -q 'Call them:\*\* Mara (she/her)' "$T/AGENT_ONBOARDING.md" || fail "onboarding: name/pronouns missing"
+grep -q '## About me' "$T/USER.md" || fail "legacy About me missing"
+grep -q 'Call them:' "$T/AGENT_ONBOARDING.md" && fail "identity still rendered into onboarding"
 grep -q 'a kanban board the AI reads' "$T/AGENT_ONBOARDING.md" || fail "onboarding: tracker missing"
 grep -q 'signed contracts' "$T/AGENT_ONBOARDING.md" || fail "onboarding: off-limits missing"
 grep -q 'start a reply with Great question' "$T/AGENT_ONBOARDING.md" || fail "onboarding: never-list missing"
@@ -515,9 +516,9 @@ expect 0 "installer rerun" node bin/agent-personalizer.js --dir "$T" --ai claude
 cmp -s "$T/USER.md" "$T/USER.md.expected" || fail "rerun changed USER.md"
 grep -q '"name": "Mara"' "$T/.agent-personalizer.json" || fail "rerun lost the onboarding answers"
 node render/render.cjs --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract failed"
-grep -q 'How to work with Mara' "$T/c.txt" || fail "contract missing the onboarding block"
+grep -q 'How to work with this person' "$T/c.txt" || fail "contract missing the onboarding block"
 node render/render.cjs --dir "$T" --contract --contract-target claude --no-personal > "$T/c2.txt" || fail "contract --no-personal failed"
-grep -q 'How to work with Mara' "$T/c2.txt" && fail "--no-personal still emitted the onboarding block"
+grep -q 'How to work with this person' "$T/c2.txt" && fail "--no-personal still emitted the onboarding block"
 pass "onboarding: answers render both files, check clean, rerun keeps answers, contract carries the block"
 
 # 56. onboarding: invalid answers are refused before anything is created
@@ -536,7 +537,8 @@ pass "onboarding: bad choice, unknown key, wrong type, unknown multi, multiline,
 mk; T="$MK"
 node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes > "$T/out.txt" || fail "installer defaults"
 grep -q 'onboarding: defaults' "$T/out.txt" || fail "installer did not say it used defaults"
-grep -q 'Call them:\*\* the user' "$T/AGENT_ONBOARDING.md" || fail "defaults not rendered"
+grep -q 'nothing confirmed yet' "$T/USER.md" || fail "default learned section missing"
+grep -q 'Name and pronouns:' "$T/USER.md" && fail "default identity still rendered"
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": ["claude"]}' > "$T/.agent-personalizer.json"
 expect 2 "onboarding target without answers" node render/render.cjs --dir "$T" --targets onboarding
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"; printf '{"targets": ["claude"], "onboarding": {"tone": "rude"}}' > "$T/.agent-personalizer.json"
@@ -551,8 +553,8 @@ JSON
 expect 0 "adversarial answers install" node bin/agent-personalizer.js --dir "$T" --ai claude,chatgpt,prompt --level 1 --answers "$F/adv.json" --yes
 expect 0 "adversarial answers check" node render/render.cjs --dir "$T" --check
 grep -q '^- \\~\\~\\~' "$T/AGENT_ONBOARDING.md" || fail "tilde fence in a list answer was not escaped"
-grep -q '^\\# Not A Heading\|\\# Not A Heading' "$T/AGENT_ONBOARDING.md" || fail "heading marker in name was not escaped"
-grep -q '\\<!-- not a comment --\\>' "$T/AGENT_ONBOARDING.md" || fail "HTML comment delimiters were not escaped"
+grep -q '^\\# Not A Heading\|\\# Not A Heading' "$T/USER.md" || fail "heading marker in legacy name was not escaped"
+grep -q '\\<!-- not a comment --\\>' "$T/USER.md" || fail "HTML comment delimiters in legacy work were not escaped"
 grep -q '\\- a list item' "$T/AGENT_ONBOARDING.md" || fail "leading list marker in an answer was not escaped"
 grep -c '^~~~' "$T/AGENT_ONBOARDING.md" | grep -q '^0$' || fail "a raw fence line reached the generated file"
 node render/render.cjs --dir "$T" --contract --contract-target claude > "$T/c.txt" || fail "contract with adversarial answers"
@@ -572,8 +574,8 @@ mk; C="$MK"; printf '{"targets": ["claude"], "level": 999}' > "$C/.agent-persona
 expect 2 "stored level out of range" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
 mk; C="$MK"; printf '{"targets": ["agents"], "level": 2}' > "$C/.agent-personalizer.json"
 expect 0 "stored valid config merges" node bin/agent-personalizer.js --dir "$C" --ai claude --level 1 --yes
-grep -q '"agents"' "$C/.agent-personalizer.json" && grep -q '"claude"' "$C/.agent-personalizer.json" && grep -q '"level": 2' "$C/.agent-personalizer.json" || fail "merge lost a stored target or lowered the level"
-[ -f "$C/AGENTS.md" ] || fail "merged target list was not rendered"
+grep -q '"claude"' "$C/.agent-personalizer.json" && grep -q '"level": 1' "$C/.agent-personalizer.json" || fail "explicit selection or level failed to override config"
+[ -f "$C/CLAUDE.md" ] || fail "chosen target was not rendered"
 expect 0 "merged config renders plain" node render/render.cjs --dir "$C" --check
 pass "adversarial answers inert, marker answers refused, malformed stored config refused untouched, valid config merged and rendered"
 
@@ -614,7 +616,7 @@ done
 # obsidian without obsidian-tc (default): plain files, companion recommended, contract does not claim obsidian-tc
 grep -q 'as plain files (obsidian-tc is not installed' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian without tc: plain-files line missing"
 grep -q 'rather than raw filesystem access' "$T/obsidian/AGENT_ONBOARDING.md" && fail "obsidian without tc: rendered as mandatory"
-grep -q 'answer yes' "$F/obsidian.hint" || fail "obsidian without tc: hint should recommend installing it"
+grep -q 'set obsidian_tc to yes through --answers' "$F/obsidian.hint" || fail "obsidian without tc: hint should recommend installing it"
 node render/render.cjs --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' && fail "contract claims obsidian-tc when not installed"
 # obsidian with obsidian-tc
 printf '{"notes_tool": "obsidian", "obsidian_tc": "yes", "notes_path": "MyVault"}' > "$F/tc.json"
@@ -721,14 +723,14 @@ node bin/agent-personalizer.js --dir "$T" --ai agents,chatgpt --level 3 --answer
 grep -q 'update USER.md (regenerated' "$F/out.txt" || fail "untouched USER.md was not regenerated"
 grep -q 'ChangedPerson' "$T/USER.md" && ! grep -q 'AuditPerson' "$T/USER.md" || fail "USER.md kept the old name"
 grep -q 'ChangedPerson' "$T/AGENTS.md" && ! grep -q 'AuditPerson' "$T/AGENTS.md" || fail "AGENTS.md profile kept the old name"
-grep -q 'ChangedPerson' "$T/AGENT_ONBOARDING.md" || fail "onboarding missing the new name"
+grep -q 'ChangedPerson' "$T/AGENT_ONBOARDING.md" && fail "legacy identity still rendered into onboarding"
 expect 0 "rerun check" node render/render.cjs --dir "$T" --check
 printf '\nMY HAND EDIT\n' >> "$T/USER.md"; cp "$T/USER.md" "$T/USER.expected"
 printf '{"name":"ThirdPerson","structure":"tables-when-comparing"}' > "$F/a.json"
 node bin/agent-personalizer.js --dir "$T" --ai agents,chatgpt --level 3 --answers "$F/a.json" --yes > "$F/out2.txt" || fail "rerun after edit"
 cmp -s "$T/USER.md" "$T/USER.expected" || fail "an edited USER.md was rewritten"
 grep -q 'ANSWERS CHANGED: name' "$F/out2.txt" || fail "conflict not named"
-grep -q 'ThirdPerson' "$T/AGENT_ONBOARDING.md" || fail "onboarding missing the third name"
+grep -q '"name": "ThirdPerson"' "$T/.agent-personalizer.json" || fail "saved legacy identity missing"
 grep -qF 'MY HAND EDIT' "$T/chatgpt-box1.txt" || fail "ChatGPT did not receive the edited profile"
 grep -q 'ThirdPerson' "$T/chatgpt-box1.txt" && fail "ChatGPT used the new answers instead of the kept profile"
 expect 0 "conflict check" node render/render.cjs --dir "$T" --check
@@ -763,13 +765,14 @@ grep -q 'ASK BEFORE EVERY WRITE' "$T/p/chatgpt-custom-instructions.md" || fail "
 grep -q 'Copy only the text inside the fence' "$T/p/chatgpt-custom-instructions.md" || fail "ChatGPT render does not say what to copy"
 [ -f "$T/p/chatgpt-box1.txt" ] && [ -f "$T/p/chatgpt-box2.txt" ] || fail "ChatGPT box files not written"
 grep -q 'ASK BEFORE EVERY WRITE' "$T/p/chatgpt-box2.txt" || fail "box2.txt lacks the write policy"
-grep -q '^Call me the user' "$T/p/chatgpt-box1.txt" || fail "box1.txt lacks the compact profile"
+grep -q '^How firmly I mean things:' "$T/p/chatgpt-box1.txt" || fail "box1.txt lacks the compact profile"
+grep -q '^Call me the user' "$T/p/chatgpt-box1.txt" && fail "default identity still in the compact profile"
 grep -q '^>' "$T/p/chatgpt-box1.txt" && fail "box file carries markdown decoration"
 printf 'x\n' >> "$T/p/chatgpt-box1.txt"
 expect 1 "box file drift" node render/render.cjs --dir "$T/p" --check
 grep -q 'PrivateTopicMarker' "$T/p/chatgpt-custom-instructions.md" || fail "off-limits missing from the ChatGPT render"
-grep -q 'AGENT_ONBOARDING.md' "$T/p/chatgpt-custom-instructions.md" | head -1
-awk '/Box 2/{b=1} b && /Always ask before/{a=NR} b && /Directness/{d=NR} END{exit !(a && d && a<d)}' "$T/p/chatgpt-custom-instructions.md" || fail "box 2 does not put restrictions before style"
+grep -q 'AGENT_ONBOARDING.md' "$T/p/chatgpt-custom-instructions.md" || fail "ChatGPT project upload guidance missing"
+awk '/Box 2/{b=1} b && /Always ask before/{a=NR} b && /Tone:/{d=NR} END{exit !(a && d && a<d)}' "$T/p/chatgpt-custom-instructions.md" || fail "box 2 does not put restrictions before style"
 # overflow: 40 long off-limits entries; written in full, flagged, exit 0, check clean
 node -e 'const o=[];for(let i=0;i<40;i++)o.push("topic-"+i+"-"+"x".repeat(60));require("fs").writeFileSync(process.argv[1],JSON.stringify({off_limits:o}))' "$F/big.json"
 node bin/agent-personalizer.js --dir "$T/b" --ai chatgpt --level 1 --answers "$F/big.json" --yes > "$F/big.out" || fail "overflow install"
@@ -906,22 +909,22 @@ v="$(node -p 'require("./package.json").version')"
 node render/render.cjs --version | grep -q "^$v\$" || fail "renderer --version is not $v"
 node check/gate.cjs --version | grep -q "gate $v\$" || fail "gate --version is not $v"
 rm -f /tmp/ap-h.txt
-# (#18) a non-terminal stdin with all flags and no --yes uses the defaults and SAYS so on stderr; with flags missing it refuses
+# Scripted first installs need explicit --yes and never collect session history.
 mk; T="$MK"
-printf '' | node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 > "$T/out.txt" 2> "$T/err.txt" || fail "piped stdin install"
-grep -q 'stdin is not a terminal' "$T/err.txt" || fail "no stderr notice when stdin is not a terminal"
-grep -q 'stdin is not a terminal' "$T/out.txt" || fail "answers source line does not name the non-terminal stdin"
+expect 2 "first piped install needs --yes" node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1
+expect 0 "scripted defaults" node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --yes
+[ ! -e "$T/p/.agent-personalizer/digest.md" ] || fail "scripted install read sessions"
 printf '' | node bin/agent-personalizer.js --dir "$T/q" > /dev/null 2>&1; got=$?; [ "$got" -eq 2 ] || fail "flags missing on a non-terminal stdin: expected exit 2, got $got"
-pass "--help/-h and --version/-v on all three entry points; non-terminal stdin defaults with a notice (#16, #17, #18)"
+pass "--help/-h and --version/-v on all entry points; scripted first installs need --yes and read no sessions"
 
 # 74. the TOOL table is the single source: interview options equal its keys, every kind is one of four
 node -e 'const o=require("./render/onboarding.cjs");const q=o.QUESTIONS.find(x=>x.id==="notes_tool");const a=q.options.map(x=>x[0]).join(",");const b=Object.keys(o.TOOL).join(",");if(a!==b)throw new Error(a+" vs "+b);for(const [k,t] of Object.entries(o.TOOL)) if(!["disk","cloud","readonly","other"].includes(t.kind)) throw new Error(k+" kind "+t.kind);' || fail "TOOL table and interview options diverged"
-pass "notes tools: one table drives the interview and the kinds"
+pass "notes tools: one table drives saved choices and note kinds"
 
-# 75. level 1 is three files (plus the config): rules render from the package, home pointers say so, check clean
+# 75. level 1 includes entries and the command (seven files with the config): rules render from the package, home pointers say so, check clean
 mk; T="$MK"
 expect 0 "level 1" node bin/agent-personalizer.js --dir "$T" --ai claude,agents --level 1 --yes
-[ "$(find "$T" -type f | wc -l | tr -d ' ')" = "5" ] || { find "$T" -type f; fail "level 1 wrote more than USER.md, AGENT_ONBOARDING.md, CLAUDE.md, AGENTS.md and the config"; }
+[ "$(find "$T" -type f | wc -l | tr -d ' ')" = "7" ] || { find "$T" -type f; fail "level 1 file inventory differs from profile, entries, 3 instruction files, command and config"; }
 [ ! -e "$T/rules" ] || fail "level 1 copied rules/"
 grep -q 'owner: the rendered block below' "$T/CLAUDE.md" || fail "level-1 home file still points at rules/ files"
 grep -q 'owning copy' "$T/CLAUDE.md" && fail "level-1 home file lists a rules/ folder it does not have"
@@ -930,7 +933,7 @@ expect 0 "level 1 check" node render/render.cjs --dir "$T" --check
 mk; E="$MK"; cp render/render.cjs render/onboarding.cjs render/targets.json "$E/"; printf 'p\n' > "$E/USER.md"
 expect 2 "copied renderer without rules" node "$E/render.cjs" --dir "$E" --targets claude
 expect 0 "--rules explicit" node "$E/render.cjs" --dir "$E" --targets claude --rules rules
-pass "level 1 writes three files and renders the package rules; a renderer with no rules refuses; --rules names them"
+pass "level 1 includes entries and the Claude command and renders package rules; a renderer with no rules refuses; --rules names them"
 
 # 76. the config stores only the answers that differ from the defaults
 mk; T="$MK"; mk; F="$MK"
@@ -940,19 +943,19 @@ printf '{"name":"Sparse","tone":"gentle"}' > "$F/a.json"
 expect 0 "sparse install" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --answers "$F/a.json" --yes
 node -e 'const o=require("./render/onboarding.cjs");const c=require(process.argv[1]+"/.agent-personalizer.json");const k=Object.keys(c.onboarding).sort().join(",");const want=[...o.PINNED,"name","tone"].sort().join(",");if(k!==want)throw new Error(k+" vs "+want)' "$T/s" || fail "config should store the two chosen answers plus the pinned keys"
 expect 0 "sparse rerun" node bin/agent-personalizer.js --dir "$T/s" --ai claude --level 1 --yes
-grep -q 'Call them:\*\* Sparse' "$T/s/AGENT_ONBOARDING.md" || fail "rerun lost the sparse answers"
+grep -q 'Name and pronouns:\*\* Sparse' "$T/s/USER.md" || fail "rerun lost the sparse legacy answer"
 expect 0 "sparse check" node render/render.cjs --dir "$T/s" --check
 pass "config is sparse (pinned safety keys always kept) and round-trips"
 
-# 77. --answers - reads stdin; --quick refuses a non-interactive run
+# 77. --answers - reads stdin; --quick remains an accepted noop.
 mk; T="$MK"
 printf '{"name":"Piped"}' | node bin/agent-personalizer.js --dir "$T/p" --ai claude --level 1 --answers - --yes > "$T/out.txt" || fail "stdin answers install"
 grep -q 'from stdin' "$T/out.txt" && grep -q 'Piped' "$T/p/USER.md" || fail "stdin answers were not used"
 printf 'not json' | node bin/agent-personalizer.js --dir "$T/q" --ai claude --level 1 --answers - --yes >/dev/null 2>&1; got=$?; [ "$got" -eq 2 ] || fail "bad stdin answers: expected exit 2, got $got"
 [ ! -e "$T/q" ] || fail "bad stdin answers created a folder"
-expect 2 "--quick non-interactive" node bin/agent-personalizer.js --dir "$T/r" --ai claude --level 1 --quick --yes
-[ ! -e "$T/r" ] || fail "--quick refusal created a folder"
-pass "--answers - reads stdin; malformed stdin refused; --quick needs a terminal"
+expect 0 "--quick accepted noop" node bin/agent-personalizer.js --dir "$T/r" --ai claude --level 1 --quick --yes
+[ -f "$T/r/LEARNED.md" ] || fail "--quick noop failed to install"
+pass "--answers - reads stdin; malformed stdin refused; --quick installs without an interview"
 
 # 78. --strict: an over-budget ChatGPT box exits 1 and writes nothing; without --strict it writes and flags
 mk; T="$MK"; mk; F="$MK"
@@ -1010,7 +1013,8 @@ grep -q 'run: node test/ap-regressions.cjs core' .github/workflows/harness.yml |
 grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
 pass "publish workflow dormant and provenance-ready; Node 18/20/22/24, Windows journeys and consumer install present; Repository checks gates every job; LF pinned"
 
-# 81. the quoted check count matches the number of checks, everywhere it is quoted
+# 81. Numbered suites count their pass lines; reader and learning assertions live within those suites.
+# The quoted suite count matches everywhere it is quoted, including the CI entry point.
 n="$(grep -c '^[[:space:]]*pass "' test/run.sh)"
 grep -q "^# Every check in this repo, and proof that each one can fail. $n checks\." test/run.sh || fail "run.sh header does not say $n checks"
 grep -q "run.sh: $n checks" README.md || fail "README does not say $n checks"
@@ -1090,7 +1094,7 @@ pass "(#20) one verb per file: wrote a new file, update a changed block, ok an u
 #     F7 names both exported files beside their purpose and follows the current interface activation step.
 mk; T="$MK"; RT="$(cd "$T" && pwd -P)" || fail "resolve temp dir"
 node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --yes > "$T/one.txt" || fail "single-AI install"
-grep -qF -- "--dir $RT --ai claude" "$T/one.txt" || fail "the rerun command does not name the installed folder"
+grep -qF -- "--dir $RT" "$T/one.txt" || fail "the rerun command does not name the installed folder"
 grep -qF -- '--dir . --ai' "$T/one.txt" && fail "the rerun command still says --dir ."
 grep -qF "Read from $RT automatically, nothing to paste: CLAUDE.md (Claude Code)" "$T/one.txt" || fail "the files read automatically are not named"
 grep -qF 'claude.ai and the Claude apps read no files' "$T/one.txt" || fail "the paste step for claude.ai is missing"
@@ -1104,8 +1108,7 @@ grep -qF 'Settings → Personalization and enable customization' "$T2/many.txt" 
 grep -qF 'fields your current interface provides, checking its displayed limits' "$T2/many.txt" || fail "the ChatGPT paste step assumes fixed interface fields"
 pass "(#21) the Next block names the installed folder, splits automatic from paste, links the paste guide, companions only for several agents"
 
-# 87. (#22, #23) level 4 is no longer offered and still installs level 3; the interview is SHORT by default
-#     and asks a conditional question only when the chosen notes tool makes it apply
+# 87. Level 4 aliases level 3; old interview flags are noops; streamed readers keep typed evidence.
 grep -qF -- '--level 1|2|3]' bin/agent-personalizer.js || fail "the usage still offers level 4"
 grep -qF -- '4 pointers to the multi-agent layer' bin/agent-personalizer.js && fail "the usage still describes level 4 as an install level"
 grep -qF -- '--level 1|2|3|4' README.md && fail "the README still offers level 4 as an install level"
@@ -1113,24 +1116,18 @@ mk; T="$MK"
 node bin/agent-personalizer.js --dir "$T" --ai claude --level 4 --yes > "$T/l4.txt" || fail "--level 4 refused"
 grep -qF 'installs exactly what --level 3 installs' "$T/l4.txt" || fail "--level 4 does not say it is level 3"
 [ -f "$T/rules/50-output-style.md" ] && [ -f "$T/render/render.cjs" ] || fail "--level 4 did not install what level 3 installs"
-expect 2 "quick and full together" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --quick --full --yes
-expect 2 "full without a terminal" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --yes
-expect 2 "full with defaults" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --defaults
+expect 0 "quick and full noops" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --quick --full --yes
+expect 0 "full without a terminal" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --yes
+expect 0 "full with defaults on rerun" node bin/agent-personalizer.js --dir "$T" --ai claude --level 1 --full --defaults
 node -e '
-const o = require("./render/onboarding.cjs");
-const asked = (full, tool) => { const raw = {}, out = [];
-  for (const q of o.QUESTIONS) { if (!o.asks(q, raw, full)) continue; out.push(q.id);
-    raw[q.id] = q.id === "notes_tool" ? tool : (Array.isArray(q.default) ? [...q.default] : q.default); }
-  return out; };
-const eq = (a, b, why) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error(why, JSON.stringify(a), "!=", JSON.stringify(b)); process.exit(1); } };
-eq(asked(false, "folder"), o.QUICK, "the short interview is not exactly the quick set for a plain folder");
-eq(asked(false, "obsidian").includes("obsidian_tc"), true, "the short interview skips the Obsidian question for an Obsidian vault");
-eq(asked(false, "obsidian").includes("notes_tool_name"), false, "the short interview asks for a tool name when the tool is Obsidian");
-eq(asked(false, "other").includes("notes_tool_name"), true, "the short interview does not ask for the name of an unnamed tool");
-eq(asked(true, "notion").includes("obsidian_tc"), false, "the full interview asks the Obsidian question about Notion");
-eq(asked(true, "notion").length, o.QUESTIONS.length - 2, "the full interview does not skip both conditional questions");
-' || fail "the interview asks the wrong set of questions"
-pass "(#22, #23) level 4 is not offered and still installs level 3; the interview is short by default and conditional questions apply only when they apply"
+const o=require("./render/onboarding.cjs");
+if(o.QUESTIONS.some(q=>["name","pronouns","work","focus"].includes(q.id))) throw new Error("legacy identity in question set");
+for (const q of o.QUESTIONS) for(const full of [false,true]) if(o.asks(q,o.defaults(),full)) throw new Error("questionnaire remains");
+const a=o.validate({name:"Legacy",pronouns:"they/them",work:"Invented work",focus:"Draft",off_limits:["private"]});
+if(a.name!=="Legacy"||a.off_limits[0]!=="private")throw new Error("legacy answers lost");
+' || fail "questionnaire or legacy answer regression"
+node test/sessions.test.cjs || fail "streamed session reader regressions"
+pass "level 4 aliases 3; interview flags are noops, settings preserve legacy values; typed session readers are bounded"
 
 # 88. (#24) the files the AI reads speak to the AI ("settle facts yourself"), and every angle-bracket
 #     placeholder in templates/ sits inside a code span, so GitHub cannot eat it as an HTML tag
@@ -1308,6 +1305,7 @@ pass "packed Markdown relative links resolve inside npm pack --dry-run inventory
 
 # 98. Interactive re-runs keep saved defaults and skipped answers, including off-limits boundaries.
 node test/ap-regressions.cjs RERUN || fail "interactive saved-answer regressions"
-pass "interactive re-runs keep saved defaults, skipped answers and off-limits; first installs and answer sources unchanged"
+node test/learning.test.cjs || fail "learning privacy and rendering regressions"
+pass "session learning: consent, entries, forget and uninstall; interactive re-runs preserve saved answers without prompts"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

@@ -1,10 +1,11 @@
 # Documentation
 
-agent-personalizer turns an interview into a profile and the instruction files each AI reads. Start with installation, then choose the guides for your setup.
+agent-personalizer writes shared AI instructions and, with your consent, helps your AI learn from your recent sessions. Start with installation, then choose the guides for your setup.
 
 | Guide | What it gives you |
 |---|---|
 | [Install and use](install.md) | Interactive setup, scripted answers, flags, updates and uninstall. |
+| [Learning and privacy](learning.md) | Consent, session sources, evidence-backed questions, shared entries and forgetting the digest. |
 | [Instruction tiers](tiers.md) | Where style, home files, session contracts, rule owners and memory belong. |
 | [Paste guide](paste-guide.md) | Which file each AI reads and how to refresh pasted instructions. |
 | [Companion tools](companions.md) | Notes connectors, access controls and approval mechanisms. |

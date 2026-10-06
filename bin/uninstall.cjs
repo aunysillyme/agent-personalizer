@@ -84,12 +84,34 @@ function run(dir, dry) {
   const homeNames = new Set(['CLAUDE.md', 'AGENTS.md']);
   const expected = new Map();
   for (const p of recipe) {
-    if (homeNames.has(p.rel)) continue; // compare these after rendering their block
+    if (homeNames.has(p.rel) || p.rel === 'LEARNED.md') continue; // entries always belong to the user
     const bytes = p.src ? fs.readFileSync(p.src) : Buffer.from(p.text);
     if (expected.has(p.rel) && !expected.get(p.rel).equals(bytes)) refuse(`${p.rel}: conflicting install paths; nothing was removed`);
     expected.set(p.rel, bytes);
   }
   const tracked = new Set(modern ? [CONFIG, ...Object.keys(cfg.installed)] : [CONFIG, 'USER.md', ...recipe.map(p => p.rel)]);
+  tracked.delete('LEARNED.md');
+  // The digest is disposable private material, independent of installed-file hashes.
+  const digestFolder = '.agent-personalizer';
+  const digestFiles = [];
+  function collectDigest(rel) {
+    const full = probe(rel, 'dir');
+    if (!full) return;
+    const names = fs.readdirSync(full).sort();
+    observations.get(rel).children = names;
+    dirs.add(rel);
+    for (const name of names) {
+      const child = `${rel}/${name}`;
+      const info = fs.lstatSync(path.join(root, child));
+      if (info.isDirectory() && !info.isSymbolicLink()) collectDigest(child);
+      else { read(child); digestFiles.push(child); }
+    }
+  }
+  // The whole private folder is removed by uninstall. Validate even unexpected descendants
+  // before planning any deletion, so a symlink cannot turn this into a wider removal.
+  collectDigest(digestFolder);
+  for (const rel of digestFiles) tracked.add(rel);
+  const learned = read('LEARNED.md');
   if (!modern) for (const key of cfg.targets) {
     const target = TARGETS[key];
     tracked.add(target.file);
@@ -115,6 +137,7 @@ function run(dir, dry) {
     : renderer.renderedContents(root, cfg);
   const plan = [];
   const add = (rel, action, output, reason) => plan.push({ rel, action, output, reason });
+  for (const rel of digestFiles) if (read(rel)) add(rel, 'remove', null, 'private digest data');
   for (const entry of rendered) {
     const { rel, key, block, raw } = entry;
     if (!tracked.has(rel)) continue;
@@ -171,7 +194,7 @@ function run(dir, dry) {
     add('USER.md', userUnedited ? 'remove' : 'keep', null, 'edited');
   }
   for (const [rel, bytes] of expected) {
-    if (!tracked.has(rel)) continue;
+    if (!tracked.has(rel) || digestFiles.includes(rel)) continue;
     const existing = read(rel);
     if (!existing) continue;
     const recorded = recordedHash(cfg, rel);
@@ -186,7 +209,7 @@ function run(dir, dry) {
   // Current answers cannot erase history, and an unrecorded file is never adopted here.
   const planned = new Set(plan.map(p => p.rel));
   if (modern) for (const rel of Object.keys(cfg.installed)) {
-    if (planned.has(rel)) continue;
+    if (planned.has(rel) || rel === 'LEARNED.md') continue;
     const bytes = read(rel);
     if (bytes) add(rel, sha256(bytes) === recordedHash(cfg, rel) ? 'remove' : 'keep', null, 'edited');
   }
@@ -207,7 +230,8 @@ function run(dir, dry) {
     const full = probe(rel, saved.kind);
     if (!full) refuse(`${rel} changed during preflight; nothing was removed`);
     const now = fs.lstatSync(full);
-    if (now.dev !== saved.info.dev || now.ino !== saved.info.ino || now.mode !== saved.info.mode || (saved.bytes && !fs.readFileSync(full).equals(saved.bytes)))
+    if (now.dev !== saved.info.dev || now.ino !== saved.info.ino || now.mode !== saved.info.mode || (saved.bytes && !fs.readFileSync(full).equals(saved.bytes))
+        || (saved.children && JSON.stringify(fs.readdirSync(full).sort()) !== JSON.stringify(saved.children)))
       refuse(`${rel} changed during preflight; nothing was removed`);
   }
   for (const rel of [...plan.filter(p => p.action !== 'keep').map(p => p.rel), ...emptyDirs, ...(removeConfig ? [CONFIG] : [])]) {
@@ -216,6 +240,7 @@ function run(dir, dry) {
   }
   const label = dry ? 'would ' : '';
   if (dry) console.log('Dry run: preview only; no files changed.');
+  if (learned) console.log('kept   LEARNED.md (your entries, edited or untouched)');
   for (const p of plan) {
     if (p.action === 'keep') { console.log(`kept   ${p.rel} (${p.reason})`); continue; }
     if (!dry) {
@@ -243,6 +268,7 @@ function run(dir, dry) {
     }
     console.log(`${label}remove ${rel}/ (empty)`);
   }
+  if (!dry && probe(digestFolder, 'dir')) refuse(`${digestFolder}/ changed during removal; ${CONFIG} kept, review its remaining contents`);
   // Config is always the final removal. A kept tracked path keeps the record for review.
   if (removeConfig) {
     if (!dry) {

@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/agent-personalizer.svg)](https://www.npmjs.com/package/agent-personalizer) [![harness](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml/badge.svg)](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml) [![release](https://img.shields.io/github/v/tag/aunysillyme/agent-personalizer?label=release)](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Answer a few questions once, and every AI you use gets the same profile and the rules it can carry:** Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
+**Every AI you use gets the same profile and the rules it can carry:** Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
 
 **The problem:** Custom instructions live in each app separately, drift apart and fade over a long chat.
 
@@ -21,6 +21,8 @@ npx agent-personalizer
 | Part | What it gives you |
 |---|---|
 | `USER.md` | Your profile, communication preferences and how firmly you mean things. It owns the profile in every profile export. |
+| `LEARNED.md` | Entries you confirmed or declined, shared with every personal AI target you selected. |
+| Local session digest | With your yes, recent typed messages your AI uses to ask up to five evidence-backed questions. |
 | `AGENT_ONBOARDING.md` | Your AI's reading order, writing policy, off-limits topics and approval steps. |
 | `CLAUDE.md` | Your profile and selected rules in Claude Code's project instruction file. |
 | `AGENTS.md` | Your profile and selected rules in the project file used by Codex and Cursor. |
@@ -39,6 +41,8 @@ npx agent-personalizer
 
 Start your AI in the installed project folder. Ask it which instruction file loaded and what your writing policy is. Confirm those answers against AGENT_ONBOARDING.md before the first write.
 
+If you accepted session reading, Claude Code's `/personalize`, or the procedure in Codex and Gemini CLI's home files, asks up to five questions with a count and a short quote. Yes records a confirmed entry; no records a declined entry that is never asked again. Every approved entry reaches your selected personal AI files. As you work, a second correction of the same thing prompts one "Make it a rule?" question.
+
 For ChatGPT, open Settings → Personalization and enable customization. Copy the exported profile (`chatgpt-box1.txt`) and response instructions (`chatgpt-box2.txt`) into the fields your current interface provides, checking its displayed limits. Re-paste after updates; the [paste guide](docs/paste-guide.md) covers each app.
 
 File generation, re-runs and uninstall run in CI on Linux, macOS and Windows; your client's context view confirms loading on your setup.
@@ -55,11 +59,7 @@ Three open-source tools that work on their own and fit together:
 
 ## Choose your setup
 
-The short interview asks seven base questions, plus any that apply to your notes tool. Enter accepts each default. For the full interview, which asks up to 23 applicable questions:
-
-```bash
-npx agent-personalizer --full
-```
+The first install asks for a folder if `--dir` is missing, then which AIs you use and whether it may read your past sessions. The AI choices are pre-selected from installed Claude Code, Codex and Gemini CLI folders; Enter accepts them. Consent defaults to No. Level 1 is the default; `--level` selects another. There is no questionnaire. Working preferences keep safe defaults and remain editable through `--answers` or the saved config.
 
 | Level | What you get |
 |---|---|
@@ -75,11 +75,17 @@ npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
 
 Node 22 or 24 (active LTS) is recommended; 18 or later runs. Published on npm with provenance. [Installation](docs/install.md) covers scripted answers, every flag, notes tools and manual copying.
 
-The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls, send no telemetry and read no environment variables. Writes stay inside the folder you name, with edited files preserved and named.
+The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls and send no telemetry. Writes stay inside the folder you name, with edited files preserved and named.
+
+## Privacy
+
+With your yes, learning reads up to 20 recent sessions kept by your selected Claude Code, Codex or Gemini CLI apps, plus Codex memory notes. It keeps typed messages, drops AI replies and tool output, and saves one local `.agent-personalizer/digest.md` ignored by git. The terminal lists files and counts, never message text. Your AI reads the digest, so its contents go to that provider again, like anything you paste in.
+
+Reuse only history you are allowed to share. Past sessions can include other people's details; put their names or other private terms in `check/forbidden.local.txt` before accepting. Check your agreement for work or client accounts. `npx agent-personalizer learn --forget` deletes the digest, and uninstall removes it too; both leave your AI apps' history alone. agent-personalizer is not affiliated with Anthropic, OpenAI or Google, and their saved formats can change. See [learning and privacy](docs/learning.md).
 
 ## Keep it in sync
 
-Re-run the installer to change answers or upgrade an install. Use the interview or supply a JSON file:
+Re-run the installer to refresh an install. It asks nothing and keeps your saved AIs, level and answers. To change answers, supply a JSON file:
 
 ```bash
 npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json
@@ -89,7 +95,9 @@ Untouched installer files update to what a fresh install with those answers woul
 
 `USER.md` updates while it remains an untouched installer profile. An edited or pre-existing profile stays the source for every profile export, including ChatGPT. Changed onboarding answers are named so you can carry them into your profile by hand.
 
-At level 3, edit `USER.md` or a source in `rules/`, then render and check:
+`LEARNED.md` is user-owned from its first install and never overwritten by a re-run. To gather newer evidence, run `npx agent-personalizer learn --dir .`; each read needs consent.
+
+At level 3, edit `USER.md`, `LEARNED.md` or a source in `rules/`, then render and check:
 
 ```bash
 node render/render.cjs --dir .
@@ -121,10 +129,10 @@ The gate checks file text and paths against that list. A missing or malformed li
 
 ## Companion tools
 
-Select your notes tool during the full interview:
+Select your notes tool through saved onboarding answers or an answers file:
 
 ```bash
-npx agent-personalizer --full
+npx agent-personalizer --dir . --answers my-answers.json
 ```
 
 [Companion setup](docs/companions.md) explains notes connectors and how to turn onboarding answers into tool permissions and approval steps.
@@ -146,7 +154,7 @@ Choose targets with `npx agent-personalizer --dir . --ai claude,agents,gemini,ch
 
 ### How do I update my AI profile or change an answer?
 
-For answers, run `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --answers my-answers.json`. At level 3, edit `USER.md` or `rules/`, then run `node render/render.cjs --dir .`; re-paste changed chat exports.
+For answers, run `npx agent-personalizer --dir . --answers my-answers.json`. At level 3, edit `USER.md`, `LEARNED.md` or `rules/`, then run `node render/render.cjs --dir .`; re-paste changed chat exports.
 
 ### How do I check generated instructions for drift?
 
@@ -158,11 +166,11 @@ Re-run `npx agent-personalizer --dir . --ai claude,agents --level 3 --yes --defa
 
 ### How do I uninstall agent-personalizer and keep my notes?
 
-Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files and user-written notes stay, and the log names retained installed files.
+Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files, user-written notes and `LEARNED.md` stay; the local digest is removed.
 
 ## Uninstall
 
-Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files and notes, and lists any hook registration you must remove.
+Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files, notes and `LEARNED.md`, removes the local digest, and lists any hook registration you must remove.
 
 ```bash
 npx agent-personalizer --uninstall --dir . --dry
@@ -176,6 +184,7 @@ The inventory covers every path recorded by any install run, including earlier n
 Start at the [documentation index](docs/README.md):
 
 - **[Install and uninstall](docs/install.md):** flags, scripted answers, re-runs, upgrades and removal.
+- **[Learning and privacy](docs/learning.md):** consent, session sources, evidence-backed questions, entries and forgetting the digest.
 - **[Instruction tiers](docs/tiers.md):** where each kind of instruction belongs.
 - **[Paste guide](docs/paste-guide.md):** how each AI loads its files and how to activate exports.
 - **[Companions](docs/companions.md):** notes connectors and enforcement tools.

@@ -4,14 +4,17 @@
 
 Install with `npx agent-personalizer`. Node 22 or 24 (active LTS) is recommended; 18 or later runs. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
 
-The installer writes USER.md, AGENT_ONBOARDING.md and each selected AI's instruction files. Level 2 adds local notes scaffolds for local and fallback notes tools. Level 3 adds editable rules, a renderer, a session-start hook, a drift check and a forbidden-string gate. Preview removal with `npx agent-personalizer --uninstall --dir . --dry`.
+The installer asks which AIs you use and whether it may learn from your recent sessions, with No as the default. It writes USER.md, LEARNED.md, AGENT_ONBOARDING.md and each selected AI's instruction files. With a yes, it reads up to 20 recent sessions from Claude Code, Codex and Gemini CLI, plus Codex memory notes, and saves a local digest. The user's AI asks up to five evidence-backed questions; confirmed entries reach every selected personal target and declined entries are never asked again. Level 2 adds local notes scaffolds for local and fallback notes tools. Level 3 adds editable rules, a renderer, a session-start hook, a drift check and a forbidden-string gate.
 
-Re-runs update untouched installed files and pointer lines to the new answers. Edited copies stay and are named, old notes folders stay in place, and upgrades refresh untouched tools. USER.md supplies every profile export, including ChatGPT. Uninstall checks the history of recorded installed paths and keeps edited files and user-written notes.
+Re-runs ask nothing, keep saved answers and update untouched installed files and pointer lines. Edited copies stay and are named, old notes folders stay in place, and upgrades refresh untouched tools. USER.md supplies every profile export, including ChatGPT; LEARNED.md owns the shared entries. `npx agent-personalizer learn --dir .` asks for consent before collecting new evidence. `learn --forget` deletes the digest. Uninstall keeps LEARNED.md and removes the digest; neither touches the AI apps' history. Preview removal with `npx agent-personalizer --uninstall --dir . --dry`.
+
+Session data stays local until the user's AI reads it and sends it to its provider again. Only reuse history you may share, filter other people's details with check/forbidden.local.txt and check agreements for work accounts. The tool makes no network calls. It is not affiliated with Anthropic, OpenAI or Google, and their saved formats can change.
 
 ## Docs
 
 - [Documentation index](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/README.md): Start here.
 - [Install and use](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/install.md): Flags, scripted answers, updates and uninstall.
+- [Learning and privacy](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/learning.md): Consent, local readers, questions, approved entries and forgetting the digest.
 - [Instruction tiers](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/tiers.md): Where each instruction belongs.
 - [Paste guide](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/paste-guide.md): The file each AI reads and how to load it.
 - [Companion tools](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/companions.md): Notes connectors and enforcement tools.
@@ -23,6 +26,7 @@ Re-runs update untouched installed files and pointer lines to the new answers. E
 - [Contributing](https://github.com/aunysillyme/agent-personalizer/blob/main/CONTRIBUTING.md): Add targets, notes tools, examples and regression fixes.
 - [Rule format](https://github.com/aunysillyme/agent-personalizer/blob/main/rules/README.md): Universal, personal, binding and origin sections.
 - [Worked example](https://github.com/aunysillyme/agent-personalizer/tree/main/examples/freelance-illustrator): An invented illustrator's profile and rendered files.
+- [More examples](https://github.com/aunysillyme/agent-personalizer/tree/main/examples): Invented users with different confirmed, inferred and declined entries.
 - [Changelog](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md): Release history.
 - [Support](https://github.com/aunysillyme/agent-personalizer/blob/main/SUPPORT.md): Where to ask questions, report bugs, request features and report security issues privately.
 - [Maintainers](https://github.com/aunysillyme/agent-personalizer/blob/main/MAINTAINERS.md): Who owns reviews, releases and support routes.

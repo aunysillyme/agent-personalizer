@@ -53,3 +53,7 @@ Files render in filename order. The two-digit prefix is the order; leave gaps.
 | `40-sign-every-edit.md` | One signature line, overwritten | no |
 | `50-output-style.md` | Lead with the answer, one item per line, no recap | yes |
 | `60-act-or-ask.md` | Fetch a missing fact; ask for a missing mandate | no |
+| `65-ask-before-it-repeats.md` | Ask once before keeping a repeated correction | yes |
+| `70-their-words-point-at-the-thing.md` | Find the result, problem or quality behind the user's word | no |
+| `80-symptoms-are-not-causes.md` | Measure when the same symptom survives a fix | no |
+| `90-surface-what-they-cant-see.md` | Name one relevant risk, cost, faster path or stale assumption | no |

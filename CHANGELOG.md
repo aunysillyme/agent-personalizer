@@ -6,6 +6,24 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-06
+
+### Added
+
+- Consent-gated local readers for recent Claude Code, Codex and Gemini CLI sessions, plus Codex memory notes. Readers stream bounded input, keep typed messages, skip automation and unsafe paths, and filter private-list matches without printing message text.
+- `learn` collects new evidence after a yes; `learn --forget` deletes the local digest without touching AI app history. The digest labels messages as data and stays in a gitignored local folder.
+- `LEARNED.md` at every install level owns confirmed, proposed and declined entries. Confirmed entries reach every personal AI target, declined entries tell the AI never to ask again, and `--check` detects unrendered entry edits.
+- One shared procedure asks up to five questions with counts and quotes from an unhandled digest. Claude Code receives `/personalize`; Codex and Gemini CLI receive the same flow in their home files.
+- Four rules with origin stories: Ask before it repeats, Their words point at the thing, Symptoms are not causes, and Surface what they can't see.
+- Learning and privacy documentation, synthetic session fixtures, and two more invented example users with different entries.
+
+### Changed
+
+- The first interactive install asks only for the folder when needed, selected AIs and consent. AIs found locally are pre-selected, level 1 is the default, and session consent defaults to No. The personal questionnaire is gone; `--full` and `--quick` remain accepted no-ops.
+- Re-runs ask nothing and preserve saved settings, including legacy name, pronouns, work and focus answers. Non-default legacy identity values remain in the generated profile's "About me" section.
+- Uninstall always keeps `LEARNED.md` and removes the digest. Non-interactive installs never read sessions; scripted consent uses `learn --yes`.
+- Privacy guidance explains local session access, AI provider visibility, other people's details, work accounts, private-list filtering and undo.
+
 ## [0.7.2] - 2026-10-06
 
 ### Changed
@@ -265,7 +283,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.6.5...v0.7.0

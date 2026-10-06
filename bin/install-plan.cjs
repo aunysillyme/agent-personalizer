@@ -99,6 +99,9 @@ function installPlan({ answers, level, targets, notesScaffolded }) {
   const noSig = answers.signature === 'no';
   const stripSig = (t) => noSig ? stripSignature(t) : t;
   const mdCopy = (rel, src) => plan.push({ rel, text: stripSig(fs.readFileSync(src, 'utf8')) });
+  // Entries belong to the user as soon as the template is written, even untouched.
+  plan.push({ rel: 'LEARNED.md', text: fs.readFileSync(path.join(PKG, 'templates', 'LEARNED.md'), 'utf8'), firstOnly: true });
+  if (targets.includes('claude')) plan.push({ rel: '.claude/commands/personalize.md', text: onboarding.learningProcedure() + '\n' });
   // rules/ is copied at level 3, where it becomes yours to edit; levels 1 and 2 render from the package's rules
   if (level >= 3) for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
     if (noSig && f === '40-sign-every-edit.md') continue;
