@@ -88,32 +88,71 @@ function scriptArgs(args) {
   const quote = s => `'${s.replace(/'/g, "'\\''")}'`;
   return ['-qec', [process.execPath, ...args].map(quote).join(' '), '/dev/null'];
 }
-// Reply only after each prompt arrives. Sending every newline at once can lose answers when
-// the installer closes and reopens readline between questions.
-function interview(d, questions, replies = {}, flags = [], onPrompt = () => {}) {
+const INTERVIEW_TIMEOUT = 15000;
+const PTY_TIMEOUT = 5000;
+const KILL_GRACE = 250;
+function terminalText(output) {
+  return output
+    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b[P^_][\s\S]*?\x1b\\/g, '')
+    .replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '')
+    .replace(/\x1b[ -\/]*[@-~]/g, '')
+    .replace(/\r/g, '');
+}
+function pty(args, label, timeout, onOutput = () => {}) {
   return new Promise((resolve, reject) => {
     // On macOS Node's stdin pipe is a socket, which BSD script cannot inspect with tcgetattr.
     // cat supplies a real pipe to script; arguments still pass through quoted positional values.
-    const child = spawn('sh', ['-c', 'cat | script "$@"', 'ap-interview', ...scriptArgs([CLI, '--dir', d, '--ai', 'claude', '--level', '1', ...flags])], { cwd: ROOT });
-    let output = '', handled = 0;
-    const asked = [];
-    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error(`interview timed out\n${output}`)); }, 15000);
-    child.on('error', e => { clearTimeout(timer); reject(e); });
+    const child = spawn('sh', ['-c', 'cat | script "$@"', label, ...scriptArgs(args)], { cwd: ROOT, detached: true });
+    let output = '', stderr = '', settled = false;
+    const killGroup = signal => {
+      if (!child.pid) return;
+      try { process.kill(-child.pid, signal); }
+      catch (e) { if (e.code !== 'ESRCH') throw e; }
+    };
+    const finish = (error, code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { killGroup('SIGTERM'); } catch (e) { error = error || e; }
+      for (const stream of [child.stdin, child.stdout, child.stderr]) stream.destroy();
+      // Keep this timer referenced: cleanup must finish even if inherited pipes never close.
+      setTimeout(() => {
+        try { killGroup('SIGKILL'); } catch (e) { error = error || e; }
+        if (error) reject(error);
+        else resolve({ code, output, stderr });
+      }, KILL_GRACE);
+    };
+    const timer = setTimeout(() => finish(new Error(`${label} timed out\n${output}`)), timeout);
+    child.on('error', e => finish(e));
+    for (const stream of [child.stdin, child.stdout, child.stderr]) stream.on('error', e => finish(e));
     child.stdout.on('data', data => {
+      if (settled) return;
       output += data.toString();
-      if (output.includes('Installing level ') || output.includes('agent-personalizer:')) child.stdin.end();
-      if (!output.endsWith(': ') || output.length <= handled) return;
-      const line = output.slice(output.lastIndexOf('\n') + 1).replace(/\r/g, '');
-      const q = questions.find(q => line.startsWith(q.ask));
-      if (!q) return;
-      handled = output.length;
-      asked.push(q.id);
-      onPrompt(q);
-      child.stdin.write((replies[q.id] || '') + '\n');
+      try { onOutput(output, child); } catch (e) { finish(e); }
     });
-    child.stderr.on('data', data => { output += data.toString(); });
-    child.on('close', code => { clearTimeout(timer); resolve({ code, output, asked }); });
+    child.stderr.on('data', data => { output += data.toString(); stderr += data.toString(); });
+    child.on('close', code => finish(null, code));
   });
+}
+// Reply only after each prompt arrives. Sending every newline at once can lose answers when
+// the installer closes and reopens readline between questions.
+async function interview(d, questions, replies = {}, flags = [], onPrompt = () => {}) {
+  let handled = 0;
+  const asked = [];
+  const result = await pty([CLI, '--dir', d, '--ai', 'claude', '--level', '1', ...flags], 'interview', INTERVIEW_TIMEOUT, (output, child) => {
+    const plain = terminalText(output);
+    if (plain.includes('Installing level ') || plain.includes('agent-personalizer:')) child.stdin.end();
+    if (!plain.endsWith(': ') || plain.length <= handled) return;
+    const line = plain.slice(plain.lastIndexOf('\n') + 1);
+    const q = questions.find(q => line.startsWith(q.ask));
+    if (!q) return;
+    handled = plain.length;
+    asked.push(q.id);
+    onPrompt(q);
+    child.stdin.write((replies[q.id] || '') + '\n');
+  });
+  return { ...result, asked };
 }
 
 const cases = {
@@ -145,9 +184,9 @@ const cases = {
       console.log(`SKIP  RERUN  pseudo-terminal interview: script flags are not supported on ${process.platform}`);
       return;
     }
-    const probe = spawnSync('sh', ['-c', 'printf "" | script "$@"', 'ap-pty-probe', ...scriptArgs(['-e', 'console.log(process.stdin.isTTY ? "AP_PTY_READY" : "AP_NO_PTY")'])], { cwd: ROOT, encoding: 'utf8', timeout: 5000 });
-    if (probe.error || probe.status !== 0 || !probe.stdout.includes('AP_PTY_READY')) {
-      console.log(`SKIP  RERUN  pseudo-terminal interview: ${probe.error ? probe.error.message : `script cannot allocate a terminal (${(probe.stderr || probe.stdout).trim()})`}`);
+    const probe = await pty(['-e', 'console.log(process.stdin.isTTY ? "AP_PTY_READY" : "AP_NO_PTY")'], 'ap-pty-probe', PTY_TIMEOUT, (output, child) => child.stdin.end()).catch(error => ({ error }));
+    if (probe.error || probe.code !== 0 || !probe.output.includes('AP_PTY_READY')) {
+      console.log(`SKIP  RERUN  pseudo-terminal interview: ${probe.error ? probe.error.message : `script cannot allocate a terminal (${(probe.stderr || probe.output).trim()})`}`);
       return;
     }
     const fresh = path.join(TMP, 'first-install', 'nested');
