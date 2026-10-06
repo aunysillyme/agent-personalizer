@@ -159,6 +159,20 @@ async function main() {
     assert.equal(unreadable.skipped.unreadable, 1);
   } finally { fs.promises.open = open; }
   console.log('ok: sessions drop private messages whole and unreadable files without crashing');
+
+  // Audit 0.8.0 F1 and F2: a private term split across content items, or typed in another
+  // Unicode form (macOS often produces decomposed accents), still drops the whole message.
+  const splitHome = home();
+  write(splitHome, '.claude/projects/split/message.jsonl', JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'tell PRIVATE_SPL' }, { type: 'text', text: 'IT_TERM about it' }] } }) + '\n' + user('meet cafe\u0301 owner tomorrow') + user('Kept after the private checks.'));
+  const splitResult = await readSessions({ home: splitHome, sources: ['claude-code'], privateTerms: ['PRIVATE_SPLIT_TERM', 'caf\u00e9 owner'] });
+  assert.deepEqual(splitResult.sessions[0].messages, ['Kept after the private checks.']);
+  assert.equal(splitResult.skipped.private_match, 2);
+  // Audit 0.8.0 F3: a Codex user message whose content is a plain string is typed text.
+  const stringHome = home();
+  write(stringHome, '.codex/sessions/2026/10/01/rollout-string.jsonl', JSON.stringify({ type: 'session_meta', payload: { id: 'string', source: 'cli' } }) + '\n' + JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: 'CODEX_STRING_KEPT shorter please' } }) + '\n');
+  const stringResult = await readSessions({ home: stringHome, sources: ['codex'] });
+  assert.deepEqual(stringResult.sessions.flatMap(session => session.messages), ['CODEX_STRING_KEPT shorter please']);
+  console.log('ok: sessions catch split and decomposed private terms and keep Codex string content');
 }
 
 main().then(() => { for (const folder of homes) fs.rmSync(folder, { recursive: true, force: true }); })
