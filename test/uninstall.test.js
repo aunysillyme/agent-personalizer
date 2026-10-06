@@ -91,7 +91,7 @@ const cases = {
       install(dir, level);
       const r = uninstall(dir);
       code(r, 0);
-      assert.deepEqual(fs.readdirSync(dir), [], `clean level ${level} leaves an empty directory`);
+      assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], `clean level ${level} leaves only the learning log`);
       if (level === 3) { assert.match(r.output, /settings/i); assert.match(r.output, /hook|SessionStart/); }
     }
   },
@@ -134,7 +134,7 @@ const cases = {
     install(dir, 1);
     const r = uninstall(dir);
     code(r, 0);
-    assert.deepEqual(fs.readdirSync(dir), [], 'reinstall keeps package-created home ownership and highest installed level');
+    assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'reinstall keeps package-created home ownership and recorded inventory');
   },
   'user-note'(dir) {
     install(dir, 2);
@@ -269,7 +269,7 @@ const cases = {
       const before = read(dir, 'CLAUDE.md'), r = uninstall(dir);
       code(r, 0);
       if (edited) kept(r, dir, 'CLAUDE.md', before);
-      else assert.deepEqual(fs.readdirSync(dir), [], 'legacy config removes exact generated files');
+      else assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'legacy config removes generated files and keeps entries');
     }
   },
   'answer-variants'(root) {
@@ -283,7 +283,7 @@ const cases = {
       fs.mkdirSync(dir); install(dir, 3, answers);
       const r = uninstall(dir);
       code(r, 0);
-      assert.deepEqual(fs.readdirSync(dir), [], `answer variant ${i} leaves an empty directory`);
+      assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], `answer variant ${i} leaves only the learning log`);
     }
   },
   'historical-inventory'(root) {
@@ -301,7 +301,7 @@ const cases = {
       const r = uninstall(dir);
       code(r, 0);
       if (edited) { kept(r, dir, rel, before); assert.match(r.output, /journal\/decisions\.md \(edited\)/); }
-      else assert.deepEqual(fs.readdirSync(dir), [], 'uninstall covers both notes folders and the retired rule');
+      else assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'uninstall covers both notes folders and the retired rule');
     }
   },
   'historical-symlink'(root) {

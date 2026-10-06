@@ -1,0 +1,5 @@
+[
+  {"sessionId":"gemini-human","messageId":"one","type":"user","message":"Ask before changing the scope."},
+  {"sessionId":"gemini-older","messageId":"old-one","type":"user","message":"Keep the source next to the claim."},
+  {"sessionId":"gemini-older","messageId":"reply","type":"gemini","message":"LOG_REPLY_EXCLUDED"}
+]

@@ -1,0 +1,18 @@
+{"type":"user","entrypoint":"cli","sessionId":"claude-human","message":{"content":"Keep the answer to a few lines."}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"ASSISTANT_EXCLUDED"}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","content":"TOOL_EXCLUDED"},{"type":"image","source":"IMAGE_EXCLUDED"},{"type":"document","text":"DOCUMENT_EXCLUDED"}]}}
+{"type":"user","isMeta":true,"message":{"content":"META_EXCLUDED"}}
+{"type":"user","isSidechain":true,"message":{"content":"SIDECHAIN_EXCLUDED"}}
+{"type":"user","isCompactSummary":true,"message":{"content":"COMPACT_EXCLUDED"}}
+{"type":"user","isVisibleInTranscriptOnly":true,"message":{"content":"VISIBLE_EXCLUDED"}}
+{"type":"user","message":{"content":"<!-- reply --> That is still too long."}}
+{"type":"user","message":{"content":"Use plain words.<system-reminder>REMINDER_EXCLUDED</system-reminder> Keep the example.<pasted_content id=\"paste\">PASTE_EXCLUDED</pasted_content>"}}
+{"type":"user","message":{"content":"Nested blocks stay out.<pasted_content>NESTED_OUTER_EXCLUDED<system-reminder>NESTED_INNER_EXCLUDED</system-reminder>NESTED_TAIL_EXCLUDED</pasted_content> Keep this tail."}}
+{"type":"user","message":{"content":"Unfinished blocks stay out.<pasted_content>UNFINISHED_EXCLUDED"}}
+{"type":"user","message":{"content":[{"type":"text","text":"One idea per line."},{"type":"tool_result","content":"RESULT_EXCLUDED"},{"type":"text","text":"<task-notification>TASK_EXCLUDED</task-notification>"}]}}
+{"type":"user","message":{"content":"Please tell PRIVATE_PERSON_FIXTURE the update."}}
+{"type":"user","message":{"content":"Please tell private_person_fixture the other update."}}
+{"type":"user","message":{"content":"<command-name>/compact</command-name>COMMAND_EXCLUDED"}}
+{"type":"user","message":{"content":"<local-command-stdout>STDOUT_EXCLUDED</local-command-stdout>"}}
+{"type":"user","message":{"content":"<task-notification>NOTIFICATION_EXCLUDED</task-notification>"}}
+not a json record

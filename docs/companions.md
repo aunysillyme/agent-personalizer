@@ -2,7 +2,7 @@
 
 This repo tells an AI *how to behave with you*. Two companions govern *what it can touch* and *what it is allowed to carry*. Neither is required; both make the onboarding answers enforceable instead of advisory.
 
-| Your answer in the interview | What enforces it without a companion | With a companion |
+| Your saved setting | What enforces it without a companion | With a companion |
 |---|---|---|
 | **Always ask before** delete / publish / send / spend | the AI remembering | obsidian-tc: destructive tools fail closed until a human confirms |
 | **Off limits** folders | the AI remembering | obsidian-tc: folder ACL deny, per caller |
@@ -39,7 +39,7 @@ Lexical search and every note tool work immediately; semantic and graph retrieva
 
 **Read in this order**: the [essay](https://sierracatalina.com/signal/the-context-layer) (the argument in plain language) → [architecture](https://sierracatalina.com/context-layer/architecture) → [specification](https://sierracatalina.com/context-layer/specification) → [implementation](https://sierracatalina.com/context-layer/implementation) → [code](https://sierracatalina.com/context-layer/code) (v0.2 contracts, encrypted local vault, four-state policy, scoped bundles, anchored receipts, a files adapter, a local-agent consumer) → [demo](https://sierracatalina.com/context-layer/demo). Its stated boundary: it does not claim production key custody or a portable signing suite.
 
-**How it pairs with this repo.** Three of the interview's answers are Context Layer decisions in miniature:
+**How it pairs with this repo.** Three saved settings are Context Layer decisions in miniature:
 - **Write policy** "logs and inbox only" or "ask before every write" is the Layer's rule that memory writes remain proposals until approved.
 - **Off limits** is the Layer's vault stage: originals that never enter a bundle.
 - **Always ask before** is the Layer's decide stage: allow, reduce, approve or deny by action and recipient.

@@ -1,0 +1,38 @@
+{
+  "targets": [
+    "claude",
+    "agents",
+    "onboarding"
+  ],
+  "level": 3,
+  "onboarding": {
+    "name": "Niko",
+    "work": "lab technician: equipment training examples",
+    "focus": "a repeatable bench handover checklist",
+    "length": "thorough",
+    "mistakes": "brief",
+    "structure": "tables-when-comparing",
+    "notes_tool": "folder",
+    "notes_path": "notes",
+    "write_policy": "logs-and-inbox-only",
+    "signature": "yes",
+    "off_limits": [
+      "sample identities",
+      "staff records",
+      "incident reports"
+    ],
+    "always_ask": [
+      "delete",
+      "publish",
+      "send",
+      "spend",
+      "settings",
+      "standing-rules"
+    ]
+  },
+  "installed": {
+    "CLAUDE.md": "8bb89d845cd9471e5f357dd9c905f9dc5f4b83dc0531d14ba051b5691a884443",
+    "AGENTS.md": "4ecab4f98605736f8b3185fa8df3a9484ba3d64d5312ece5d131c2316fab92d6",
+    "AGENT_ONBOARDING.md": "94f4081f591bc7aac0921b53c21769e8e48cd85a52bc47f1abb09b1054c66bca"
+  }
+}

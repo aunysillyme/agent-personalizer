@@ -2,6 +2,7 @@ node_modules/
 .test-work/
 check/forbidden.local.txt
 AUDIT_BRIEF.md
+AUDIT_BRIEF_*.md
 audit/
 .DS_Store
 *.log

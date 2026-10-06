@@ -158,81 +158,34 @@ async function interview(d, questions, replies = {}, flags = [], onPrompt = () =
 const cases = {
   async RERUN() {
     const o = require(path.join(ROOT, 'render', 'onboarding.cjs'));
-    const saved = { tone: 'gentle', off_limits: ['client work'], always_ask: ['delete', 'publish'] };
-    const helpers = typeof o.interviewDefault === 'function' && typeof o.interviewAnswers === 'function';
-    verify(helpers, 'saved-answer interview helpers are available');
-    if (helpers) {
-      const before = JSON.stringify(saved);
-      const tone = o.QUESTIONS.find(q => q.id === 'tone');
-      verify(o.interviewDefault(tone, saved) === 'gentle', 'tone prompt defaults to the saved gentle answer');
-      const asked = {}, soFar = o.interviewAnswers(saved);
-      for (const q of o.QUESTIONS) {
-        if (!o.asks(q, soFar, false)) continue;
-        asked[q.id] = o.parseAnswer({ ...q, default: o.interviewDefault(q, saved) }, '');
-        Object.assign(soFar, asked);
-      }
-      verify(JSON.stringify(o.validate(o.interviewAnswers(saved, asked))) === JSON.stringify(o.validate(saved)), 'all-Enter short answers equal the saved answers completed with defaults');
-      verify(JSON.stringify(o.sparse(o.validate(o.interviewAnswers(saved, asked)))) === JSON.stringify(o.sparse(o.validate(saved))), 'all-Enter short answers keep the same stored answer object');
-      verify(JSON.stringify(saved) === before, 'the pure helpers do not mutate saved answers');
-      verify(o.interviewAnswers(saved, { tone: 'balanced' }).tone === 'balanced', 'a typed answer overrides the saved value');
-      const limits = o.QUESTIONS.find(q => q.id === 'off_limits');
-      verify(o.parseAnswer({ ...limits, default: o.interviewDefault(limits, { off_limits: [] }) }, '').length === 0, 'Enter keeps an empty saved list');
-      const conditional = o.QUESTIONS.find(q => q.id === 'obsidian_tc');
-      verify(o.asks(conditional, o.interviewAnswers({ notes_tool: 'obsidian' }), false) && !o.asks(conditional, o.interviewAnswers({ notes_tool: 'obsidian' }, { notes_tool: 'notion' }), false), 'conditions see asked answers merged over saved values');
-    }
-    if (!['darwin', 'linux'].includes(process.platform)) {
-      console.log(`SKIP  RERUN  pseudo-terminal interview: script flags are not supported on ${process.platform}`);
-      return;
-    }
-    const probe = await pty(['-e', 'console.log(process.stdin.isTTY ? "AP_PTY_READY" : "AP_NO_PTY")'], 'ap-pty-probe', PTY_TIMEOUT, (output, child) => child.stdin.end()).catch(error => ({ error }));
-    if (probe.error || probe.code !== 0 || !probe.output.includes('AP_PTY_READY')) {
-      console.log(`SKIP  RERUN  pseudo-terminal interview: ${probe.error ? probe.error.message : `script cannot allocate a terminal (${(probe.stderr || probe.output).trim()})`}`);
-      return;
-    }
-    const fresh = path.join(TMP, 'first-install', 'nested');
-    let stayedMissing = true;
-    const first = requireCode(await interview(fresh, o.QUESTIONS, {}, [], () => { stayedMissing = stayedMissing && !fs.existsSync(path.dirname(fresh)); }), 0, 'interactive first install');
-    const defaults = dir('first-defaults');
-    requireCode(exec(process.execPath, [CLI, '--dir', defaults, '--ai', 'claude', '--level', '1', '--defaults', '--yes']), 0, 'default first install');
-    verify(sameFiles(files(fresh), files(defaults)) && first.output.includes('Enter accepts the default in brackets.') && first.output.includes('Every other answer takes its default'), 'a first interview retains the original defaults, files and intro');
-    verify(stayedMissing, 'a missing destination stays uncreated until every interview prompt is answered');
-    const d = dir('interactive-rerun');
-    install(d, { ...saved, name: 'Sam', never: ['sales talk'], signature: 'no', obsidian_tc: 'yes', notes_tool_name: 'Saved tool' }, CLI, 'claude', 1);
-    const snapshot = text(d, CONFIG);
-    const before = JSON.parse(snapshot).onboarding;
-    const r = requireCode(await interview(d, o.QUESTIONS), 0, 'interactive short rerun');
-    verify(JSON.stringify(JSON.parse(text(d, CONFIG)).onboarding) === JSON.stringify(before), 'an interactive short rerun keeps every stored answer');
-    verify(text(d, 'AGENT_ONBOARDING.md').includes('- client work'), 'the rendered off-limits entry survives the short rerun');
-    verify(r.output.includes('How direct should the AI be? [gentle]:') && r.output.includes('[delete, publish]:') && r.output.includes('Enter keeps the saved answer shown in brackets.'), 'the prompts and intro show the saved defaults');
-    verify(JSON.stringify(r.asked) === JSON.stringify(o.QUICK), 'the short rerun asks the same seven questions');
-    const changed = requireCode(await interview(d, o.QUESTIONS, { tone: 'balanced' }), 0, 'interactive changed answer');
-    verify(JSON.stringify(JSON.parse(text(d, CONFIG)).onboarding) === JSON.stringify({ ...before, tone: 'balanced' }), 'typing one new answer changes only that answer');
-    verify(!changed.asked.includes('obsidian_tc') && JSON.parse(text(d, CONFIG)).onboarding.obsidian_tc === 'yes', 'a false conditional keeps its saved answer');
-    requireCode(exec(process.execPath, [CLI, '--dir', d, '--ai', 'claude', '--level', '1', '--defaults', '--yes']), 0, 'defaults rerun');
-    verify(JSON.stringify(JSON.parse(text(d, CONFIG)).onboarding) === JSON.stringify({ ...before, tone: 'balanced' }), '--defaults retains its stored-answer behavior');
-    install(d, { tone: 'gentle' }, CLI, 'claude', 1);
-    verify(JSON.stringify(JSON.parse(text(d, CONFIG)).onboarding) === JSON.stringify(o.sparse(o.validate({ tone: 'gentle' }))), 'a partial --answers file still uses package defaults for missing fields');
-
-    const lists = dir('interactive-full-rerun');
-    install(lists, { ...saved, name: '', off_limits: ['client work, including drafts'], always_ask: [], notes_tool: 'obsidian', obsidian_tc: 'yes' }, CLI, 'claude', 1);
-    const listBefore = JSON.parse(text(lists, CONFIG)).onboarding;
-    const full = requireCode(await interview(lists, o.QUESTIONS, {}, ['--full']), 0, 'interactive full rerun');
-    verify(JSON.stringify(JSON.parse(text(lists, CONFIG)).onboarding) === JSON.stringify(listBefore), 'full Enter keeps empty saved answers and list entries containing commas');
-    verify(full.asked.includes('obsidian_tc') && !full.asked.includes('notes_tool_name') && full.output.includes('What should the AI call you? []:'), 'full conditions use saved answers and empty defaults are shown');
-
-    const bad = dir('interactive-invalid-config');
-    write(bad, CONFIG, '{');
-    const refused = requireCode(await interview(bad, o.QUESTIONS), 2, 'malformed config before interview');
-    verify(!refused.asked.length && text(bad, CONFIG) === '{' && files(bad).size === 1, 'malformed saved JSON refuses before the interview and writes nothing');
-    write(bad, CONFIG, JSON.stringify({ onboarding: { tone: 'invalid' } }));
-    const badBefore = files(bad);
-    const invalid = requireCode(await interview(bad, o.QUESTIONS), 2, 'invalid saved answers before interview');
-    verify(!invalid.asked.length && sameFiles(badBefore, files(bad)) && invalid.output.includes('.agent-personalizer.json onboarding answers:'), 'invalid saved answers retain the refusal message and write nothing');
-    fs.unlinkSync(path.join(bad, CONFIG));
-    fs.symlinkSync(path.join(d, CONFIG), path.join(bad, CONFIG));
-    const outside = read(d, CONFIG);
-    const linked = requireCode(await interview(bad, o.QUESTIONS), 2, 'symlink config before interview');
-    verify(!linked.asked.length && linked.output.includes('.agent-personalizer.json is a symlink; refusing to write through it') && read(d, CONFIG).equals(outside), 'a linked config refuses before the interview without touching its target');
+    const saved = { name:'Sam', pronouns:'they/them', work:'Illustration', focus:'Drafts', tone:'gentle', off_limits:['client work'], always_ask:['delete','publish'], never:['sales talk'], signature:'no' };
+    const d = dir('saved-rerun');
+    install(d, saved, CLI, 'claude', 1);
+    const before = JSON.parse(text(d, CONFIG)).onboarding;
+    requireCode(exec(process.execPath, [CLI, '--dir', d]), 0, 'nonterminal rerun without flags');
+    verify(JSON.stringify(JSON.parse(text(d, CONFIG)).onboarding) === JSON.stringify(before), 'nonterminal rerun retains every legacy and current answer');
+    verify(text(d,'USER.md').includes('## About me') && text(d,'USER.md').includes('Sam'), 'saved identity lives in About me');
+    const fresh = dir('partial-answers');
+    install(fresh, {tone:'gentle'}, CLI, 'claude', 1);
+    verify(JSON.stringify(JSON.parse(text(fresh,CONFIG)).onboarding) === JSON.stringify(o.sparse(o.validate({tone:'gentle'}))), 'partial answers retain documented defaults semantics');
+    const bad=dir('bad-rerun');write(bad,CONFIG,'{');
+    requireCode(exec(process.execPath,[CLI,'--dir',bad]),2,'malformed config');
+    verify(files(bad).size===1 && text(bad,CONFIG)==='{', 'invalid config refuses without writes');
+    if (!['darwin','linux'].includes(process.platform)) {console.log('SKIP RERUN pty platform');return;}
+    const probe=await pty(['-e','console.log(process.stdin.isTTY ? "AP_PTY_READY" : "AP_NO_PTY")'],'pty-probe',PTY_TIMEOUT,(output,child)=>child.stdin.end()).catch(error=>({error}));
+    if(probe.error || probe.code!==0 || !probe.output.includes('AP_PTY_READY')) { console.log('SKIP RERUN pseudo-terminal unavailable: '+(probe.error ? probe.error.message : probe.stderr));return; }
+    const result=requireCode(await pty([CLI,'--dir',d],'rerun',INTERVIEW_TIMEOUT,(output,child)=>child.stdin.end()),0,'terminal rerun');
+    verify(!result.output.includes('Read your last 20 sessions?') && !result.output.includes('AIs to use') && !result.output.includes('How direct should'), 'terminal rerun asks nothing');
+    verify(JSON.stringify(JSON.parse(text(d,CONFIG)).onboarding)===JSON.stringify(before), 'terminal rerun retains every answer');
+    const f=path.join(TMP,'interactive-first');let replies=0;
+    const first=requireCode(await pty([CLI,'--dir',f,'--ai','claude','--level','1'],'first',INTERVIEW_TIMEOUT,(output,child)=>{
+      const plain=terminalText(output);
+      if(replies===0 && /AIs \[claude\]:/.test(plain)) {replies++;child.stdin.write('\n');}
+      if(replies===1 && plain.includes('Read your last 20 sessions? (y/N)')) {replies++;child.stdin.write('\n');}
+      // Let cat finish after the install, so the terminal wrapper can report its exit.
+      if(plain.includes('The installer made no network calls.')) child.stdin.end();
+    }),0,'terminal first install default no');
+    verify(replies===2 && first.output.includes('Nothing was read.') && !exists(f,'.agent-personalizer/digest.md'), 'Enter on first consent reads nothing');
   },
   F1() {
     const d = dir('profile-edit');
@@ -327,14 +280,14 @@ const cases = {
     verify(sameFiles(before, files(d)), 'uninstall --dry leaves every file byte unchanged');
     const r = uninstall(d);
     const left = [...files(d).keys()];
-    verify(left.length === 0, 'uninstall after a notes-path change leaves nothing', left.join(', '));
+    verify(left.length === 1 && left[0] === 'LEARNED.md', 'uninstall after a notes-path change keeps only entries', left.join(', '));
     for (const name of ['journal/README.md', 'journal/decisions.md', 'journal/inbox/README.md', 'journal/sessions/TEMPLATE-week.md']) verify(dry.output.includes(name) && r.output.includes(name), `preview and removal both name historical ${name}`);
     const s = dir('uninstall-signature-history');
     install(s, { signature: 'yes' });
     install(s, { signature: 'no' });
     uninstall(s);
     const signatureLeft = [...files(s).keys()];
-    verify(signatureLeft.length === 0, 'uninstall after signature yes -> no leaves nothing', signatureLeft.join(', '));
+    verify(signatureLeft.length === 1 && signatureLeft[0] === 'LEARNED.md', 'uninstall after signature changes keeps only entries', signatureLeft.join(', '));
     const e = dir('uninstall-edited-notes');
     fs.mkdirSync(path.join(e, 'journal/sessions'), { recursive: true });
     install(e, { notes_path: 'journal' });

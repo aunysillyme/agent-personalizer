@@ -1,0 +1,38 @@
+{
+  "targets": [
+    "claude",
+    "agents",
+    "onboarding"
+  ],
+  "level": 3,
+  "onboarding": {
+    "name": "Eli",
+    "work": "product designer: a library booking app",
+    "focus": "an accessible booking form",
+    "tone": "balanced",
+    "length": "adaptive",
+    "mistakes": "brief",
+    "structure": "prose",
+    "notes_tool": "folder",
+    "notes_path": "notes",
+    "write_policy": "notes-freely",
+    "signature": "yes",
+    "off_limits": [
+      "patron contact details",
+      "staff interview recordings"
+    ],
+    "always_ask": [
+      "delete",
+      "publish",
+      "send",
+      "spend",
+      "settings",
+      "standing-rules"
+    ]
+  },
+  "installed": {
+    "CLAUDE.md": "6a058809841d4a98458b955c20373ea09740aface4f9465766dee64d54f5eee5",
+    "AGENTS.md": "636fdb3ce93ca17f04e79200e618ccf9ad324abe8cbe7d6d3cc730eb744a433d",
+    "AGENT_ONBOARDING.md": "08103273f0edea5da6c38ed79ce51113a9f040f98f357badc95b3f4e6fcfbcc3"
+  }
+}

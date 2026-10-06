@@ -1,0 +1,11 @@
+{"type":"session_meta","payload":{"id":"codex-human","source":"cli","cwd":"/invented/design-notes"}}
+{"type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"DEVELOPER_EXCLUDED"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Show the result first."},{"type":"input_image","text":"IMAGE_EXCLUDED"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"# AGENTS.md instructions for this folder\nINSTRUCTIONS_EXCLUDED"},{"type":"input_text","text":"# Files mentioned by the user\nFILES_EXCLUDED"},{"type":"input_text","text":"# Response annotations\nANNOTATIONS_EXCLUDED"},{"type":"input_text","text":"# Browser comments\nCOMMENTS_EXCLUDED"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>ENVIRONMENT_EXCLUDED</environment_context>"},{"type":"input_text","text":"<realtime_delegation>DELEGATION_EXCLUDED</realtime_delegation>"},{"type":"input_text","text":"<in-app-browser-context>BROWSER_EXCLUDED</in-app-browser-context>"},{"type":"input_text","text":"<image>IMAGE_TAG_EXCLUDED</image>"}]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ASSISTANT_EXCLUDED"}]}}
+{"type":"response_item","payload":{"type":"reasoning","text":"REASONING_EXCLUDED"}}
+{"type":"response_item","payload":{"type":"function_call","arguments":"CALL_EXCLUDED"}}
+{"type":"response_item","payload":{"type":"function_call_output","output":"OUTPUT_EXCLUDED"}}
+{"type":"event_msg","payload":{"type":"user_message","message":"EVENT_EXCLUDED"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<!-- reply --> Use a table for this comparison."}]}}

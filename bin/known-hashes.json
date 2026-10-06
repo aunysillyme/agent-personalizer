@@ -49,6 +49,9 @@
       },
       "v0.6.5": {
         "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
+      },
+      "v0.7.2": {
+        "original": "ba6495eedfff5c5ea3658e4b7c4072f7505b0860414d67150e090366ca87e772"
       }
     },
     "check/gate.cjs": {
@@ -92,6 +95,9 @@
         "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
       },
       "v0.6.5": {
+        "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
+      },
+      "v0.7.2": {
         "original": "52e959a266d68e1e9f0de1373786bdfb5a7792c093145813623714d7d4f83c86"
       }
     },
@@ -159,6 +165,10 @@
       "v0.6.5": {
         "original": "93801d3e0d111653259d73a400fd72e5f70fca0fb12b41603ef372d817ce32fb",
         "withoutSignature": "93801d3e0d111653259d73a400fd72e5f70fca0fb12b41603ef372d817ce32fb"
+      },
+      "v0.7.2": {
+        "original": "fb1daf41acd72d3bf01fb620b8f8f09f118154b983d634547352b944c07f72bc",
+        "withoutSignature": "fb1daf41acd72d3bf01fb620b8f8f09f118154b983d634547352b944c07f72bc"
       }
     },
     "hooks/claude-code/session-start.sh": {
@@ -209,6 +219,9 @@
       },
       "v0.6.5": {
         "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
+      },
+      "v0.7.2": {
+        "original": "282024ff74e8a7168c49dcd75e45d61da6709c8901f5f91938fc02cdc7c5cfed"
       }
     },
     "render/onboarding.cjs": {
@@ -253,6 +266,9 @@
       },
       "v0.6.5": {
         "original": "55bfb0679d1d5264195be409b7f0bb7ed929263bd440daf4ff7b7eea05039c43"
+      },
+      "v0.7.2": {
+        "original": "0a06b8fec458b98ed9a5219c02a592d3b3692187d279f2809db6058f7cb2d395"
       }
     },
     "render/render.cjs": {
@@ -297,6 +313,9 @@
       },
       "v0.6.5": {
         "original": "78e397bc4717b8ceb5a8eaf4f4fe6ab3cf6309f14ba6e529429e75e71bdecd26"
+      },
+      "v0.7.2": {
+        "original": "a1ed005b082508c357569212d09f3e72b4b6cf3062c76d18796c6902a7195d1a"
       }
     },
     "render/targets.json": {
@@ -346,6 +365,9 @@
         "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
       },
       "v0.6.5": {
+        "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
+      },
+      "v0.7.2": {
         "original": "070209f11e929c89384d507975086955824014974886e2f84353d8b91d08fc83"
       }
     },
@@ -411,6 +433,10 @@
         "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
       },
       "v0.6.5": {
+        "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
+        "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
+      },
+      "v0.7.2": {
         "original": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2",
         "withoutSignature": "3806ff9a3f4bd539d1689c56bfa6397eb29938f9400117cecc1f487cdf6506a2"
       }
@@ -479,6 +505,10 @@
       "v0.6.5": {
         "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
         "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
+      },
+      "v0.7.2": {
+        "original": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d",
+        "withoutSignature": "ce6f7862af2078617433899aec3419227c116dd2722d47e7234d5b7615e1559d"
       }
     },
     "rules/20-one-owner-per-rule.md": {
@@ -543,6 +573,10 @@
         "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
       },
       "v0.6.5": {
+        "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
+        "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
+      },
+      "v0.7.2": {
         "original": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c",
         "withoutSignature": "5268e490404da41e4474a368e9b4ff38ba6375bcbc5c643ee742ceacd9c8535c"
       }
@@ -611,6 +645,10 @@
       "v0.6.5": {
         "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
         "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
+      },
+      "v0.7.2": {
+        "original": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f",
+        "withoutSignature": "50863f6b0ea933c6c7209bf4bbfbfc28c7481aabe9001cdd49b730f58dd3010f"
       }
     },
     "rules/40-sign-every-edit.md": {
@@ -675,6 +713,10 @@
         "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
       },
       "v0.6.5": {
+        "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
+        "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
+      },
+      "v0.7.2": {
         "original": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562",
         "withoutSignature": "ec73f0d745eb106a3632f22383ecf4ab5f7b0f89657a9dd5f1bf3657c7d96562"
       }
@@ -743,6 +785,10 @@
       "v0.6.5": {
         "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
         "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
+      },
+      "v0.7.2": {
+        "original": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4",
+        "withoutSignature": "56a8f916863e730185c092c5b78750c12fadf926d41e435f151f251d94d933c4"
       }
     },
     "rules/60-act-or-ask.md": {
@@ -809,6 +855,10 @@
       "v0.6.5": {
         "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
         "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
+      },
+      "v0.7.2": {
+        "original": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30",
+        "withoutSignature": "77e3fc8f0064c5f537f4ee6991aef77b865fee756e20c9cab8ccc1137f520b30"
       }
     },
     "rules/README.md": {
@@ -873,6 +923,10 @@
         "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
       },
       "v0.6.5": {
+        "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
+        "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
+      },
+      "v0.7.2": {
         "original": "d5a069dca7b498041992df74bbffd9907b68157709b239cece3d47106862eb48",
         "withoutSignature": "e6bf5ac7404aaa264a0b7a1889389e891cb759667d99dd5bef803d96440b8607"
       }

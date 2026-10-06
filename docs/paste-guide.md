@@ -31,11 +31,11 @@ Re-paste after every re-render. `--check` verifies the files on disk; it cannot 
 
 Open Settings → Personalization and enable customization. Copy the exported profile and response instructions into the fields your current interface provides, checking its displayed limits.
 
-- **Profile:** `chatgpt-box1.txt` is the plain profile text. An edited or pre-existing `USER.md` is its source too.
+- **Profile:** `chatgpt-box1.txt` is the plain profile text. An edited or pre-existing `USER.md` is its source too. Confirmed entries from `LEARNED.md` reach the ChatGPT exports.
 - **Response instructions:** `chatgpt-box2.txt` is the plain onboarding and selected rule text.
 - **Preview:** `chatgpt-custom-instructions.md` carries both exports inside fences with their character counts.
 
-The configured budget is 1,500 characters per export in `render/targets.json`; your current interface displays its own limits. With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the `inject: true` rules. The preview reports each count. Over-budget text is written in full and flagged OVER BUDGET; `--strict` refuses the write. Review the text against your displayed limits. For the full onboarding and rule source, create a ChatGPT Project and upload `AGENT_ONBOARDING.md` and `rules/` as project files.
+The configured budget is 1,500 characters per export in `render/targets.json`; your current interface displays its own limits. With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the selected session rules. Confirmed entries are retained; declined "Never ask again" entries may be shortened to fit the budget. Proposed entries are omitted. The preview reports each count. Over-budget text is written in full and flagged OVER BUDGET; `--strict` refuses the write. Review the text against your displayed limits. For the full onboarding, entries and rule source, create a ChatGPT Project and upload `AGENT_ONBOARDING.md`, `LEARNED.md` and `rules/` as project files.
 
 ## Codex CLI
 
@@ -64,12 +64,12 @@ Use `system-prompt.md`. It carries only the universal blocks: no profile, no per
 
 ## When you change an answer
 
-1. Re-run the installer with the new answers (`--answers` or the interview). It regenerates `AGENT_ONBOARDING.md` and every rendered block. `USER.md` is regenerated only if you never edited it; otherwise it is kept and the installer names the changed answers for you to carry over by hand (or delete `USER.md` and re-run). Editing `USER.md` or a rule by hand: `node render/render.cjs --dir .` at level 3.
+1. Re-run the installer with new answers through `--answers`. It asks no questions on an existing install, regenerates `AGENT_ONBOARDING.md` and updates every rendered block. `USER.md` is regenerated only if you never edited it; otherwise it is kept and the installer names the changed answers for you to carry over by hand (or delete `USER.md` and re-run). Editing `USER.md`, `LEARNED.md` or a rule by hand: `node render/render.cjs --dir .` at level 3.
 2. Files that are read automatically (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) are done.
 3. Files that were pasted (claude.ai, ChatGPT, any system prompt) must be pasted again. Nothing can detect a stale paste for you; put "re-paste after re-render" in your own checklist.
 
 ## Keep it working
 
-- **Edit the source:** change `USER.md`, `rules/`, or your answers, then re-render. The next render replaces the generated block.
+- **Edit the source:** change `USER.md`, `LEARNED.md`, `rules/`, or your answers, then re-render. The next render replaces the generated block.
 - **Share the universal rules:** use `system-prompt.md` for a shared bot. Keep `AGENT_ONBOARDING.md` in your own setup because it names your off-limits topics and working habits.
 - **Keep one rule owner:** link other files to the owning rule, or generate and check their copies. See [tiers.md](tiers.md), tier 4.

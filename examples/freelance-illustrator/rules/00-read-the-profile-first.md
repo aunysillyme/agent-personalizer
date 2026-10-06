@@ -11,7 +11,7 @@ Before the first substantive reply of a session, read the user's profile (`USER.
 In practice: two files, read before you answer anything, every time you start.
 
 ## personal
-If the profile and a rendered instruction file disagree, the profile wins: the rendered file is generated from it and is the one that drifted.
+For learned entries, `LEARNED.md` owns the current status; a summary in the profile may lag until a re-run. For other profile content, if the profile and a rendered instruction file disagree, the profile wins: the rendered file is generated from it and is the one that drifted.
 
 ## binding:claude
 `USER.md` sits next to `CLAUDE.md`. In Claude Code, `CLAUDE.md` loads automatically; `USER.md` does not, so the first action of a session is to read it.

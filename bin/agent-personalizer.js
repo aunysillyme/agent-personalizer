@@ -1,39 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 /*
-  agent-personalizer installer.
-
-    npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
-                                              [--answers <file.json>] [--defaults] [--full] [--yes]
-
-  Interactive when flags are missing and stdin is a terminal. Non-interactive with flags.
-  The ONBOARDING INTERVIEW (how to talk to you, output shape, what to read first, where the AI
-  may write, how to save, what to ask before doing) runs interactively, or takes --answers
-  <file.json>, or --defaults / --yes to accept every default. The answers are stored under
-  "onboarding" in .agent-personalizer.json and rendered to AGENT_ONBOARDING.md; USER.md is
-  generated from the same answers when it does not exist yet.
-  Level 1 writes USER.md, AGENT_ONBOARDING.md and the home file(s); the rules render into the home
-  file from the package's own rules/ and nothing is copied, so the home files name no notes folder
-  (level 2 creates it, and level 2+ repoints them). Level 3 copies rules/ (yours to edit from
-  then on) with the renderer, hook and gate. .agent-personalizer.json stores only the answers that
-  differ from the defaults.
-  Writes only the chosen AIs and the highest installed level. Re-runs replace untouched
-  installer-owned copies using recorded hashes, with a static release-hash fallback for older
-  installs. Edited files and pointer lines are kept and named. Previous notes folders stay in
-  place and in the uninstall inventory. The config is merged; USER.md is regenerated only
-  when it still equals the previous answer render. All writes roll back if rendering fails.
-  PREFLIGHT: every path is probed and every existing rendered target is decoded and its marker
-  block checked BEFORE the first write, so a refusal leaves the folder as it was. The notes
-  folder the scaffold creates and the home files point at is your notes_path (disk tools) or
-  notes/ (the fallback); a cloud tool gets no local notes folder at all. Refuses to write through any
-  symlink or outside the install folder (the folder you name is followed once, via realpath;
-  nothing beneath it may be a symlink). Reads no environment variables. Writes no secrets.
-
+  Local installer with consent-gated session learning. First installs ask for the AIs and
+  consent; saved installs re-render without questions. Answers remain editable through
+  --answers or the config. The complete plan is validated before any writes, and render
+  failures restore every changed file. Paths beneath the chosen folder never use symlinks.
   exit codes: 0 ok · 1 unexpected error · 2 refused or invalid input
 */
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const os = require('os');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -53,7 +30,7 @@ let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--forget', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
@@ -61,17 +38,19 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
                                             [--help | -h] [--version | -v]
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
-  Interactive when flags are missing and stdin is a terminal; the onboarding interview runs then.
-  The interview is SHORT by default: the seven questions that change behaviour (name, tone, length,
-  notes tool and path, write policy, always-ask), plus any question the notes tool you pick makes
-  apply. Other answers keep their saved values, or take defaults on the first install.
-  --full       ask every question instead of the short set. Interactive only.
-  --quick      the short interview. It is now the default; the flag is kept so older commands still work.
-  --answers    a JSON file of answers, or "-" to read the JSON from stdin. Unknown keys and values are refused.
-  --defaults   the ANSWER SOURCE: accept every default without being asked. With or without --yes.
-  --yes        NON-INTERACTIVE MODE, not an answer source. It needs --dir, --ai and --level, and with no
-               --answers it falls back to the defaults.
-  --uninstall  remove unchanged installed files; keep and name edited files and user text.
+  npx agent-personalizer learn [--dir <folder>] [--yes]
+  npx agent-personalizer learn --forget [--dir <folder>]
+
+  First interactive install: choose your AIs, then choose whether to read your recent sessions.
+  Saved installs ask nothing and keep their AIs, level and answers unless you give replacements.
+  --full       accepted for older commands; the interview is gone.
+  --quick      accepted for older commands; the interview is gone.
+  --answers    a JSON file of answers, or "-" to read JSON from stdin. Saved legacy keys stay valid.
+  --defaults   accept defaults on first install; a re-run keeps saved answers.
+  --yes        scripted first install: needs --dir, --ai and --level. Never reads session history.
+  learn        with your yes, write a local digest for up to five evidence-backed questions.
+  --forget     with learn, remove the digest; your AI apps' own history stays as it is.
+  --uninstall  remove unchanged installed files; keep LEARNED.md and edited files.
   --dry        preview --uninstall without changing files.
   Levels: 1 profile, onboarding and home file(s); nothing else (the rules render from the package)
           2 + the notes folder: its README, a weekly session log, a decisions log and an inbox
@@ -84,6 +63,7 @@ function parseArgs() {
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (i === 0 && a === 'learn') { out.command = a; continue; }
     if (VALUE_OPTS.includes(a)) {
       if (a in out) die(`${a} given more than once`);
       const v = argv[i + 1];
@@ -103,7 +83,7 @@ if (ARGS['--version'] || ARGS['-v']) { process.stdout.write(require(path.join(PK
 
 async function ask(q, dflt, saved = false) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const a = await new Promise(res => rl.question(`${q}${dflt || saved ? ` [${dflt}]` : ''}: `, res));
+  const a = await new Promise(res => { rl.question(`${q}${dflt || saved ? ` [${dflt}]` : ''}: `, res); rl.once('close', () => res('')); });
   rl.close();
   return saved ? a.trim() : (a || dflt || '').trim();
 }
@@ -148,8 +128,7 @@ function probe(root, rel) {
   die('unreachable');
 }
 
-// Read the stored config once. The interview uses it before any directories or files are created;
-// non-interactive answer sources retain their existing handling below.
+// Read the stored config before prompting, so saved installs ask nothing and keep their answers.
 function readConfig(root, level) {
   const { full: cfgPath, exists: cfgExists } = probe(root, '.agent-personalizer.json');
   let cfg = { targets: [], level };
@@ -187,6 +166,14 @@ function resolveDestination(dir) {
 }
 
 async function main() {
+  if (ARGS.command === 'learn') {
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry'])
+      if (opt in ARGS) die(`${opt} is not a learn option`);
+    if (ARGS['--forget'] && ARGS['--yes']) die('--forget and --yes are exclusive');
+    const learning = require('./learn.cjs');
+    return ARGS['--forget'] ? learning.forget(arg('--dir', '.')) : learning.learn({ dir: arg('--dir', '.'), yes: !!ARGS['--yes'] });
+  }
+  if (ARGS['--forget']) die('--forget needs learn');
   if (ARGS['--uninstall']) {
     if (!ARGS['--dir']) die('--uninstall needs --dir <folder>');
     for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full'])
@@ -194,93 +181,72 @@ async function main() {
     return require('./uninstall.cjs').uninstall(ARGS['--dir'], { dry: !!ARGS['--dry'] });
   }
   if (ARGS['--dry']) die('--dry needs --uninstall');
-  const interactive = process.stdin.isTTY && !!!ARGS['--yes'];
-  let dir = arg('--dir', null);
-  let ais = arg('--ai', null);
-  let level = arg('--level', null);
-
-  if (interactive) {
-    console.log('\nagent-personalizer\n');
-    dir = dir || await ask('Folder to install into', '.');
+  if (ARGS['--full'] || ARGS['--quick']) console.log('The interview is gone; --full and --quick are accepted for older commands.');
+  const interactive = !!process.stdin.isTTY && !ARGS['--yes'];
+  let dir = arg('--dir', '.');
+  let destination = resolveDestination(dir);
+  let stored = readConfig(destination.root, 1);
+  // Looking in the current folder first lets a saved install re-run with no prompts or flags.
+  if (interactive && !ARGS['--dir'] && !stored.cfgExists) {
+    dir = await ask('Folder to install into', '.');
+    destination = resolveDestination(dir);
+    stored = readConfig(destination.root, 1);
+  }
+  if (!stored.cfgExists && !interactive && (!ARGS['--dir'] || !ARGS['--ai'] || !ARGS['--level'] || !ARGS['--yes']))
+    die('non-interactive run needs --dir, --ai and --level (and --yes)');
+  let ais = arg('--ai', stored.cfgExists ? (stored.cfg.targets || []).filter(t => AIS.includes(t)).join(',') : null);
+  let level = arg('--level', stored.cfgExists ? stored.cfg.level || 1 : 1);
+  if (interactive && !stored.cfgExists) {
     console.log('\nWhich AIs do you use? Comma-separated from:');
     for (const k of AIS) console.log(`  ${k.padEnd(8)} ${AI_LABEL[k]}`);
-    ais = ais || await ask('\nAIs', 'claude,agents');
-    console.log('\nLevels: 1 profile, onboarding and home file(s) · 2 + the notes folder · 3 + renderer, session-start hook, gate and your own rules/');
-    level = level || await ask('Level', '1');
+    // Existence is the only inspection of app folders permitted before consent.
+    const found = [['.claude', 'claude'], ['.codex', 'agents'], ['.gemini', 'gemini']]
+      .filter(([folder]) => fs.existsSync(path.join(os.homedir(), folder))).map(([, ai]) => ai);
+    ais = await ask('\nAIs', ais || (found.length ? found.join(',') : 'claude,agents'));
   }
-  if (!dir || !ais || !level) die('non-interactive run needs --dir, --ai and --level (and --yes)');
   if (!/^[1-4]$/.test(String(level))) die('level must be exactly 1, 2 or 3');
   level = Number(level);
-  // Keep the former level accepted so existing scripts run. Routing has its own package.
   if (level === 4) console.log('note: --level 4 installs exactly what --level 3 installs. For model routing, see https://github.com/aunysillyme/model-orchestrator');
-  const targets = String(ais).split(',').map(s => s.trim()).filter(Boolean);
+  const targets = String(ais || '').split(',').map(s => s.trim()).filter(Boolean);
   const bad = targets.filter(t => !AIS.includes(t));
   if (bad.length) die(`unknown AI: ${bad.join(', ')} (known: ${AIS.join(', ')})`);
   if (!targets.length) die('no AIs chosen');
   if (new Set(targets).size !== targets.length) die(`an AI is listed twice in --ai (${targets.join(',')}); list each once`);
 
-  // Onboarding answers: a file, the defaults, or the interview. Validated before anything is created.
-  let answers = null, answersSource = '';
   const answersFile = arg('--answers', null);
   if (answersFile && arg('--defaults', false)) die('--answers and --defaults are exclusive');
-  if (arg('--quick', false) && arg('--full', false)) die('--quick and --full are exclusive; the short interview is the default');
-  if (arg('--quick', false) && (answersFile || arg('--defaults', false) || !interactive)) die('--quick is the short interview; it needs a terminal and no --answers, --defaults or --yes');
-  if (arg('--full', false) && (answersFile || arg('--defaults', false) || !interactive)) die('--full is the long interview; it needs a terminal and no --answers, --defaults or --yes');
-  let destination = null, stored = null;
+  let answers = stored.prevAnswers || onboarding.defaults();
+  let answersSource = stored.prevAnswers ? 'kept from .agent-personalizer.json' : 'defaults (editable through --answers or .agent-personalizer.json)';
   if (answersFile) {
     let raw;
     const label = answersFile === '-' ? 'stdin' : answersFile;
-    try { raw = JSON.parse(answersFile === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(path.resolve(answersFile), 'utf8')); } catch (e) { die(`--answers: cannot read ${label} as JSON (${e.message})`); }
+    try { raw = JSON.parse(answersFile === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(path.resolve(answersFile), 'utf8')); }
+    catch (e) { die(`--answers: cannot read ${label} as JSON (${e.message})`); }
     try { answers = onboarding.validate(raw); } catch (e) { die(`--answers: ${e.message}`); }
     answersSource = `from ${label}`;
-  } else if (arg('--defaults', false) || !interactive) {
-    answers = onboarding.defaults();
-    if (!arg('--defaults', false) && !process.stdin.isTTY) console.error('agent-personalizer: stdin is not a terminal, so the interview cannot run; using the default answers (pass --answers <file.json>, --answers -, or --defaults to silence this)');
-    answersSource = process.stdin.isTTY ? 'defaults (pass --answers <file.json>, or run without --yes, to answer the interview)' : 'defaults (stdin is not a terminal; pass --answers <file.json> or --answers - to script them)';
-  } else {
-    destination = resolveDestination(dir);
-    const { requested, root, missing } = destination;
-    if (!missing.length && !fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
-    stored = readConfig(root, level);
-    const saved = stored.prevAnswers;
-    const full = !!arg('--full', false);
-    console.log(saved
-      ? '\nOnboarding: how should an AI work with you? Enter keeps the saved answer shown in brackets.'
-      : '\nOnboarding: how should an AI work with you? Enter accepts the default in brackets.');
-    console.log(full
-      ? `Full interview: up to ${onboarding.QUESTIONS.length} questions, some of which apply only to certain notes tools.\n`
-      : `Short interview: the ${onboarding.QUICK.length} questions that change behaviour, plus any the notes tool you pick makes apply. ${saved ? 'Every other answer keeps its saved value' : 'Every other answer takes its default'}; --full asks up to ${onboarding.QUESTIONS.length}, skipping questions that do not apply to your notes tool.\n`);
-    const raw = saved ? onboarding.interviewAnswers(saved) : {};
-    for (const q of onboarding.QUESTIONS) {
-      if (!onboarding.asks(q, raw, full)) continue;
-      if (q.options) for (const [v, l] of q.options) console.log(`    ${v.padEnd(30)} ${l}`);
-      const value = onboarding.interviewDefault(q, saved);
-      const dflt = Array.isArray(value) ? value.join(', ') : value;
-      raw[q.id] = onboarding.parseAnswer({ ...q, default: value }, await ask(q.ask, dflt || '', !!saved));
-    }
-    try { answers = onboarding.validate(raw); } catch (e) { die(`onboarding: ${e.message}`); }
-    answersSource = full ? 'your interview answers' : `your short-interview answers (the rest are ${saved ? 'kept saved values' : 'defaults'})`;
   }
+  const learnRequested = interactive && !stored.cfgExists
+    ? await require('./learn.cjs').requestConsent() : false;
 
   // The folder you name is followed once (realpath of its deepest EXISTING ancestor); the
   // missing tail is created one level at a time, so nothing is ever created through a
   // symlink that did not exist when you ran the command. Everything beneath root is then
   // symlink-free by construction (safeDest refuses any).
-  const { requested, root, realExisting, missing } = destination || resolveDestination(dir);
+  const { requested, root, realExisting, missing } = destination;
   let creating = realExisting;
   for (const part of missing) { creating = path.join(creating, part); fs.mkdirSync(creating); }
   if (!fs.lstatSync(root).isDirectory()) die(`--dir ${requested} is not a directory`);
   // Config: the one file this installer rewrites. Read and VALIDATED here, before the first write, so a malformed
   // stored config refuses the whole run and leaves the folder untouched. Existing onboarding answers are kept unless
-  // --answers or the interview supplied new ones; targets are merged; "onboarding" is always a target.
+  // --answers supplied new ones; explicit targets replace the saved selection; "onboarding" is always a target.
   const storedConfig = stored || readConfig(root, level);
   const { cfgPath, cfgExists, prevAnswers } = storedConfig;
   let cfg = storedConfig.cfg;
   if (prevAnswers && !answersFile && answersSource.startsWith('defaults')) {
     answers = prevAnswers; answersSource = 'kept from .agent-personalizer.json';
   }
-  const allTargets = [...new Set([...(Array.isArray(cfg.targets) ? cfg.targets : []), ...targets, 'onboarding'])];
-  const installedLevel = Math.max(level, cfg.level || 0);
+  const allTargets = [...new Set([...targets, 'onboarding'])];
+  const installedLevel = level;
   const effectiveLevel = Math.min(installedLevel, 3);
   const base = onboarding.baseFor(answers);              // the folder scaffolds and home-file pointers use
   const kind = onboarding.kindOf(answers);
@@ -349,6 +315,7 @@ async function main() {
   // USER.md: yours once it exists. Regenerated only when it still equals the render of the PREVIOUS
   // answers byte for byte (you never touched it) and the answers changed. Otherwise kept, and any
   // changed answer that the kept file still carries the old value of is named as a conflict.
+  const entries = markers.readLearned(root);
   const user = probe(root, 'USER.md');
   let userAction = 'create';
   let staleNotesInUser = false;
@@ -359,14 +326,15 @@ async function main() {
     // Two candidate renders per answer set, one saying the notes folder is there and one saying it is
     // not (#25). A match against EITHER means the file is still exactly what this installer wrote,
     // so regenerating loses nothing; anything else is yours and is kept.
-    const untouched = (ans) => [true, false].some(ns => current === onboarding.renderUser(ans, { notesScaffolded: ns }));
+    const untouched = (ans) => [true, false].some(ns => current === onboarding.renderUser(ans, { notesScaffolded: ns, entries }));
     if (changedKeys.length) {
       userAction = untouched(prevAnswers) ? 'regenerate' : 'conflict';
-    } else if (notesScaffolded && current === onboarding.renderUser(answers, { notesScaffolded: false })) {
+    } else if (notesScaffolded && current === onboarding.renderUser(answers, { notesScaffolded: false, entries })) {
       // Same answers, but the file says the folder is absent and it is not (this run created it, or
       // it was already there). The real paths go back, and only on a byte-for-byte match.
       userAction = 'relevel';
-    } else userAction = 'keep';
+    } else if (recordedHash(cfg, 'USER.md') && sha256(Buffer.from(current)) === recordedHash(cfg, 'USER.md') && current !== onboarding.renderUser(answers, { notesScaffolded, entries })) userAction = 'refresh';
+    else userAction = 'keep';
     // A kept file that does not name the folder README while the folder is there is stale, however it
     // was worded: keying the notice on one sentence let an edit to that sentence silence it (finding 6).
     if (userAction === 'keep' && notesScaffolded && !current.includes(`\`${base}/README.md\``)) staleNotesInUser = true;
@@ -426,6 +394,7 @@ async function main() {
       if (!destination.exists) writes.push({ rel: p.rel, bytes, report: `wrote  ${p.rel} (${p.note})` });
       continue;
     }
+    if (destination.exists && p.firstOnly) { console.log(`kept   ${p.rel} (user-owned)`); continue; }
     if (destination.exists) {
       const existing = fs.readFileSync(destination.full);
       const old = previousPlan.find(prior => prior.rel === p.rel);
@@ -453,7 +422,7 @@ async function main() {
   // stays, even when no current recipe mentions it; its hashes remain in the inventory.
   const currentPaths = new Set(plan.map(p => p.rel));
   for (const rel of Object.keys(installedHashes)) {
-    if (!rel.startsWith('rules/') || currentPaths.has(rel)) continue;
+    if (effectiveLevel < 3 || !rel.startsWith('rules/') || currentPaths.has(rel)) continue;
     const destination = probe(root, rel);
     if (!destination.exists) continue;
     if (!fs.lstatSync(destination.full).isFile()) die(`${rel} is not a regular file; nothing was written`);
@@ -462,12 +431,13 @@ async function main() {
   }
   if (previousBase && previousBase !== base && previousNotesExists) console.log(`kept   ${previousBase}/ (previous notes folder; current notes folder: ${base}/; kept in the uninstall inventory)`);
 
-  if (userAction === 'create' || userAction === 'regenerate' || userAction === 'relevel') {
-    const rendered = onboarding.renderUser(answers, { notesScaffolded });
+  if (['create', 'regenerate', 'relevel', 'refresh'].includes(userAction)) {
+    const rendered = onboarding.renderUser(answers, { notesScaffolded, entries });
     writes.push({ rel: 'USER.md', bytes: Buffer.from(rendered) });
     installedHashes['USER.md'] = sha256(Buffer.from(rendered));
     if (userAction === 'create') console.log('wrote  USER.md (from your answers)');
     else if (userAction === 'regenerate') console.log(`update USER.md (regenerated: it matched your previous answers byte for byte; changed: ${changedKeys.join(', ')})`);
+    else if (userAction === 'refresh') console.log('update USER.md (untouched installer profile refreshed from your entries)');
     else console.log(`update USER.md (notes pointers now name ${base}/, which is there; it matched the render that said it was not, byte for byte)`);
   }
   else if (userAction === 'conflict') {
@@ -481,6 +451,7 @@ async function main() {
   // Snapshot every possible output and check every parent before the first write. The
   // renderer runs from this package, not from a potentially edited installed executable.
   const outputPaths = new Set(['.agent-personalizer.json', ...writes.map(p => p.rel), ...removals.map(p => p.rel)]);
+  if (learnRequested) { outputPaths.add('.agent-personalizer/digest.md'); outputPaths.add('.agent-personalizer/.gitignore'); }
   for (const target of allTargets.map(key => TARGETS[key])) {
     outputPaths.add(target.file);
     for (const rel of Object.values(target.boxFiles || {})) outputPaths.add(rel);
@@ -510,7 +481,7 @@ async function main() {
     try { fs.accessSync(ancestor, fs.constants.W_OK); } catch (_) { die(`${rel}: parent is not writable; nothing was written`); }
   }
   for (const rel of newDirectories) createdDirectories.add(rel);
-  cfg = { ...cfg, targets: allTargets, level: installedLevel, onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets], installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
+  cfg = { ...cfg, targets: allTargets, level: installedLevel, onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
   writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
   const replace = (rel, bytes, mode) => {
     const destination = safeDest(root, rel);
@@ -544,6 +515,7 @@ async function main() {
     }
     // Include renderer outputs in rollback even when it committed before reporting a failure.
     for (const rel of outputPaths) touched.add(rel);
+    if (learnRequested) await require('./learn.cjs').learn({ dir: root, consented: true });
     execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
   } catch (e) {
     const incomplete = [];
@@ -561,6 +533,8 @@ async function main() {
     console.error(incomplete.length ? `agent-personalizer: ROLLBACK INCOMPLETE\n${incomplete.join('\n')}` : 'agent-personalizer: install failed; every changed file was restored');
     throw e;
   } finally { committing = false; }
+
+  if (interactive && !cfgExists && !learnRequested) console.log('Nothing was read. Run npx agent-personalizer learn any time.');
 
   const DOCS = onboarding.DOCS;
   // the rerun command a user can actually type: the npx form when this ran from npm's cache, else the local path that just worked
@@ -584,7 +558,7 @@ async function main() {
   steps.push('Read AGENT_ONBOARDING.md once: that is what every AI will be told about working with you. Re-run this installer with new answers to change it.\n     USER.md is yours to edit freely; the onboarding file is regenerated from .agent-personalizer.json.');
   steps.push(level >= 3
     ? `Re-render after editing: node render/render.cjs --dir ${DIR}   (drift check: add --check)`
-    : `Re-render after editing by running this installer again (it refreshes generated outputs and untouched installer copies, and keeps and names edited files):\n     ${SELF} --dir ${DIR} --ai ${targets.join(',')} --level ${level} --yes`);
+    : `Re-render after editing by running this installer again (it refreshes generated outputs and untouched installer copies, and keeps and names edited files):\n     ${SELF} --dir ${DIR}`);
   steps.push([
     auto.length ? `Read from ${root} automatically, nothing to paste: ${auto.join(', ')}.` : null,
     paste.length ? `Still needs a paste: ${paste.join('; ')}.` : null,
@@ -596,13 +570,13 @@ async function main() {
   steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
   if (answers.notes_tool === 'obsidian') console.log(answers.obsidian_tc === 'yes'
     ? `\nCompanion: the onboarding file routes the AI through obsidian-tc; configure its folder ACLs from your off-limits answer and its human-in-the-loop list from your always-ask answer. See ${DOCS}/companions.md`
-    : `\nCompanion: your notes are an Obsidian vault and the AI will work on the folder directly. obsidian-tc would give it governed access (folder ACLs, human-in-the-loop, audit log): \`npx obsidian-tc /path/to/vault\`, then re-run this installer and answer yes. See ${DOCS}/companions.md`);
+    : `\nCompanion: your notes are an Obsidian vault and the AI will work on the folder directly. obsidian-tc would give it governed access (folder ACLs, human-in-the-loop, audit log): \`npx obsidian-tc /path/to/vault\`, then set obsidian_tc to yes through --answers. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'notion' || answers.notes_tool === 'google-docs') console.log(`\nCompanion: connect ${answers.notes_tool === 'notion' ? 'Notion' : 'Google Drive / Docs'} through your AI's own connector settings (where the app offers one); the onboarding file already names the door and the write posture, and tells the AI to make no filesystem writes for these notes. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'apple-notes') console.log(`\nCompanion: Apple Notes needs a separately installed local Apple Notes MCP; no AI app ships one built in. Until you connect one, the onboarding file already limits the AI to reading and creating new notes. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'other') console.log(`\nNote: "${answers.notes_tool_name || 'your notes tool'}" is unknown to this kit; the onboarding file tells the AI to ask before its first write there and to use the local fallback folder notes/ meanwhile.`);
   else if (['onenote', 'evernote'].includes(answers.notes_tool)) console.log(`\nNote: ${answers.notes_tool} has no first-class agent door today; the onboarding file treats it as read-only. See ${DOCS}/companions.md`);
   if (targets.length > 1) console.log(`\nSeveral agents? Read ${DOCS}/companions.md on the Context Layer: purpose-bound bundles and receipts for every delegation.`);
-  console.log('\nNothing here read an environment variable or wrote a secret.');
+  console.log('\nThe installer made no network calls.');
   console.log('\nIf this saved you time, a star helps people find it: https://github.com/aunysillyme/agent-personalizer');
 }
 

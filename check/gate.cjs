@@ -97,7 +97,7 @@ function refuseTrackedList(file) {
   }
 }
 
-function loadList(file) {
+function loadList(file, { allowEmpty = false } = {}) {
   let st = null;
   try { st = fs.lstatSync(file); } catch (_) { st = null; }
   if (!st) die(`${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
@@ -117,7 +117,7 @@ function loadList(file) {
       allow.push(a);
     } else terms.push(line);
   });
-  if (!terms.length) die('forbidden list has no terms.');
+  if (!terms.length && !allowEmpty) die('forbidden list has no terms.');
   return { terms, allow, real };
 }
 
@@ -354,4 +354,5 @@ function main() {
   console.log(`gate clean: 0 hits across ${files} files, text and paths (${scan.mode === 'git' ? 'files git would ship, index blobs included' : 'every file under --dir'}; ${skipped.length} skipped)`);
 }
 
-main();
+module.exports = { loadList };
+if (require.main === module) main();

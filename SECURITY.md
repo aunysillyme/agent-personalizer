@@ -6,11 +6,13 @@ This is a small local tool: it reads your files, writes files into a folder you 
 
 Use GitHub's private vulnerability reporting on this repository (Security tab → "Report a vulnerability"). That opens a private advisory only the maintainer can see. Please do not open a public issue for anything that could let an installer or renderer write outside the folder the user named, read a file it should not, or let `check/forbidden.local.txt` reach a commit.
 
+Report a leak of session data through that private route too; describe the reproduction with invented messages and keep real session text out of the report.
+
 You will get an acknowledgement within 7 days and a fix or a reasoned "won't fix" within 30. Credit is given in the changelog unless you ask otherwise.
 
 ## Scope
 
-In scope: `bin/agent-personalizer.js`, `render/`, `check/gate.cjs`, `hooks/`, the templates and the harness. Out of scope: the AI products this repo writes files for, and the companion tools it links to (report those to their own projects).
+In scope: `bin/`, including session reading, learning and removal, `render/`, `check/gate.cjs`, `hooks/`, the templates and the harness. Out of scope: the AI products this repo writes files for, and the companion tools it links to (report those to their own projects).
 
 ## What is already done
 
