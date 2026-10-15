@@ -166,11 +166,11 @@ Re-run `npx agent-personalizer --dir . --ai claude,agents --level 3 --yes --defa
 
 ### How do I uninstall agent-personalizer and keep my notes?
 
-Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files, user-written notes and `LEARNED.md` stay; the local digest is removed.
+Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files, user-written notes and a `LEARNED.md` with entries stay; the local digest is removed and untouched files return byte for byte.
 
 ## Uninstall
 
-Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files, notes and `LEARNED.md`, removes the local digest, and lists any hook registration you must remove.
+Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files, notes and a `LEARNED.md` with entries, removes the local digest, and lists any hook registration you must remove.
 
 ```bash
 npx agent-personalizer --uninstall --dir . --dry
