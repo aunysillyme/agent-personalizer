@@ -280,14 +280,14 @@ const cases = {
     verify(sameFiles(before, files(d)), 'uninstall --dry leaves every file byte unchanged');
     const r = uninstall(d);
     const left = [...files(d).keys()];
-    verify(left.length === 1 && left[0] === 'LEARNED.md', 'uninstall after a notes-path change keeps only entries', left.join(', '));
+    verify(left.length === 0, 'uninstall after a notes-path change leaves nothing, the untouched entries template included', left.join(', '));
     for (const name of ['journal/README.md', 'journal/decisions.md', 'journal/inbox/README.md', 'journal/sessions/TEMPLATE-week.md']) verify(dry.output.includes(name) && r.output.includes(name), `preview and removal both name historical ${name}`);
     const s = dir('uninstall-signature-history');
     install(s, { signature: 'yes' });
     install(s, { signature: 'no' });
     uninstall(s);
     const signatureLeft = [...files(s).keys()];
-    verify(signatureLeft.length === 1 && signatureLeft[0] === 'LEARNED.md', 'uninstall after signature changes keeps only entries', signatureLeft.join(', '));
+    verify(signatureLeft.length === 0, 'uninstall after signature changes leaves nothing, the untouched entries template included', signatureLeft.join(', '));
     const e = dir('uninstall-edited-notes');
     fs.mkdirSync(path.join(e, 'journal/sessions'), { recursive: true });
     install(e, { notes_path: 'journal' });
