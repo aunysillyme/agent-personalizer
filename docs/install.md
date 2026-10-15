@@ -148,14 +148,14 @@ npx agent-personalizer --uninstall --dir /path/to/project
 The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares files with their recorded install hashes. Its inventory includes every path recorded by any install run, including files under a previous notes path and rules omitted by later answers. Files absent from that inventory are left alone. Configurations from before hashes were recorded use the legacy comparison for their known recipe.
 
 - **Generated files:** removed when unchanged. Edited files are kept and named in the output.
-- **Existing home files:** user text stays; only an unchanged generated block is removed.
+- **Existing home files:** user text stays; only an unchanged generated block and the blank separator line the installer added are removed, so an untouched file returns byte for byte. (A file that had no final newline before install keeps the one the installer added.)
 - **`USER.md`:** removed only when it matches its recorded install hash. Edited and pre-existing profiles stay.
-- **`LEARNED.md`:** always kept, whether edited or untouched. It holds the entries you approved or declined.
+- **`LEARNED.md`:** kept once it holds anything you wrote, and kept if it existed before install. An untouched template that matches its recorded install hash is removed.
 - **Session digest:** `.agent-personalizer/digest.md`, its `.gitignore` and private folder are removed. Your AI apps' history is untouched.
 - **Notes scaffold:** unchanged historically installed templates are removed. Edited templates are kept and named; user-written notes stay byte for byte. A directory is removed only when the install recorded that it created it and it is empty.
 - **Rules and tools:** unchanged installed copies are removed file by file, including the session-start hook. Edited copies stay.
 - **Hook registration:** remove the matching `SessionStart` entry from `.claude/settings.json` or `~/.claude/settings.json` yourself. The uninstaller prints this step; it never edits settings outside the installation.
 - **Paths:** the whole removal plan is preflighted before the first unlink, and each path is re-probed before it is unlinked. The uninstaller never follows symlinks, deletes recursively or removes a path outside the named folder. A refused preflight leaves the removal plan unapplied.
-- **Configuration:** `.agent-personalizer.json` is removed last, only after every path it tracks is gone. A retained file, including a pre-existing home file with its block removed, keeps the configuration available for review.
+- **Configuration:** `.agent-personalizer.json` is removed last, only after every path it tracks is gone or, for a pre-existing home file, has had its block removed. An edited file the uninstaller retained keeps the configuration available for review.
 
 `--dry` previews the same decisions without writing. A missing configuration exits `2` and names the expected path. Keep the configuration while reviewing any edited files the uninstaller retained.
