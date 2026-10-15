@@ -8,8 +8,10 @@ The first interactive install asks which AIs you use, then shows this consent sc
 
 ```text
 Learn from your past sessions?
-agent-personalizer can read up to 20 of your most recent sessions that
-Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
+agent-personalizer can read up to 20 of your most recent sessions from this
+project that Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
+  · By default, only sessions for this --dir project are included.
+  · Use --all-projects to include sessions from other projects.
   · Only what you typed, never the AI's replies.
   · Stays on this computer, saved to .agent-personalizer/digest.md.
   · Your AI reads that file next time you open it, like anything you share with it.
@@ -44,9 +46,11 @@ The saved AI selection chooses the sources. The reader takes up to 20 of the new
 | `gemini` | Gemini CLI: `~/.gemini/tmp/<hash>/chats/session-*.jsonl` and the older `logs.json` |
 | `chatgpt`, `prompt` | No local session reader |
 
-The digest contains typed user messages and, when Codex is selected, Codex's own memory notes in a separate section. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Large likely pastes are dropped too. Gemini chat snapshots replace earlier messages; a message repeated in the chat and logs is included once.
+By default, only sessions associated with the `--dir` folder or one of its subfolders are included. Claude Code and Codex sessions are matched by their recorded working directory; Gemini CLI uses the SHA-256 project folder it creates from that path. If a session does not provide enough path information to match it safely, it is skipped. Use `npx agent-personalizer learn --dir . --all-projects` to include sessions from every project.
 
-The reader streams session files, skips oversized lines and stops a file at its size limit. Symlinks, unreadable files and unknown or malformed formats are skipped and counted. The terminal lists every file read and the skip counts; message text is never printed there. Vendor format changes may mean fewer usable sessions until the reader is updated.
+The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Large likely pastes are dropped too. Gemini chat snapshots replace earlier messages; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
+
+The reader streams session files, skips oversized lines and stops a file at its size limit. Symlinks, unreadable files, other-project sessions and unknown or malformed formats are skipped and counted. Codex session headers are inspected to determine their project; message content from other projects is not scanned. The terminal lists files read and skip counts; message text is never printed there. Vendor format changes may mean fewer usable sessions until the reader is updated.
 
 ## Privacy before reading
 

@@ -3,14 +3,27 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_FILE = 64 * 1024 * 1024;
+const MAX_MEMORIES = 20;
 const SOURCES = new Set(['claude-code', 'codex', 'gemini-cli']);
 const CONTEXT_HEADERS = ['# AGENTS.md instructions', '# Files mentioned by the user', '# Response annotations', '# Browser comments'];
 
-function bump(state, reason) {
-  state.skipped[reason] = (state.skipped[reason] || 0) + 1;
+function bump(state, reason, count = 1) {
+  state.skipped[reason] = (state.skipped[reason] || 0) + count;
+}
+
+function claudeProjectNames(projectDir) {
+  const absolute = path.resolve(projectDir);
+  return [...new Set([absolute.replace(/[\\/]/g, '-'), absolute.replace(/[:\\/]/g, '-')])];
+}
+
+function belongsToProject(cwd, projectDir) {
+  if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) return false;
+  const relative = path.relative(projectDir, path.resolve(cwd));
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
 /* Both sides are compared in NFC and lower case: macOS often stores accents decomposed (NFD),
@@ -97,10 +110,14 @@ async function discover(home, sources, state) {
     const app = path.join(home, '.claude');
     if (await statPath(app, 'directory', state)) {
       const projects = path.join(app, 'projects');
-      for (const project of await children(projects, state)) {
-        const dir = path.join(projects, project);
-        for (const name of await children(dir, state)) {
-          if (name.endsWith('.jsonl')) await candidate(path.join(dir, name), 'claude-code', project, 'claude', state);
+      if (await statPath(projects, 'directory', state)) {
+        const projectNames = state.allProjects ? await children(projects, state) : claudeProjectNames(state.projectDir);
+        for (const project of projectNames) {
+          const dir = path.join(projects, project);
+          if (!await statPath(dir, 'directory', state)) continue;
+          for (const name of await children(dir, state)) {
+            if (name.endsWith('.jsonl')) await candidate(path.join(dir, name), 'claude-code', project, 'claude', state);
+          }
         }
       }
     }
@@ -132,17 +149,20 @@ async function discover(home, sources, state) {
     const app = path.join(home, '.gemini');
     if (await statPath(app, 'directory', state)) {
       const tmp = path.join(app, 'tmp');
-      for (const project of await children(tmp, state)) {
-        const dir = path.join(tmp, project);
-        if (!await statPath(dir, 'directory', state)) continue;
-        for (const name of await children(path.join(dir, 'chats'), state)) {
-          if (name.startsWith('session-') && name.endsWith('.jsonl')) await candidate(path.join(dir, 'chats', name), 'gemini-cli', project, 'gemini', state);
+      if (await statPath(tmp, 'directory', state)) {
+        const projects = state.allProjects ? await children(tmp, state) : [state.geminiProjectHash];
+        for (const project of projects) {
+          const dir = path.join(tmp, project);
+          if (!await statPath(dir, 'directory', state)) continue;
+          for (const name of await children(path.join(dir, 'chats'), state)) {
+            if (name.startsWith('session-') && name.endsWith('.jsonl')) await candidate(path.join(dir, 'chats', name), 'gemini-cli', project, 'gemini', state);
+          }
+          const logs = path.join(dir, 'logs.json');
+          try {
+            await fs.promises.lstat(logs);
+            await candidate(logs, 'gemini-cli', project, 'gemini-logs', state);
+          } catch (error) { if (error.code !== 'ENOENT') bump(state, 'unreadable'); }
         }
-        const logs = path.join(dir, 'logs.json');
-        try {
-          await fs.promises.lstat(logs);
-          await candidate(logs, 'gemini-cli', project, 'gemini-logs', state);
-        } catch (error) { if (error.code !== 'ENOENT') bump(state, 'unreadable'); }
       }
     }
   }
@@ -178,14 +198,15 @@ async function safeOpen(file, state) {
 async function scanLines(file, state, onLine) {
   const handle = await safeOpen(file, state);
   if (!handle) return false;
-  let fragments = [], length = 0, oversize = false;
+  let fragments = [], length = 0, oversize = false, stopped = false;
   function line() {
-    if (!oversize && length) onLine(Buffer.concat(fragments, length).toString('utf8'));
+    if (!oversize && length && onLine(Buffer.concat(fragments, length).toString('utf8')) === false) stopped = true;
     fragments = []; length = 0; oversize = false;
   }
   try {
     const stream = handle.createReadStream({ autoClose: false, highWaterMark: 64 * 1024, start: 0, end: MAX_FILE - 1 });
     for await (const chunk of stream) {
+      if (stopped) break;
       let start = 0;
       for (let end = chunk.indexOf(10); ; end = chunk.indexOf(10, start)) {
         const stop = end === -1 ? chunk.length : end;
@@ -196,12 +217,16 @@ async function scanLines(file, state, onLine) {
         }
         if (end === -1) break;
         line();
+        if (stopped) break;
         start = end + 1;
       }
+      if (stopped) break;
     }
     // A capped file's partial final record is not a complete JSON line.
-    const stat = await handle.stat();
-    if (stat.size <= MAX_FILE) line();
+    if (!stopped) {
+      const stat = await handle.stat();
+      if (stat.size <= MAX_FILE) line();
+    }
     return true;
   } catch { bump(state, 'unreadable'); return false; }
   finally { await handle.close(); }
@@ -221,13 +246,19 @@ function baseSession(file) {
 
 async function readClaude(file, state) {
   const session = baseSession(file);
-  let known = false, automation = false;
+  if (!state.allProjects) session.project = path.basename(state.projectDir);
+  let known = false, automation = false, sessionCwd = null;
   const ok = await scanLines(file.file, state, line => {
     const record = parsedLine(line, state);
     if (!record) return;
+    if (typeof record.cwd === 'string') sessionCwd = record.cwd;
     if (typeof record.entrypoint === 'string' && record.entrypoint.startsWith('sdk')) automation = true;
     if (record.type !== 'user') return;
     known = true;
+    if (!state.allProjects && !belongsToProject(sessionCwd, state.projectDir)) {
+      bump(state, typeof sessionCwd === 'string' ? 'other_project' : 'project_unknown');
+      return;
+    }
     if (record.isMeta || record.isSidechain || record.isCompactSummary || record.isVisibleInTranscriptOnly) { bump(state, 'non_typed'); return; }
     if (typeof record.sessionId === 'string') session.sessionId = record.sessionId;
     const text = typedText(textItems(record.message && record.message.content, 'text'), state);
@@ -241,7 +272,7 @@ async function readClaude(file, state) {
 
 async function readCodex(file, state) {
   const session = baseSession(file);
-  let known = false, automation = false;
+  let known = false, automation = false, projectMatches = state.allProjects;
   const ok = await scanLines(file.file, state, line => {
     const record = parsedLine(line, state);
     if (!record) return;
@@ -250,17 +281,30 @@ async function readCodex(file, state) {
       const meta = record.payload;
       if (meta.source === 'exec' || (meta.source && typeof meta.source === 'object' && Object.prototype.hasOwnProperty.call(meta.source, 'subagent'))) automation = true;
       if (typeof meta.id === 'string') session.sessionId = meta.id;
+      if (!state.allProjects) {
+        projectMatches = belongsToProject(meta.cwd, state.projectDir);
+        if (!projectMatches) {
+          bump(state, typeof meta.cwd === 'string' ? 'other_project' : 'project_unknown');
+          return false;
+        }
+      }
       if (typeof meta.cwd === 'string') session.project = path.basename(meta.cwd);
       return;
     }
     if (record.type !== 'response_item' || !record.payload || record.payload.type !== 'message' || record.payload.role !== 'user') return;
     known = true;
+    if (!projectMatches) {
+      if (!state.allProjects) bump(state, 'project_unknown');
+      if (!state.allProjects) return false;
+      return;
+    }
     const text = typedText(textItems(record.payload.content, 'input_text'), state);
     if (text) session.messages.push(text);
   });
   if (!ok) return [];
   if (automation) { bump(state, 'automation_session'); return []; }
   if (!known) bump(state, 'unknown_format');
+  if (!projectMatches) return [];
   return session.messages.length ? [session] : [];
 }
 
@@ -353,11 +397,14 @@ async function readMemory(file, state) {
   return { file: file.file, text, date: new Date(file.mtimeMs).toISOString() };
 }
 
-async function readSessions({ home = os.homedir(), sources = [], limit = 20, privateTerms = [] } = {}) {
+async function readSessions({ home = os.homedir(), projectDir = process.cwd(), allProjects = false, sources = [], limit = 20, privateTerms = [] } = {}) {
   const selectedSources = new Set(Array.isArray(sources) ? sources.filter(source => SOURCES.has(source)) : []);
   const maximum = Number.isInteger(limit) && limit >= 0 ? Math.min(limit, 20) : 20;
+  projectDir = path.resolve(projectDir);
   const state = {
-    home: path.resolve(home), candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
+    home: path.resolve(home), projectDir, allProjects,
+    geminiProjectHash: crypto.createHash('sha256').update(projectDir).digest('hex'),
+    candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
     privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && term).map(fold) : []
   };
   await discover(state.home, selectedSources, state);
@@ -382,7 +429,8 @@ async function readSessions({ home = os.homedir(), sources = [], limit = 20, pri
   }
   const memories = [];
   state.memoryFiles.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));
-  for (const file of state.memoryFiles) {
+  for (const file of state.memoryFiles.slice(MAX_MEMORIES)) bump(state, 'memory_limit');
+  for (const file of state.memoryFiles.slice(0, MAX_MEMORIES)) {
     const memory = await readMemory(file, state);
     if (memory) memories.push(memory);
   }
