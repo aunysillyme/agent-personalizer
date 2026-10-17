@@ -50,7 +50,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   --yes        scripted first install: needs --dir, --ai and --level. Never reads session history.
   learn        with your yes, write a local digest for up to five evidence-backed questions.
   --forget     with learn, remove the digest; your AI apps' own history stays as it is.
-  --uninstall  remove unchanged installed files; keep LEARNED.md and edited files.
+  --uninstall  remove unchanged installed files; keep edited files and LEARNED.md with entries.
   --dry        preview --uninstall without changing files.
   Levels: 1 profile, onboarding and home file(s); nothing else (the rules render from the package)
           2 + the notes folder: its README, a weekly session log, a decisions log and an inbox

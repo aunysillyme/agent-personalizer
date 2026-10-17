@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+### Fixed
+
+- Uninstall restores a pre-existing home file byte for byte: it removes the blank separator line install added along with the block. An untouched `LEARNED.md` template is removed, and `.agent-personalizer.json` is removed when only stripped home files remain (#32).
+
 ## [0.8.0] - 2026-10-06
 
 ### Added
