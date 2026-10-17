@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-17
+
 ### Fixed
 
 - Re-render keeps user text outside generated blocks out of whole-file ownership updates and leaves legacy configurations without `installed` on the legacy removal path, so uninstall retains added instructions and removes untouched legacy targets (Codex audit 2026-10-17, F1; agy audit, A3).
@@ -17,6 +19,8 @@ Every entry names the adversarial audit round that produced it where one did. Au
 - The demo recorder follows the current folder, AI selection and default-No session-consent prompts (Codex audit 2026-10-17, F7).
 - Uninstall restores a pre-existing home file byte for byte: it removes the blank separator line install added along with the block. An untouched `LEARNED.md` template is removed, and `.agent-personalizer.json` is removed when only stripped home files remain (#32).
 - Inside a git repo, install adds `USER.md`, `LEARNED.md`, `.agent-personalizer.json` and the ChatGPT paste files to `.git/info/exclude` in one marked block per install folder, and notes that the home files carry your profile. Uninstall removes the block (#30).
+- Learning reads sessions from the current project by default; `--all-projects` explicitly includes sessions from other projects (#31).
+- The F5 historical-install check skips when its version tags are absent, including in shallow clones, and reports the skip separately from a pass (#34).
 
 ## [0.8.0] - 2026-10-06
 
@@ -295,7 +299,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.0...v0.7.1
