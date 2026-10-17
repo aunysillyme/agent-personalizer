@@ -363,6 +363,8 @@ async function main() {
     if (migration.changed) {
       const why = effectiveLevel >= 3 && (cfg.level || 1) < 3 ? 'rule pointers now name rules/, which this level installs' : 'unchanged installer pointer lines migrated to the new answers';
       upgrades.push({ rel: name, bytes: Buffer.from(migration.text), report: `update ${name} (${why})` });
+      // Only an unchanged owned file can advance its whole-file ownership after migration.
+      if (installedHashes[name] === sha256(Buffer.from(current))) installedHashes[name] = sha256(Buffer.from(migration.text));
     }
   }
 
@@ -394,7 +396,10 @@ async function main() {
     const destination = probe(root, p.rel);
     const bytes = p.src ? fs.readFileSync(p.src) : Buffer.from(p.text);
     if (HOME_NAMES.has(p.rel)) {
-      if (!destination.exists) writes.push({ rel: p.rel, bytes, report: `wrote  ${p.rel} (${p.note})` });
+      if (!destination.exists) {
+        writes.push({ rel: p.rel, bytes, report: `wrote  ${p.rel} (${p.note})` });
+        installedHashes[p.rel] = sha256(bytes);
+      }
       continue;
     }
     if (destination.exists && p.firstOnly) { console.log(`kept   ${p.rel} (user-owned)`); continue; }

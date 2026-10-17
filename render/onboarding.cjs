@@ -173,6 +173,9 @@ function validate(input) {
   // no "..", no empty segment, no backslash, nothing but [A-Za-z0-9._ -] per segment.
   if (kindOf(out) === 'disk' && !SAFE_REL.test(out.notes_path))
     throw new Error(`"notes_path" for ${out.notes_tool} must be a relative folder path such as "notes" or "docs/vault" (letters, digits, space, . _ -, segments joined by /; no leading /, no ..)`);
+  const owned = ['.agent-personalizer', '.agent-personalizer.json', '.claude', 'render', 'rules', 'check', 'hooks', 'USER.md', 'LEARNED.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'AGENT_ONBOARDING.md', 'system-prompt.md', 'chatgpt-custom-instructions.md', 'chatgpt-box1.txt', 'chatgpt-box2.txt'];
+  if (kindOf(out) === 'disk' && owned.some(p => out.notes_path.toLowerCase() === p.toLowerCase() || out.notes_path.toLowerCase().startsWith(p.toLowerCase() + '/')))
+    throw new Error('"notes_path" must be outside agent-personalizer tool-owned paths, including .agent-personalizer/');
   return out;
 }
 const SAFE_REL = /^(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+)*$/;

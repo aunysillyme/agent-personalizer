@@ -141,8 +141,8 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   const consent = consented || await requestConsent({ yes, allProjects });
   if (!consent) { console.log('Nothing was read.'); return false; }
   probe(root, FOLDER, 'dir');
-  probe(root, DIGEST);
-  probe(root, IGNORE);
+  const priorDigest = probe(root, DIGEST);
+  const priorIgnore = probe(root, IGNORE);
   probe(root, 'LEARNED.md');
   const list = probe(root, 'check/forbidden.local.txt');
   const terms = list.exists ? require('../check/gate.cjs').loadList(list.full, { allowEmpty: true }).terms : [];
@@ -156,6 +156,14 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   if (!folder.exists) fs.mkdirSync(folder.full, { mode: 0o700 });
   replace(root, IGNORE, '*\n');
   replace(root, DIGEST, text);
+  // Record only the two outputs we wrote, never other files sharing the private folder.
+  if (cfg.installed) {
+    const saved = JSON.parse(fs.readFileSync(path.join(root, CONFIG), 'utf8'));
+    if (!priorIgnore.exists || Object.hasOwn(cfg.installed, IGNORE)) saved.installed[IGNORE] = crypto.createHash('sha256').update('*\n').digest('hex');
+    if (!priorDigest.exists || Object.hasOwn(cfg.installed, DIGEST)) saved.installed[DIGEST] = crypto.createHash('sha256').update(text).digest('hex');
+    if (!folder.exists) saved.createdDirectories = [...new Set([...(saved.createdDirectories || []), FOLDER])];
+    replace(root, CONFIG, JSON.stringify(saved, null, 2) + '\n');
+  }
   for (const file of data.filesRead) console.log(`read   ${shownFile(file, home, terms)}`);
   console.log(`Files checked: ${data.filesChecked}. Files read: ${data.filesRead.length}. Sessions: ${data.sessions.length}. Memory notes: ${data.memories.length}.`);
   console.log(`Skipped by reason: ${Object.entries(data.skipped).map(([reason, count]) => `${reason}: ${count}`).join(', ') || 'none'}`);
