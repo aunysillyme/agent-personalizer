@@ -12,6 +12,16 @@ const CONFIG = '.agent-personalizer.json';
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function refuse(message) { throw new renderer.Refusal(message); }
+// Install appends "\n" + block + "\n" to a pre-existing file that ends in a newline
+// (render.cjs splice). Take back exactly that: the newline ending the end marker and one
+// separator newline before the begin marker, so an untouched file returns byte for byte.
+function stripBlock(existing, ms) {
+  let before = existing.slice(0, ms.bStart), after = existing.slice(ms.eEnd);
+  if (after.startsWith('\r\n')) after = after.slice(2);
+  else if (after.startsWith('\n')) after = after.slice(1);
+  if (before.endsWith('\n\n')) before = before.slice(0, -1);
+  return before + after;
+}
 function uninstall(dir, { dry = false } = {}) {
   const previousThrows = renderer.DIE_THROWS;
   renderer.DIE_THROWS = true;
@@ -165,7 +175,7 @@ function run(dir, dry) {
       // edited (or vice versa).
       const currentBlock = renderer.between(existing, rel);
       const blockUnedited = recorded ? (currentBlock !== null && sha256(Buffer.from(currentBlock)) === recorded) : matchesBlock;
-      if (blockUnedited) add(rel, 'strip', Buffer.from(existing.slice(0, ms.bStart) + existing.slice(ms.eEnd)), 'pre-existing file; removed only the marked block');
+      if (blockUnedited) add(rel, 'strip', Buffer.from(stripBlock(existing, ms)), 'pre-existing file; removed only the marked block');
       else add(rel, 'keep', null, ms.kind === 'none' ? 'pre-existing file; block already absent' : 'edited');
       continue;
     }
@@ -205,6 +215,11 @@ function run(dir, dry) {
     const unedited = recorded ? sha256(existing) === recorded : existing.equals(bytes);
     add(rel, unedited ? 'remove' : 'keep', null, 'edited');
   }
+  // LEARNED.md belongs to the user once it holds anything they wrote. Only the exact template
+  // bytes this package recorded writing are removed; a pre-existing or edited file stays.
+  const recordedLearned = recordedHash(cfg, 'LEARNED.md');
+  const learnedUntouched = !!learned && !!recordedLearned && sha256(learned) === recordedLearned;
+  if (learnedUntouched) add('LEARNED.md', 'remove', null, 'untouched template');
   // Earlier notes folders, retired rules and all other recorded paths are inventory too.
   // Current answers cannot erase history, and an unrecorded file is never adopted here.
   const planned = new Set(plan.map(p => p.rel));
@@ -214,7 +229,8 @@ function run(dir, dry) {
     if (bytes) add(rel, sha256(bytes) === recordedHash(cfg, rel) ? 'remove' : 'keep', null, 'edited');
   }
   if (new Set(plan.map(p => p.rel)).size !== plan.length) refuse('conflicting tracked paths; nothing was removed');
-  const retained = plan.filter(p => p.action !== 'remove');
+  // A pre-existing home file with only its block removed holds nothing of ours to review.
+  const retained = plan.filter(p => p.action === 'keep');
   const removeConfig = retained.length === 0;
   const gone = new Set(plan.filter(p => p.action === 'remove').map(p => p.rel));
   const emptyDirs = [];
@@ -240,7 +256,7 @@ function run(dir, dry) {
   }
   const label = dry ? 'would ' : '';
   if (dry) console.log('Dry run: preview only; no files changed.');
-  if (learned) console.log('kept   LEARNED.md (your entries, edited or untouched)');
+  if (learned && !learnedUntouched) console.log('kept   LEARNED.md (your entries)');
   for (const p of plan) {
     if (p.action === 'keep') { console.log(`kept   ${p.rel} (${p.reason})`); continue; }
     if (!dry) {
@@ -272,7 +288,7 @@ function run(dir, dry) {
   // Config is always the final removal. A kept tracked path keeps the record for review.
   if (removeConfig) {
     if (!dry) {
-      for (const p of plan) if (probe(p.rel)) refuse(`${p.rel} still exists; ${CONFIG} kept`);
+      for (const p of plan) if (p.action === 'remove' && probe(p.rel)) refuse(`${p.rel} still exists; ${CONFIG} kept`);
       const full = probe(CONFIG);
       if (!full || !fs.readFileSync(full).equals(observations.get(CONFIG).bytes)) refuse(`${CONFIG} changed; config kept`);
       fs.unlinkSync(full);

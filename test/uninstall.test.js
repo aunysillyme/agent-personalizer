@@ -91,7 +91,7 @@ const cases = {
       install(dir, level);
       const r = uninstall(dir);
       code(r, 0);
-      assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], `clean level ${level} leaves only the learning log`);
+      assert.deepEqual(fs.readdirSync(dir), [], `clean level ${level} leaves an empty folder; the untouched entries template goes too`);
       if (level === 3) { assert.match(r.output, /settings/i); assert.match(r.output, /hook|SessionStart/); }
     }
   },
@@ -110,23 +110,20 @@ const cases = {
     assert.deepEqual(installed.subarray(0, user.length), user, 'setup preserves the original prefix');
     const begin = installed.indexOf(BEGIN), end = installed.indexOf(END) + Buffer.byteLength(END);
     assert.ok(begin >= user.length && end > begin, 'setup contains the inserted block');
-    const expected = Buffer.concat([installed.subarray(0, begin), installed.subarray(end)]);
     const r = uninstall(dir);
     code(r, 0);
-    assert.deepEqual(read(dir, 'CLAUDE.md'), expected, 'only the marker block is removed; outside bytes stay exact');
-    assert.ok(!read(dir, 'CLAUDE.md').includes(Buffer.from(BEGIN)));
+    assert.deepEqual(read(dir, 'CLAUDE.md'), user, 'the block and its separator are removed; the original returns byte for byte');
     named(r, 'CLAUDE.md');
+    assert.ok(!exists(dir, CONFIG), 'a stripped home file holds nothing to review, so the config goes');
   },
   'preserved-home-rerun'(dir) {
-    write(dir, 'CLAUDE.md', '# Existing project instructions\nKeep my own policy.\n');
+    const original = Buffer.from('# Existing project instructions\nKeep my own policy.\n');
+    write(dir, 'CLAUDE.md', original);
     install(dir, 1);
     install(dir, 3);
-    const installed = read(dir, 'CLAUDE.md');
-    const begin = installed.indexOf(BEGIN), end = installed.indexOf(END) + Buffer.byteLength(END);
-    const expected = Buffer.concat([installed.subarray(0, begin), installed.subarray(end)]);
     const r = uninstall(dir);
     code(r, 0);
-    assert.deepEqual(read(dir, 'CLAUDE.md'), expected, 'reinstall preserves the original home ownership');
+    assert.deepEqual(read(dir, 'CLAUDE.md'), original, 'reinstall preserves the original home ownership');
   },
   'owned-home-rerun'(dir) {
     install(dir, 1);
@@ -134,7 +131,38 @@ const cases = {
     install(dir, 1);
     const r = uninstall(dir);
     code(r, 0);
-    assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'reinstall keeps package-created home ownership and recorded inventory');
+    assert.deepEqual(fs.readdirSync(dir), [], 'reinstall keeps package-created home ownership and recorded inventory');
+  },
+  'restore-bytes'(root) {
+    // Install then uninstall must give back the folder exactly as it was: every pre-existing
+    // file byte for byte (LF and CRLF), nothing added, and no config left behind.
+    const contents = bytes => { const out = {}; for (const [k, v] of Object.entries(snapshot(bytes))) out[k] = v.bytes || v.directory || v.link; return out; };
+    const seeds = {
+      'CLAUDE.md': '# Project\n\nUse tabs.\n',
+      'AGENTS.md': '# Agents\r\nRun the tests first.\r\n',
+      'GEMINI.md': '# Gemini\n\n\nTrailing blank lines stay.\n\n',
+      'README.md': 'Unrelated file.\n'
+    };
+    for (const level of [1, 2, 3]) for (const own of [false, true]) {
+      const dir = path.join(root, `level-${level}${own ? '-own-entries' : ''}`);
+      fs.mkdirSync(dir);
+      for (const [rel, value] of Object.entries(seeds)) write(dir, rel, value);
+      if (own) write(dir, 'LEARNED.md', '# My own log\nKeep me.\n');
+      const before = contents(dir);
+      install(dir, level);
+      install(dir, level);
+      const r = uninstall(dir);
+      code(r, 0);
+      assert.deepEqual(contents(dir), before, `level ${level}${own ? ' with a pre-existing LEARNED.md' : ''}: install then uninstall restores the folder byte for byte`);
+    }
+    const dir = path.join(root, 'edited-entries');
+    fs.mkdirSync(dir); install(dir);
+    fs.appendFileSync(path.join(dir, 'LEARNED.md'), '\nAn entry I wrote.\n');
+    const learned = read(dir, 'LEARNED.md'), r = uninstall(dir);
+    code(r, 0);
+    assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'edited entries are the only thing left');
+    assert.deepEqual(read(dir, 'LEARNED.md'), learned, 'edited LEARNED.md keeps every byte');
+    named(r, 'LEARNED.md');
   },
   'user-note'(dir) {
     install(dir, 2);
@@ -269,7 +297,7 @@ const cases = {
       const before = read(dir, 'CLAUDE.md'), r = uninstall(dir);
       code(r, 0);
       if (edited) kept(r, dir, 'CLAUDE.md', before);
-      else assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'legacy config removes generated files and keeps entries');
+      else assert.deepEqual(fs.readdirSync(dir), [], 'legacy config removes generated files and the untouched entries template');
     }
   },
   'answer-variants'(root) {
@@ -283,7 +311,7 @@ const cases = {
       fs.mkdirSync(dir); install(dir, 3, answers);
       const r = uninstall(dir);
       code(r, 0);
-      assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], `answer variant ${i} leaves only the learning log`);
+      assert.deepEqual(fs.readdirSync(dir), [], `answer variant ${i} leaves an empty folder`);
     }
   },
   'historical-inventory'(root) {
@@ -301,7 +329,7 @@ const cases = {
       const r = uninstall(dir);
       code(r, 0);
       if (edited) { kept(r, dir, rel, before); assert.match(r.output, /journal\/decisions\.md \(edited\)/); }
-      else assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md'], 'uninstall covers both notes folders and the retired rule');
+      else assert.deepEqual(fs.readdirSync(dir), [], 'uninstall covers both notes folders and the retired rule');
     }
   },
   'historical-symlink'(root) {

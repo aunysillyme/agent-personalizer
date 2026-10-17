@@ -86,7 +86,7 @@ npx agent-personalizer --uninstall --dir . --dry
 npx agent-personalizer --uninstall --dir .
 ```
 
-`learn --forget` deletes agent-personalizer's digest and removes its empty private folder. It keeps approved entries. Uninstall removes the digest, its `.gitignore` and private folder, and always keeps `LEARNED.md`, edited or untouched. Neither changes the AI apps' own history. To stop questions, decline the consent screen and do not run `learn --yes`; to change an entry, edit its owning line and re-render.
+`learn --forget` deletes agent-personalizer's digest and removes its empty private folder. It keeps approved entries. Uninstall removes the digest, its `.gitignore` and private folder, and keeps `LEARNED.md` once it holds anything you wrote; an untouched template is removed. Neither changes the AI apps' own history. To stop questions, decline the consent screen and do not run `learn --yes`; to change an entry, edit its owning line and re-render.
 
 ## How the loop closes
 
