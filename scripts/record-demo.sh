@@ -45,6 +45,7 @@ import errno
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import struct
@@ -57,16 +58,9 @@ command = ["npx", "--offline", "--yes", package]
 # Each response waits for its real prompt. A changed interview fails the script
 # rather than producing a plausible-looking recording of canned output.
 answers = [
-    ("Folder to install into [.]", "."),
-    ("AIs [claude,agents]", "claude,agents"),
-    ("Level [1]", "1"),
-    ("What should the AI call you? [the user]", "Riley"),
-    ("How direct should the AI be? [direct]", "direct"),
-    ("How long should replies be? [short]", "short"),
-    ("Where do your notes live? [folder]", "folder"),
-    ("name (Notion, Google Docs, Apple Notes, others) [notes]", "notes"),
-    ("How freely may the AI write into your notes? [notes-freely]", "notes-freely"),
-    ("blank for all) [delete, publish, send, spend, settings, standing-rules]", ""),
+    (r"Folder to install into \[\.\]: ", "."),
+    (r"AIs \[[^\r\n]*\]: ", "claude,agents"),
+    (r"Read your last 20 sessions\? \(y/N\) ", ""),
 ]
 print("$ " + " ".join(command), flush=True)
 time.sleep(0.8)
@@ -99,8 +93,7 @@ try:
             pending += chunk
             if next_answer < len(answers):
                 prompt, answer = answers[next_answer]
-                token = (prompt + ": ").encode()
-                if token in pending:
+                if re.search(prompt.encode(), pending):
                     time.sleep(0.6)
                     for character in answer:
                         os.write(master, character.encode())

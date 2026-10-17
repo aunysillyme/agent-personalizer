@@ -66,6 +66,7 @@ function typedText(items, state) {
     if (text) kept.push(text);
   }
   const text = kept.join('\n');
+  if (privateMatch(text, state.privateTerms) || privateMatch(kept.join(''), state.privateTerms)) { bump(state, 'private_match'); return null; }
   if (!text) { bump(state, 'empty_message'); return null; }
   if (text.length > 2000) { bump(state, 'long_message'); return null; }
   return text;

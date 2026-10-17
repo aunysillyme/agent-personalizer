@@ -1313,6 +1313,7 @@ pass "packed Markdown relative links resolve inside npm pack --dry-run inventory
 # 98. Interactive re-runs keep saved defaults and skipped answers, including off-limits boundaries.
 node test/ap-regressions.cjs RERUN || fail "interactive saved-answer regressions"
 node test/learning.test.cjs || fail "learning privacy and rendering regressions"
+node test/release-081.test.cjs || fail "0.8.1 regression tests"
 pass "session learning: consent, entries, forget and uninstall; interactive re-runs preserve saved answers without prompts"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

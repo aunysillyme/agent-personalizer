@@ -101,7 +101,7 @@ function run(dir, dry) {
   }
   const tracked = new Set(modern ? [CONFIG, ...Object.keys(cfg.installed)] : [CONFIG, 'USER.md', ...recipe.map(p => p.rel)]);
   tracked.delete('LEARNED.md');
-  // The digest is disposable private material, independent of installed-file hashes.
+  // Digest files use the same ownership proof as every other installed file.
   const digestFolder = '.agent-personalizer';
   const digestFiles = [];
   function collectDigest(rel) {
@@ -109,7 +109,7 @@ function run(dir, dry) {
     if (!full) return;
     const names = fs.readdirSync(full).sort();
     observations.get(rel).children = names;
-    dirs.add(rel);
+    if ((cfg.createdDirectories || []).includes(rel)) dirs.add(rel);
     for (const name of names) {
       const child = `${rel}/${name}`;
       const info = fs.lstatSync(path.join(root, child));
@@ -117,8 +117,7 @@ function run(dir, dry) {
       else { read(child); digestFiles.push(child); }
     }
   }
-  // The whole private folder is removed by uninstall. Validate even unexpected descendants
-  // before planning any deletion, so a symlink cannot turn this into a wider removal.
+  // Validate even unexpected descendants, then keep anything without a matching creation hash.
   collectDigest(digestFolder);
   for (const rel of digestFiles) tracked.add(rel);
   const learned = read('LEARNED.md');
@@ -147,7 +146,10 @@ function run(dir, dry) {
     : renderer.renderedContents(root, cfg);
   const plan = [];
   const add = (rel, action, output, reason) => plan.push({ rel, action, output, reason });
-  for (const rel of digestFiles) if (read(rel)) add(rel, 'remove', null, 'private digest data');
+  for (const rel of digestFiles) {
+    const bytes = read(rel), recorded = recordedHash(cfg, rel);
+    if (bytes) add(rel, recorded && sha256(bytes) === recorded ? 'remove' : 'keep', null, 'unrecorded or edited digest-folder file');
+  }
   for (const entry of rendered) {
     const { rel, key, block, raw } = entry;
     if (!tracked.has(rel)) continue;
@@ -284,7 +286,6 @@ function run(dir, dry) {
     }
     console.log(`${label}remove ${rel}/ (empty)`);
   }
-  if (!dry && probe(digestFolder, 'dir')) refuse(`${digestFolder}/ changed during removal; ${CONFIG} kept, review its remaining contents`);
   // Config is always the final removal. A kept tracked path keeps the record for review.
   if (removeConfig) {
     if (!dry) {
