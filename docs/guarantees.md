@@ -21,6 +21,7 @@ The check measures rendered-file consistency. The [instruction tiers](tiers.md) 
 The installer validates answers, configuration, source files and target marker structure before its write phase. The renderer validates its full target plan before replacing files.
 
 - **Paths:** paths beneath the installation root must be real files and directories. Symlinks and paths outside the root are refused.
+- **Git exclude:** the one write outside the installed files. Inside a git work tree, the installer adds `USER.md`, `LEARNED.md`, `.agent-personalizer.json` and the ChatGPT paste files to the repo's `.git/info/exclude` (the path `git rev-parse --git-path info/exclude` names) in one block marked with the install folder. Re-runs replace that block; it is never committed. A folder git already ignores is left alone, a symlinked or unwritable exclude file gets a warning instead, and so does a private file git already tracks. `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and `AGENT_ONBOARDING.md` stay committable with a note to review them.
 - **Markers:** each target may have one correctly ordered generated block or be ready for its first block. Malformed blocks are refused.
 - **Encoding:** sources and targets must contain valid UTF-8; invalid bytes are refused instead of re-encoded.
 - **Existing work:** edited and pre-existing profiles, notes templates, rules and tools are kept and named. Untouched installer-owned files update to the current answers and package. Obsolete untouched copies are removed; edited copies stay and are named.

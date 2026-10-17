@@ -294,6 +294,7 @@ function run(dir, dry) {
       fs.unlinkSync(full);
     }
     console.log(`${label}remove ${CONFIG}`);
+    require('./git-exclude.cjs').unprotect(root, { dry });
   } else console.log(`kept   ${CONFIG} (tracked files remain; review the kept paths above)`);
   if (level >= 3) console.log('Manual step: remove any SessionStart entry for hooks/claude-code/session-start.sh from .claude/settings.json or ~/.claude/settings.json if you registered it. Settings are kept.');
 }
