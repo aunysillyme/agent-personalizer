@@ -1276,7 +1276,8 @@ pass "(library) parseFrontmatter and parseSections are exported, parse a shipped
 # 91. uninstall keeps user data, checks the complete plan before deleting, and previews without writes.
 #     F4 adds historical inventory journeys in check 95; these existing hostile-path cases remain the safety floor.
 node test/uninstall.test.js || fail "uninstall regressions"
-pass "uninstall: clean levels, edited files, shared home files, notes, dry-run and hostile paths"
+node test/git-exclude.test.cjs || fail "git exclude regressions"
+pass "uninstall: clean levels, edited files, shared home files, notes, dry-run and hostile paths; private outputs excluded from git and restored"
 
 # 92. Codex audit 2026-10-04, F1: USER.md supplies every profile, including both ChatGPT edit paths.
 node test/ap-regressions.cjs F1 || fail "F1 canonical profile regressions"

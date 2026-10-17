@@ -153,6 +153,7 @@ The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares f
 - **`LEARNED.md`:** kept once it holds anything you wrote, and kept if it existed before install. An untouched template that matches its recorded install hash is removed.
 - **Session digest:** `.agent-personalizer/digest.md`, its `.gitignore` and private folder are removed. Your AI apps' history is untouched.
 - **Notes scaffold:** unchanged historically installed templates are removed. Edited templates are kept and named; user-written notes stay byte for byte. A directory is removed only when the install recorded that it created it and it is empty.
+- **Git exclude:** after the configuration is removed, the block install added to `.git/info/exclude` for this folder is removed, and the rest of the file stays byte for byte. While an edited file keeps the configuration, the block stays too.
 - **Rules and tools:** unchanged installed copies are removed file by file, including the session-start hook. Edited copies stay.
 - **Hook registration:** remove the matching `SessionStart` entry from `.claude/settings.json` or `~/.claude/settings.json` yourself. The uninstaller prints this step; it never edits settings outside the installation.
 - **Paths:** the whole removal plan is preflighted before the first unlink, and each path is re-probed before it is unlinked. The uninstaller never follows symlinks, deletes recursively or removes a path outside the named folder. A refused preflight leaves the removal plan unapplied.

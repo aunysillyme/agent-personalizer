@@ -534,6 +534,8 @@ async function main() {
     throw e;
   } finally { committing = false; }
 
+  require('./git-exclude.cjs').protect(root);
+
   if (interactive && !cfgExists && !learnRequested) console.log('Nothing was read. Run npx agent-personalizer learn any time.');
 
   const DOCS = onboarding.DOCS;
