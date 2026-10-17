@@ -8,12 +8,12 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ### Fixed
 
-- Re-render keeps user text outside generated blocks out of whole-file ownership updates, so uninstall retains added instructions (Codex audit 2026-10-17, F1).
-- Local notes paths inside tool-owned paths are refused, and uninstall keeps unrecorded or edited digest-folder files (Codex audit 2026-10-17, F2).
+- Re-render keeps user text outside generated blocks out of whole-file ownership updates and leaves legacy configurations without `installed` on the legacy removal path, so uninstall retains added instructions and removes untouched legacy targets (Codex audit 2026-10-17, F1; agy audit, A3).
+- Local notes paths inside tool-owned paths are refused, `learn` preserves edited or pre-existing `.agent-personalizer/.gitignore` and `digest.md` files without adopting their hashes, and uninstall keeps unrecorded or edited digest-folder files (Codex audit 2026-10-17, F2; agy audit, A5).
 - Renderer ownership configuration writes share target staging and rollback, with clean diagnostics on failure (Codex audit 2026-10-17, F3).
-- Session privacy filtering checks the final text after context removal, including rejoined private terms (Codex audit 2026-10-17, F4).
+- Session and Codex memory privacy filtering strips control characters before matching and checks the final text after context removal, including private terms rejoined across newlines, item boundaries or spaces (Codex audit 2026-10-17, F4; agy audit, A1 and A6).
 - ChatGPT exports every declined entry in full and reports overflow; `--strict` refuses over-budget lists before writing (Codex audit 2026-10-17, F5).
-- Render, drift checks and uninstall preserve a leading UTF-8 BOM outside generated blocks (Codex audit 2026-10-17, F6).
+- Render, drift checks and uninstall strip a leading UTF-8 BOM before fence, marker and `LEARNED.md` parsing while preserving it byte for byte on output (Codex audit 2026-10-17, F6; agy audit, A2 and A4).
 - The demo recorder follows the current folder, AI selection and default-No session-consent prompts (Codex audit 2026-10-17, F7).
 - Uninstall restores a pre-existing home file byte for byte: it removes the blank separator line install added along with the block. An untouched `LEARNED.md` template is removed, and `.agent-personalizer.json` is removed when only stripped home files remain (#32).
 - Inside a git repo, install adds `USER.md`, `LEARNED.md`, `.agent-personalizer.json` and the ChatGPT paste files to `.git/info/exclude` in one marked block per install folder, and notes that the home files carry your profile. Uninstall removes the block (#30).

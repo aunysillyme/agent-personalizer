@@ -186,15 +186,136 @@ assert 're.search(prompt.encode(), pending)' in ${JSON.stringify(python)}
     const r = spawnSync('python3', ['-c', probe, 'offline-package', scratch], { encoding: 'utf8' });
     assert.ifError(r.error);
     assert.equal(r.status, 0, r.stdout + r.stderr);
+  },
+  'A1a-newline-split-private'() {
+    const context = { require, module: { exports: {} } };
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
+    const typedText = context.module.exports.probe;
+    const state = { privateTerms: ['secretfixtureperson'], skipped: {} };
+    assert.equal(typedText(['Ask Secret\n<system-reminder>x</system-reminder>FixturePerson.'], state), null);
+    assert.equal(state.skipped.private_match, 1);
+  },
+  'A1b-spaced-term-private'() {
+    const context = { require, module: { exports: {} } };
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
+    const typedText = context.module.exports.probe;
+    for (const items of [
+      ['Ask Secret <system-reminder>x</system-reminder>', 'FixturePerson.'],
+      ['Ask Secret', '# AGENTS.md instructions hidden context', 'FixturePerson.']
+    ]) {
+      const state = { privateTerms: ['secret fixtureperson'], skipped: {} };
+      assert.equal(typedText(items, state), null);
+      assert.equal(state.skipped.private_match, 1);
+    }
+    assert.equal(typedText(['Ask Someone Else.'], { privateTerms: ['secret fixtureperson'], skipped: {} }), 'Ask Someone Else.');
+  },
+  'A2-bom-fence'(dir) {
+    const fenced = Buffer.from('\ufeff```\nexample\n```\n');
+    fs.writeFileSync(path.join(dir, 'AGENTS.md'), fenced);
+    install(dir, 'agents', 1);
+    code(render(dir), 0);
+    code(render(dir, '--check'), 0);
+    code(uninstall(dir), 0);
+    assert.deepEqual(read(dir, 'AGENTS.md'), fenced);
+    const quoted = path.join(dir, 'quoted');
+    fs.mkdirSync(quoted);
+    const quotedBytes = Buffer.from('\ufeff```\n<!-- agent-personalizer:begin -->\nquoted example\n<!-- agent-personalizer:end -->\n```\n');
+    fs.writeFileSync(path.join(quoted, 'AGENTS.md'), quotedBytes);
+    install(quoted, 'agents', 1);
+    code(render(quoted), 0);
+    code(render(quoted, '--check'), 0);
+    assert.deepEqual(read(quoted, 'AGENTS.md').subarray(0, quotedBytes.length), quotedBytes);
+    code(uninstall(quoted), 0);
+    assert.deepEqual(read(quoted, 'AGENTS.md'), quotedBytes);
+  },
+  'A3-legacy-config-installed'(dir) {
+    install(dir, 'agents', 1);
+    const cfgPath = path.join(dir, CONFIG);
+    const raw = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    delete raw.installed;
+    fs.writeFileSync(cfgPath, JSON.stringify(raw, null, 2) + '\n');
+    code(render(dir), 0);
+    code(render(dir, '--check'), 0);
+    assert(!Object.hasOwn(JSON.parse(fs.readFileSync(cfgPath, 'utf8')), 'installed'), 'legacy config without installed must stay on legacy path');
+    code(uninstall(dir), 0);
+    assert.deepEqual(fs.readdirSync(dir), ['LEARNED.md']);
+    const outer = path.join(dir, 'outer');
+    install(outer, 'agents', 1);
+    const outerCfg = JSON.parse(fs.readFileSync(path.join(outer, CONFIG), 'utf8'));
+    delete outerCfg.installed;
+    fs.writeFileSync(path.join(outer, CONFIG), JSON.stringify(outerCfg, null, 2) + '\n');
+    fs.appendFileSync(path.join(outer, 'AGENTS.md'), '\nKEEP_LEGACY_OUTER\n');
+    code(render(outer), 0);
+    code(uninstall(outer), 0);
+    assert(read(outer, 'AGENTS.md').toString().includes('KEEP_LEGACY_OUTER'));
+  },
+  'A4-bom-learned'(dir) {
+    install(dir, 'agents', 1);
+    fs.writeFileSync(path.join(dir, 'LEARNED.md'), '\ufeff## Learned\n- [said, confirmed] KEEP_REPLIES_SHORT_BOM\n- [said, declined] NEVER_ASK_TABS_BOM\n');
+    code(render(dir), 0);
+    code(render(dir, '--check'), 0);
+    const text = read(dir, 'AGENTS.md').toString();
+    assert(text.includes('KEEP_REPLIES_SHORT_BOM'));
+    assert(text.includes('NEVER_ASK_TABS_BOM'));
+  },
+  'A5-learn-preserves-edited'(dir) {
+    install(dir, 'agents', 1);
+    code(run(CLI, ['learn', '--dir', dir, '--yes']), 0);
+    const ignorePath = path.join(dir, '.agent-personalizer/.gitignore');
+    const digestPath = path.join(dir, '.agent-personalizer/digest.md');
+    fs.appendFileSync(ignorePath, '!/mine/\n');
+    fs.appendFileSync(digestPath, '\nMy digest note.\n');
+    const ignoreBefore = fs.readFileSync(ignorePath);
+    const digestBefore = fs.readFileSync(digestPath);
+    code(run(CLI, ['learn', '--dir', dir, '--yes']), 0);
+    assert.deepEqual(fs.readFileSync(ignorePath), ignoreBefore);
+    assert.deepEqual(fs.readFileSync(digestPath), digestBefore);
+    code(uninstall(dir), 0);
+    assert.deepEqual(fs.readFileSync(ignorePath), ignoreBefore);
+    assert.deepEqual(fs.readFileSync(digestPath), digestBefore);
+    const pre = path.join(dir, 'pre');
+    install(pre, 'agents', 1);
+    fs.mkdirSync(path.join(pre, '.agent-personalizer'));
+    fs.writeFileSync(path.join(pre, '.agent-personalizer/.gitignore'), '# custom ignore\n');
+    fs.writeFileSync(path.join(pre, '.agent-personalizer/digest.md'), '# custom digest\n');
+    code(run(CLI, ['learn', '--dir', pre, '--yes']), 0);
+    const preCfg = JSON.parse(read(pre, CONFIG).toString());
+    assert(!Object.hasOwn(preCfg.installed, '.agent-personalizer/.gitignore'));
+    assert(!Object.hasOwn(preCfg.installed, '.agent-personalizer/digest.md'));
+    code(uninstall(pre), 0);
+    assert.equal(read(pre, '.agent-personalizer/.gitignore').toString(), '# custom ignore\n');
+    assert.equal(read(pre, '.agent-personalizer/digest.md').toString(), '# custom digest\n');
+  },
+  'A6-control-char-private'(dir) {
+    const context = { require, module: { exports: {} } };
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
+    const typedText = context.module.exports.probe;
+    const state = { privateTerms: ['secretfixtureperson'], skipped: {} };
+    assert.equal(typedText(['Ask Secret\u007fFixturePerson.'], state), null);
+    assert.equal(state.skipped.private_match, 1);
+    install(dir, 'claude,agents', 3);
+    fs.writeFileSync(path.join(dir, 'check/forbidden.local.txt'), 'SecretFixturePerson\n');
+    const realDir = fs.realpathSync(dir);
+    const slug = realDir.replace(/[:\\/]/g, '-');
+    const claudeDir = path.join(home, '.claude/projects', slug);
+    fs.mkdirSync(claudeDir, { recursive: true });
+    fs.writeFileSync(path.join(claudeDir, 'ctrl.jsonl'), JSON.stringify({ type: 'user', cwd: realDir, message: { content: 'Ask Secret\u007fFixturePerson.' } }) + '\n');
+    const memDir = path.join(home, '.codex/memories');
+    fs.mkdirSync(memDir, { recursive: true });
+    fs.writeFileSync(path.join(memDir, 'ctrl.md'), 'Remember Secret\u007fFixturePerson.\n');
+    code(run(CLI, ['learn', '--dir', dir, '--yes']), 0);
+    const digest = read(dir, '.agent-personalizer/digest.md').toString();
+    assert(!/secretfixtureperson/i.test(digest), 'control-char split private term must not enter digest.md');
   }
 };
 
+const matchesId = (name, id) => name === id || name.startsWith(id + '-') || (id === 'A1' && /^A1[ab]-/.test(name));
 let failed = 0;
 const selected = process.argv.slice(2);
 try {
-  if (selected.some(id => !Object.keys(cases).some(name => name === id || name.startsWith(id + '-')))) throw new Error('Unknown case');
+  if (selected.some(id => !Object.keys(cases).some(name => matchesId(name, id)))) throw new Error('Unknown case');
   for (const [name, test] of Object.entries(cases)) {
-    if (selected.length && !selected.some(id => name === id || name.startsWith(id + '-'))) continue;
+    if (selected.length && !selected.some(id => matchesId(name, id))) continue;
     const dir = path.join(scratch, name);
     fs.mkdirSync(dir);
     try { test(dir); console.log('PASS 0.8.1 ' + name); }
