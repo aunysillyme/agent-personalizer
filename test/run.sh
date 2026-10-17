@@ -1296,8 +1296,14 @@ pass "F4: historical notes and rules removed, dry-run faithful, edited and unrec
 
 # 96. Codex audit 2026-10-04, F5: real tagged pre-hash and recorded-hash installs refresh untouched tools.
 #     git archive reads local tags only; CI fetches history so these historical fixtures are reproducible.
-node test/ap-regressions.cjs F5 || fail "F5 runtime upgrade regressions (the v0.5.1 and v0.6.4 tags must be available)"
-pass "F5: tagged historical installs refresh every untouched tool and rule; edited gate bytes and version guidance stay"
+#     A shallow clone or a tarball has no tags, so the check is skipped there (a skip is printed as a skip).
+if git -C "$ROOT" rev-parse -q --verify 'refs/tags/v0.5.1^{commit}' >/dev/null 2>&1 &&
+   git -C "$ROOT" rev-parse -q --verify 'refs/tags/v0.6.4^{commit}' >/dev/null 2>&1; then
+  node test/ap-regressions.cjs F5 || fail "F5 runtime upgrade regressions (the v0.5.1 and v0.6.4 tags must be available)"
+  pass "F5: tagged historical installs refresh every untouched tool and rule; edited gate bytes and version guidance stay"
+else
+  echo "skip: v0.5.1 and v0.6.4 tags absent (shallow clone?); F5 NOT run (a skip, not a pass; git fetch --tags to run it)"
+fi
 
 # 97. Codex audit 2026-10-04, F9: every relative Markdown navigation target ships in npm's actual inventory.
 node test/package-links.cjs || fail "packed Markdown links do not resolve offline"
