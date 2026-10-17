@@ -28,10 +28,17 @@ function belongsToProject(cwd, projectDir) {
 
 /* Both sides are compared in NFC and lower case: macOS often stores accents decomposed (NFD),
    which would otherwise let a listed name through. Audit 0.8.0 F2. */
-const fold = (text) => String(text).normalize('NFC').toLowerCase();
+const CTRL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+const fold = (text) => String(text).replace(CTRL, '').normalize('NFC').toLowerCase();
+const compact = (text) => fold(text).replace(/\s+/g, '');
 function privateMatch(text, terms) {
   const lower = fold(text);
-  return terms.some(term => lower.includes(term));
+  const collapsed = compact(text);
+  return terms.some(raw => {
+    const term = fold(raw).trim();
+    const tight = compact(raw);
+    return (term && lower.includes(term)) || (tight && collapsed.includes(tight));
+  });
 }
 
 function cutContextBlocks(text) {
@@ -57,12 +64,12 @@ function typedText(items, state) {
   if (privateMatch(items.join('\n'), state.privateTerms) || privateMatch(items.join(''), state.privateTerms)) { bump(state, 'private_match'); return null; }
   const kept = [];
   for (const item of items) {
-    let text = item.trim();
+    let text = String(item).replace(CTRL, '').trim();
     if (/^<[A-Za-z][A-Za-z0-9_:-]*/.test(text) || CONTEXT_HEADERS.some(prefix => text.startsWith(prefix))) {
       bump(state, 'automation_text');
       continue;
     }
-    text = cutContextBlocks(text).trim();
+    text = cutContextBlocks(text).replace(CTRL, '').trim();
     if (text) kept.push(text);
   }
   const text = kept.join('\n');
@@ -392,7 +399,7 @@ async function readGeminiLogs(file, state) {
 async function readMemory(file, state) {
   const lines = [];
   if (!await scanLines(file.file, state, line => lines.push(line))) return null;
-  const text = lines.join('\n').trim();
+  const text = lines.join('\n').replace(CTRL, '').trim();
   if (!text) return null;
   if (privateMatch(text, state.privateTerms)) { bump(state, 'private_match'); return null; }
   return { file: file.file, text, date: new Date(file.mtimeMs).toISOString() };
@@ -406,7 +413,7 @@ async function readSessions({ home = os.homedir(), projectDir = process.cwd(), a
     home: path.resolve(home), projectDir, allProjects,
     geminiProjectHash: crypto.createHash('sha256').update(projectDir).digest('hex'),
     candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
-    privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && term).map(fold) : []
+    privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && fold(term).trim()).map(fold) : []
   };
   await discover(state.home, selectedSources, state);
   state.candidates.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));

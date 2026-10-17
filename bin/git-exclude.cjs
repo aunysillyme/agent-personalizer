@@ -10,7 +10,7 @@ const { spawnSync } = require('child_process');
 // Profile, entries, answers and ChatGPT paste copies are personal. Home files (CLAUDE.md,
 // AGENTS.md, GEMINI.md) and AGENT_ONBOARDING.md are often committed on purpose, so they get a
 // warning instead; tooling (rules/, render/, check/, hooks/, .claude/commands/) is shareable.
-const PRIVATE = ['USER.md', 'LEARNED.md', '.agent-personalizer.json', 'chatgpt-custom-instructions.md', 'chatgpt-box1.txt', 'chatgpt-box2.txt'];
+const PRIVATE = ['USER.md', 'LEARNED.md', '.agent-personalizer.json', '.agent-personalizer/digest.md', 'chatgpt-custom-instructions.md', 'chatgpt-box1.txt', 'chatgpt-box2.txt'];
 const SHARED_PERSONAL = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'AGENT_ONBOARDING.md'];
 
 function git(cwd, args) {

@@ -507,6 +507,7 @@ function compactProfileFromUser(text, answers, opts) {
 
 // Entry status is explicit: a guess does not become an approved instruction by being saved.
 function parseLearned(text, where = 'LEARNED.md', warn = console.error) {
+  text = String(text).replace(/^\ufeff/, '');
   if (/<!--\s*agent-personalizer/i.test(text)) throw new Error(`${where}: contains a reserved render marker token`);
   const out = { confirmed: [], declined: [], proposed: [], asked: [] };
   let section = '';

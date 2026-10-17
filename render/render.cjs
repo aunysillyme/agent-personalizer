@@ -119,6 +119,7 @@ function mustBe(p, kind, where) {
 }
 
 function parseFrontmatter(text, where) {
+  text = String(text).replace(/^\ufeff/, '');
   if (!text.startsWith('---\n')) return { meta: {}, body: text };
   const close = text.indexOf('\n---\n', 4);
   if (close === -1) die(`${where}: frontmatter opened with --- but never closed`);
@@ -157,6 +158,7 @@ function parseFrontmatter(text, where) {
 }
 
 function parseSections(body, where) {
+  body = String(body).replace(/^\ufeff/, '');
   const sections = {};
   let current = null;
   const lines = body.split('\n');
@@ -187,7 +189,8 @@ function fenceMap(lines, where) {
   const inside = new Array(lines.length).fill(false);
   let open = null; // { ch, len, line }
   lines.forEach((raw, i) => {
-    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const clean = i === 0 && raw.startsWith('\ufeff') ? raw.slice(1) : raw;
+    const line = clean.endsWith('\r') ? clean.slice(0, -1) : clean;
     const m = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (open) {
       inside[i] = true;
@@ -205,8 +208,12 @@ function rejectMarkers(text, where) {
   if (text.includes(BEGIN) || text.includes(END)) die(`${where}: contains a render marker token; those are reserved for rendered files`);
 }
 
+function hasUtf8Bom(bytes) {
+  return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+}
+
 function decodeUtf8(bytes, where) {
-  try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
   catch (_) { die(`${where}: not valid UTF-8. Nothing was written`); }
 }
 
@@ -509,30 +516,38 @@ function main() {
     if (!target) die(`unknown target "${key}" (known: ${KNOWN.join(', ')})`);
     const file = safeTargetPath(root, target.file, key);
     const block = renderTarget(key, target, profile, rules, cfg, root, learned);
-    let existing = null;
+    let existing = null, existingBytes = null, hasBom = false;
     if (fs.existsSync(file)) {
-      existing = decodeUtf8(fs.readFileSync(file), target.file);
+      existingBytes = fs.readFileSync(file);
+      hasBom = hasUtf8Bom(existingBytes);
+      existing = decodeUtf8(existingBytes, target.file);
     }
     if (!check) {
       try { fs.accessSync(existing == null ? path.dirname(file) : file, fs.constants.W_OK); }
       catch (_) { die(`${target.file}: not writable. Nothing was written`); }
     }
     const current = existing == null ? null : between(existing, target.file);
-    const output = check ? null : splice(existing, block, target.file);
+    const body = check ? null : splice(existing, block, target.file);
     // the generated file must itself re-parse to exactly one block, or the next render would refuse it
-    if (output != null) { const st = markerState(output, `${target.file} (generated)`); if (st.kind !== 'one' || between(output, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
+    if (body != null) { const st = markerState(body, `${target.file} (generated)`); if (st.kind !== 'one' || between(body, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
+    const output = body == null ? null : (hasBom ? '\ufeff' + body : body);
     const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
-    const entry = { key, target, file, block, current, existing, output, mode, report: report(target.file, existing, current, block, false) };
+    const entry = { key, target, file, block, current, existing, existingBytes, output, mode, report: report(target.file, existing, current, block, false) };
     if (!target.boxes) return entry;
     // the two plain paste files: whole-file outputs, no markers, compared whole in --check
     const raws = Object.entries(target.boxFiles || {}).map(([which, rel]) => {
       const rfile = safeTargetPath(root, rel, `${key}:${which}`);
       const text = renderTarget.boxes[which];
-      let rexisting = null;
-      if (fs.existsSync(rfile)) rexisting = decodeUtf8(fs.readFileSync(rfile), rel);
+      let rexisting = null, rhasBom = false;
+      if (fs.existsSync(rfile)) {
+        const rbytes = fs.readFileSync(rfile);
+        rhasBom = hasUtf8Bom(rbytes);
+        rexisting = decodeUtf8(rbytes, rel);
+      }
       if (!check) { try { fs.accessSync(rexisting == null ? path.dirname(rfile) : rfile, fs.constants.W_OK); } catch (_) { die(`${rel}: not writable. Nothing was written`); } }
       const rmode = rexisting == null ? 0o644 : (fs.statSync(rfile).mode & 0o777);
-      return { key: `${key}:${which}`, target: { file: rel }, file: rfile, block: text, current: rexisting, output: check ? null : text, mode: rmode, raw: true, report: report(rel, rexisting, rexisting, text, true) };
+      const routput = check ? null : (rhasBom ? '\ufeff' + text : text);
+      return { key: `${key}:${which}`, target: { file: rel }, file: rfile, block: text, current: rexisting, output: routput, mode: rmode, raw: true, report: report(rel, rexisting, rexisting, text, true) };
     });
     return [entry, ...raws];
   }).flat();
@@ -627,17 +642,19 @@ function main() {
 
 /* Plan ownership updates in the same transaction as the targets. A whole-file hash can advance
    only from bytes already recorded as ours; an edited outer file keeps its old hash so uninstall
-   retains it. Preserved targets record only the block. User bytes are never adopted on re-render. */
+   retains it. Preserved targets record only the block. User bytes are never adopted on re-render.
+   A config predating the installed map stays without it so legacy recipe fallback still applies. */
 function installedConfig(root, plan) {
   const cfgPath = path.join(root, '.agent-personalizer.json');
   if (!mustBe(cfgPath, 'file', '.agent-personalizer.json')) return null;
   const raw = readJson(cfgPath, 'config');
   try { fs.accessSync(cfgPath, fs.constants.W_OK); }
   catch (_) { die('.agent-personalizer.json: not writable. Nothing was written'); }
-  const installed = (raw.installed && typeof raw.installed === 'object' && !Array.isArray(raw.installed)) ? { ...raw.installed } : {};
+  if (!raw.installed || typeof raw.installed !== 'object' || Array.isArray(raw.installed)) return null;
+  const installed = { ...raw.installed };
   for (const p of plan) {
     const preserved = !p.raw && Array.isArray(raw.preservedTargets) && raw.preservedTargets.includes(p.key);
-    if (!p.raw && !preserved && p.existing !== null && installed[p.target.file] !== sha256(Buffer.from(p.existing))) continue;
+    if (!p.raw && !preserved && p.existingBytes !== null && installed[p.target.file] !== sha256(p.existingBytes)) continue;
     installed[p.target.file] = sha256(Buffer.from(preserved ? p.block : p.output));
   }
   raw.installed = installed;

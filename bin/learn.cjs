@@ -135,6 +135,13 @@ function replace(root, rel, text) {
   } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
 }
 
+const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+function canOverwrite(cfg, prior, rel) {
+  if (!prior.exists) return true;
+  if (!cfg.installed || !Object.hasOwn(cfg.installed, rel)) return false;
+  return sha256(fs.readFileSync(prior.full)) === cfg.installed[rel];
+}
+
 async function learn({ dir = '.', yes = false, consented = false, allProjects = false } = {}) {
   const root = projectRoot(dir);
   const cfg = readInstall(root);
@@ -153,17 +160,22 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   const now = new Date().toISOString();
   const text = digestText(data, entries, { sources, home, terms, now });
   const folder = probe(root, FOLDER, 'dir');
-  if (!folder.exists) fs.mkdirSync(folder.full, { mode: 0o700 });
-  replace(root, IGNORE, '*\n');
-  replace(root, DIGEST, text);
-  // Record only the two outputs we wrote, never other files sharing the private folder.
-  if (cfg.installed) {
+  const writeIgnore = canOverwrite(cfg, priorIgnore, IGNORE);
+  const writeDigest = canOverwrite(cfg, priorDigest, DIGEST);
+  if (!folder.exists && (writeIgnore || writeDigest)) fs.mkdirSync(folder.full, { mode: 0o700 });
+  if (writeIgnore) replace(root, IGNORE, '*\n');
+  else console.log(`kept   ${IGNORE} (edited or pre-existing)`);
+  if (writeDigest) replace(root, DIGEST, text);
+  else console.log(`kept   ${DIGEST} (edited or pre-existing; not overwritten)`);
+  // Record only the outputs this run wrote, never other or edited files sharing the folder.
+  if (cfg.installed && (writeIgnore || writeDigest || !folder.exists)) {
     const saved = JSON.parse(fs.readFileSync(path.join(root, CONFIG), 'utf8'));
-    if (!priorIgnore.exists || Object.hasOwn(cfg.installed, IGNORE)) saved.installed[IGNORE] = crypto.createHash('sha256').update('*\n').digest('hex');
-    if (!priorDigest.exists || Object.hasOwn(cfg.installed, DIGEST)) saved.installed[DIGEST] = crypto.createHash('sha256').update(text).digest('hex');
-    if (!folder.exists) saved.createdDirectories = [...new Set([...(saved.createdDirectories || []), FOLDER])];
+    if (writeIgnore) saved.installed[IGNORE] = sha256('*\n');
+    if (writeDigest) saved.installed[DIGEST] = sha256(text);
+    if (!folder.exists && (writeIgnore || writeDigest)) saved.createdDirectories = [...new Set([...(saved.createdDirectories || []), FOLDER])];
     replace(root, CONFIG, JSON.stringify(saved, null, 2) + '\n');
   }
+  if (!writeIgnore) require('./git-exclude.cjs').protect(root);
   for (const file of data.filesRead) console.log(`read   ${shownFile(file, home, terms)}`);
   console.log(`Files checked: ${data.filesChecked}. Files read: ${data.filesRead.length}. Sessions: ${data.sessions.length}. Memory notes: ${data.memories.length}.`);
   console.log(`Skipped by reason: ${Object.entries(data.skipped).map(([reason, count]) => `${reason}: ${count}`).join(', ') || 'none'}`);
@@ -174,14 +186,15 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
 
 function forget(dir = '.', { dry = false } = {}) {
   const root = projectRoot(dir);
-  readInstall(root);
+  const cfg = readInstall(root);
   const folder = probe(root, FOLDER, 'dir');
   const digest = probe(root, DIGEST);
   const ignore = probe(root, IGNORE);
   if (!digest.exists) console.log('No digest to forget.');
   const removes = digest.exists ? [DIGEST] : [];
   const names = folder.exists ? fs.readdirSync(folder.full) : [];
-  const emptyAfter = folder.exists && names.every(name => name === 'digest.md' || name === '.gitignore');
+  const ignoreOwned = !ignore.exists || !cfg.installed || (Object.hasOwn(cfg.installed, IGNORE) && sha256(fs.readFileSync(ignore.full)) === cfg.installed[IGNORE]);
+  const emptyAfter = folder.exists && ignoreOwned && names.every(name => name === 'digest.md' || name === '.gitignore');
   if (emptyAfter && ignore.exists) removes.push(IGNORE);
   for (const rel of removes) {
     if (!dry) fs.unlinkSync(probe(root, rel).full);
