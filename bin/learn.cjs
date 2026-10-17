@@ -13,10 +13,13 @@ const IGNORE = `${FOLDER}/.gitignore`;
 const SOURCE = { claude: 'claude-code', agents: 'codex', gemini: 'gemini-cli' };
 
 function refuse(message) { throw new renderer.Refusal(message); }
-function consentScreen() {
+function consentScreen({ allProjects = false } = {}) {
+  const scope = allProjects ? 'all projects' : 'the --dir project';
+  const scopeHint = allProjects ? 'Sessions from every project are included.' : 'Use --all-projects to include sessions from other projects.';
   return `Learn from your past sessions?
-agent-personalizer can read up to 20 of your most recent sessions that
-Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
+agent-personalizer can read up to 20 of your most recent sessions from ${scope}
+that Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
+  · ${scopeHint}
   · Only what you typed, never the AI's replies.
   · Stays on this computer, saved to .agent-personalizer/digest.md.
   · Your AI reads that file next time you open it, like anything you share with it.
@@ -30,12 +33,13 @@ Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
 Read your last 20 sessions? (y/N)`;
 }
 
-async function requestConsent({ yes = false } = {}) {
+async function requestConsent({ yes = false, allProjects = false } = {}) {
+  const screen = consentScreen({ allProjects });
   if (!yes && !process.stdin.isTTY) refuse('learn needs your yes: run it in a terminal, or pass --yes');
-  if (yes) { console.log(consentScreen()); return true; }
+  if (yes) { console.log(screen); return true; }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const answer = await new Promise(resolve => {
-    rl.question(consentScreen() + ' ', resolve);
+    rl.question(screen + ' ', resolve);
     rl.once('close', () => resolve(''));
   });
   rl.close();
@@ -131,10 +135,10 @@ function replace(root, rel, text) {
   } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
 }
 
-async function learn({ dir = '.', yes = false, consented = false } = {}) {
+async function learn({ dir = '.', yes = false, consented = false, allProjects = false } = {}) {
   const root = projectRoot(dir);
   const cfg = readInstall(root);
-  const consent = consented || await requestConsent({ yes });
+  const consent = consented || await requestConsent({ yes, allProjects });
   if (!consent) { console.log('Nothing was read.'); return false; }
   probe(root, FOLDER, 'dir');
   probe(root, DIGEST);
@@ -145,7 +149,7 @@ async function learn({ dir = '.', yes = false, consented = false } = {}) {
   const entries = renderer.readLearned(root);
   const sources = [...new Set((cfg.targets || []).map(target => SOURCE[target]).filter(Boolean))];
   const home = os.homedir();
-  const data = await require('./sessions.cjs').readSessions({ home, sources, limit: 20, privateTerms: terms });
+  const data = await require('./sessions.cjs').readSessions({ home, projectDir: root, allProjects, sources, limit: 20, privateTerms: terms });
   const now = new Date().toISOString();
   const text = digestText(data, entries, { sources, home, terms, now });
   const folder = probe(root, FOLDER, 'dir');

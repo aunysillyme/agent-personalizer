@@ -103,6 +103,10 @@ jobs:
           node esm/render/render.cjs --dir esm --check
       - name: profile edits, reruns and historical uninstall
         run: node test/ap-regressions.cjs core
+      - name: project-scoped session learning
+        run: |
+          node test/sessions.test.cjs
+          node test/learning.test.cjs
       - name: misuse exits 2
         shell: bash
         run: |
