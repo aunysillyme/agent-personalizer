@@ -30,7 +30,7 @@ let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--forget', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
@@ -38,7 +38,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
                                             [--help | -h] [--version | -v]
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
-  npx agent-personalizer learn [--dir <folder>] [--yes]
+  npx agent-personalizer learn [--dir <folder>] [--all-projects] [--yes]
   npx agent-personalizer learn --forget [--dir <folder>]
 
   First interactive install: choose your AIs, then choose whether to read your recent sessions.
@@ -49,6 +49,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   --defaults   accept defaults on first install; a re-run keeps saved answers.
   --yes        scripted first install: needs --dir, --ai and --level. Never reads session history.
   learn        with your yes, write a local digest for up to five evidence-backed questions.
+  --all-projects  include sessions from projects other than --dir; default reads only --dir.
   --forget     with learn, remove the digest; your AI apps' own history stays as it is.
   --uninstall  remove unchanged installed files; keep edited files and LEARNED.md with entries.
   --dry        preview --uninstall without changing files.
@@ -169,11 +170,13 @@ async function main() {
   if (ARGS.command === 'learn') {
     for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry'])
       if (opt in ARGS) die(`${opt} is not a learn option`);
+    if (ARGS['--forget'] && ARGS['--all-projects']) die('--all-projects cannot be used with --forget');
     if (ARGS['--forget'] && ARGS['--yes']) die('--forget and --yes are exclusive');
     const learning = require('./learn.cjs');
-    return ARGS['--forget'] ? learning.forget(arg('--dir', '.')) : learning.learn({ dir: arg('--dir', '.'), yes: !!ARGS['--yes'] });
+    return ARGS['--forget'] ? learning.forget(arg('--dir', '.')) : learning.learn({ dir: arg('--dir', '.'), yes: !!ARGS['--yes'], allProjects: !!ARGS['--all-projects'] });
   }
   if (ARGS['--forget']) die('--forget needs learn');
+  if (ARGS['--all-projects']) die('--all-projects needs learn');
   if (ARGS['--uninstall']) {
     if (!ARGS['--dir']) die('--uninstall needs --dir <folder>');
     for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full'])
