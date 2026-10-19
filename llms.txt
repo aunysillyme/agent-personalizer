@@ -31,5 +31,5 @@ Session data stays local until the user's AI reads it and sends it to its provid
 - [Support](https://github.com/aunysillyme/agent-personalizer/blob/main/SUPPORT.md): Where to ask questions, report bugs, request features and report security issues privately.
 - [Maintainers](https://github.com/aunysillyme/agent-personalizer/blob/main/MAINTAINERS.md): Who owns reviews, releases and support routes.
 - [Releasing](https://github.com/aunysillyme/agent-personalizer/blob/main/RELEASING.md): Version sites, checks, tags, provenance and publication steps.
-- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: installs routing rules, 8 subagents, hooks and a CLI runner so your AI picks model and effort per task and saves tokens.
+- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: routes routine work to cheaper models with routing rules, 8 subagents, hooks and a CLI runner.
 - [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security.
