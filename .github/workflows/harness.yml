@@ -54,6 +54,8 @@ jobs:
           sh -n test/consumer-install.sh
       - name: harness (98 checks, exact exit codes)
         run: sh test/run.sh
+      - name: Check the Part of a set block (offline)
+        run: node scripts/check-set.mjs
       - name: rollback fault injection (cases A-K)
         run: |
           T="$(mktemp -d)"

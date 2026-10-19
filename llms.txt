@@ -20,6 +20,14 @@ Session data stays local until the user's AI reads it and sends it to its provid
 - [Companion tools](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/companions.md): Notes connectors and enforcement tools.
 - [Guarantees](https://github.com/aunysillyme/agent-personalizer/blob/main/docs/guarantees.md): What the code enforces and how instructions reach the AI.
 
+<!-- set:start -->
+## Part of a set
+
+- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: routes routine work to cheaper models with routing rules, 8 subagents, hooks and a CLI runner
+- [repo-build-skill](https://github.com/aunysillyme/repo-build-skill): Skill pack that teaches your AI to build, release and launch a GitHub repo: stack pick, README, AGENTS.md, llms.txt, repo SEO and AEO, trusted publishing.
+- [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that turns your AI into an expert website builder: current research, design, code, accessibility, speed, SEO and security, alone or as a team.
+<!-- set:end -->
+
 ## Optional
 
 - [Agent contributor instructions](https://github.com/aunysillyme/agent-personalizer/blob/main/AGENTS.md): Repository rules and verification.
@@ -31,5 +39,3 @@ Session data stays local until the user's AI reads it and sends it to its provid
 - [Support](https://github.com/aunysillyme/agent-personalizer/blob/main/SUPPORT.md): Where to ask questions, report bugs, request features and report security issues privately.
 - [Maintainers](https://github.com/aunysillyme/agent-personalizer/blob/main/MAINTAINERS.md): Who owns reviews, releases and support routes.
 - [Releasing](https://github.com/aunysillyme/agent-personalizer/blob/main/RELEASING.md): Version sites, checks, tags, provenance and publication steps.
-- [model-orchestrator](https://github.com/aunysillyme/model-orchestrator): Model router for AI coding agents: routes routine work to cheaper models with routing rules, 8 subagents, hooks and a CLI runner.
-- [website-build-skill](https://github.com/aunysillyme/website-build-skill): A skill pack that teaches your AI current website-building expertise: research, design, code, accessibility, performance, search and security.

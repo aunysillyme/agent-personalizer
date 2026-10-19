@@ -19,4 +19,10 @@ Maintainer notes. Follow the steps below for version sites, rendering, checks an
 
 Optional hardening: put the publish job behind a protected GitHub environment with a required reviewer (a repository setting, not a file change).
 
+## Shared set rows
+
+The README and llms.txt "Part of a set" rows come from https://raw.githubusercontent.com/aunysillyme/.github/HEAD/set.json; each row's line is that package's npm description. Refresh with `npx repo-build-skill@0.1.1 set sync` outside CI and commit the result. Keep `.repo-build/*` and the text between the set markers generated. CI only checks drift offline with `node scripts/check-set.mjs` in the harness job on pushes and pull requests, using the existing Node matrix.
+
+The check reads README.md, llms.txt, package.json and the vendored renderer, set file and lock. It renders in memory and compares both SHA-256 hashes with the lock, with no writes or network calls. Exit 0 prints one match line; exit 1 names each drifted file with `SET_DRIFT:` and the refresh command; exit 2 reports a missing or unreadable file, invalid input or bad usage. Run `node test/check-set.test.cjs` to verify clean and seeded-drift copies in temp directories; `--root <dir>` checks another copy. The shared source and generated lock own the rows and hashes; the harness watches them when CI runs, with no separate watcher. Resolve failures by refreshing outside CI and rerunning the check before release.
+
 `npx agent-personalizer` is the install path; `npx github:aunysillyme/agent-personalizer` still runs the tag directly.
