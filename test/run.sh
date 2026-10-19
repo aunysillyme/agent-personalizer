@@ -1306,9 +1306,10 @@ else
   echo "skip: v0.5.1 and v0.6.4 tags absent (shallow clone?); F5 NOT run (a skip, not a pass; git fetch --tags to run it)"
 fi
 
-# 97. Codex audit 2026-10-04, F9: every relative Markdown navigation target ships in npm's actual inventory.
+# 97. Codex audit 2026-10-04, F9: packed Markdown links resolve; shared set blocks and locked hashes detect drift offline.
 node test/package-links.cjs || fail "packed Markdown links do not resolve offline"
-pass "packed Markdown relative links resolve inside npm pack --dry-run inventory"
+node test/check-set.test.cjs || fail "offline set drift regressions"
+pass "packed Markdown links resolve; shared set blocks and locked hashes detect drift offline"
 
 # 98. Interactive re-runs keep saved defaults and skipped answers, including off-limits boundaries.
 node test/ap-regressions.cjs RERUN || fail "interactive saved-answer regressions"

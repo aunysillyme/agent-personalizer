@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-19
+
+### Changed
+
+- The README and llms.txt "Part of a set" section now renders from the shared set file. The README table has four rows, adds repo-build-skill, and uses each package's npm description. CI checks the rendered blocks and locked file hashes for drift offline.
+
 ## [0.8.2] - 2026-10-18
 
 ### Changed
@@ -305,7 +311,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.7.2...v0.8.0
