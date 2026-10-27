@@ -1,6 +1,6 @@
 # agent-personalizer
 
-[![npm](https://img.shields.io/npm/v/agent-personalizer.svg)](https://www.npmjs.com/package/agent-personalizer) [![harness](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml/badge.svg)](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml) [![release](https://img.shields.io/github/v/tag/aunysillyme/agent-personalizer?label=release)](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/agent-personalizer.svg)](https://www.npmjs.com/package/agent-personalizer) [![harness](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml/badge.svg)](https://github.com/aunysillyme/agent-personalizer/actions/workflows/harness.yml) [![release](https://img.shields.io/github/v/tag/aunysillyme/agent-personalizer?label=release)](https://github.com/aunysillyme/agent-personalizer/blob/main/CHANGELOG.md) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/aunysillyme/agent-personalizer/badge)](https://scorecard.dev/viewer/?uri=github.com/aunysillyme/agent-personalizer)
 
 **Every AI you use gets the same profile and the rules it can carry:** Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
 
