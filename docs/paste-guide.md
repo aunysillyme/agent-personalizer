@@ -4,12 +4,14 @@ The renderer writes one file per AI. This page says where each AI reads it, and 
 
 | Rendered file | Who reads it | How it is read |
 |---|---|---|
-| `CLAUDE.md` | Claude Code | Automatically, from the folder you run it in (and from `~/.claude/CLAUDE.md` for every folder). Nothing to paste. |
+| `CLAUDE.md` | Claude Code | Automatically, from the project, or `~/.claude/CLAUDE.md` for every project with `--global`. Nothing to paste. |
 | `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md` and `AGENTS.md`. Paste it wherever the AI has no file access (below). |
-| `AGENTS.md` | Codex CLI, Cursor, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root. Nothing to paste. |
-| `GEMINI.md` | Gemini CLI | Automatically, from the folder. Nothing to paste. |
+| `AGENTS.md` | Codex CLI, Cursor, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` for all projects. Nothing to paste. |
+| `GEMINI.md` | Gemini CLI | Automatically, from the folder; `--global` writes `~/.gemini/GEMINI.md` for all projects. Nothing to paste. |
 | `chatgpt-box1.txt`, `chatgpt-box2.txt` and `chatgpt-custom-instructions.md` | ChatGPT | Profile and response text to paste, with a preview and counts. |
 | `system-prompt.md` | anything with a system-prompt field, shared bots, API calls | Paste as the system prompt. Universal rules only, no profile, safe to share. |
+
+Use `npx agent-personalizer --global --ai claude,agents,gemini --yes` for one profile across projects. Its source lives in `~/.agent-personalizer/`; re-run with `--global` after editing it and start a new client session. Global mode accepts only these three targets and level 1, excludes `--dir`, preserves text outside its markers and supports `--global --uninstall`. See [global installation](install.md#every-project-with-one-profile).
 
 ---
 

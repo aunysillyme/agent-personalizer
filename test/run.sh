@@ -928,7 +928,8 @@ expect 0 "level 1" node bin/agent-personalizer.js --dir "$T" --ai claude,agents 
 [ ! -e "$T/rules" ] || fail "level 1 copied rules/"
 grep -q 'owner: the rendered block below' "$T/CLAUDE.md" || fail "level-1 home file still points at rules/ files"
 grep -q 'owning copy' "$T/CLAUDE.md" && fail "level-1 home file lists a rules/ folder it does not have"
-grep -q 'Sign every edit' "$T/CLAUDE.md" || fail "level-1 home file did not render the rules from the package"
+grep -q '^### Output style' "$T/CLAUDE.md" || fail "level-1 home file did not render the Core 5 from the package"
+node test/core-rules.test.cjs || fail "Core 5 level and upgrade regressions"
 expect 0 "level 1 check" node render/render.cjs --dir "$T" --check
 mk; E="$MK"; cp render/render.cjs render/onboarding.cjs render/targets.json "$E/"; printf 'p\n' > "$E/USER.md"
 expect 2 "copied renderer without rules" node "$E/render.cjs" --dir "$E" --targets claude
@@ -980,6 +981,7 @@ expect 0 "CLA workflow and template agreement" node test/cla.test.js
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
 grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
+node test/publish-version.test.cjs || fail "trusted-publishing npm version gate"
 grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
 grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep -q 'rev-parse "refs/tags/\$TAG^{commit}"' .github/workflows/publish.yml || fail "publish.yml does not resolve the input through refs/tags"
 grep -q 'ref: \${{ inputs.tag }}' .github/workflows/publish.yml && fail "publish.yml checks out the raw input as a ref"
@@ -1315,6 +1317,8 @@ pass "packed Markdown links resolve; shared set blocks and locked hashes detect 
 node test/ap-regressions.cjs RERUN || fail "interactive saved-answer regressions"
 node test/learning.test.cjs || fail "learning privacy and rendering regressions"
 node test/release-081.test.cjs || fail "0.8.1 regression tests"
+node test/session-recency.test.cjs || fail "newest session selection regressions"
+node test/global.test.cjs || fail "global installation regressions"
 pass "session learning: consent, entries, forget and uninstall; interactive re-runs preserve saved answers without prompts"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

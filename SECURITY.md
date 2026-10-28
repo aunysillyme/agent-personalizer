@@ -4,11 +4,13 @@ This is a small local tool: it reads your files, writes files into a folder you 
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting on this repository (Security tab → "Report a vulnerability"). That opens a private advisory only the maintainer can see. Please do not open a public issue for anything that could let an installer or renderer write outside the folder the user named, read a file it should not, or let `check/forbidden.local.txt` reach a commit.
+Use [GitHub's private vulnerability reporting](https://github.com/aunysillyme/agent-personalizer/security/advisories/new) on this repository (Security tab → "Report a vulnerability"). That opens a private advisory only the maintainer can see. Please do not open a public issue for anything that could let an installer or renderer write outside the folder the user named, read a file it should not, or let `check/forbidden.local.txt` reach a commit.
 
 Report a leak of session data through that private route too; describe the reproduction with invented messages and keep real session text out of the report.
 
 You will get an acknowledgement within 7 days and a fix or a reasoned "won't fix" within 30. Credit is given in the changelog unless you ask otherwise.
+
+Disclosure timeline: allow the 7-day acknowledgement and 30-day fix window before coordinated public disclosure.
 
 ## Scope
 

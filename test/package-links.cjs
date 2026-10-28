@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const assert = require('assert').strict;
 
 const args = process.argv.slice(2);
 if (args.length && !(args.length === 2 && args[0] === '--repo')) throw new Error('usage: package-links.cjs [--repo path]');
@@ -28,7 +29,14 @@ const files = new Set(inventory[0].files.map(file => file.path));
 function destinations(markdown) {
   // Links shown as code samples or inside comments are examples, rather than
   // navigation in the rendered Markdown. Inline code can appear in link labels.
-  const source = markdown.replace(/<!--[^]*?-->/g, '').split('\n');
+  let uncommented = markdown, previous;
+  do {
+    previous = uncommented;
+    uncommented = uncommented.replace(/<!--[^]*?-->/g, '');
+  } while (uncommented !== previous);
+  const unfinished = uncommented.indexOf('<!--');
+  if (unfinished !== -1) uncommented = uncommented.slice(0, unfinished);
+  const source = uncommented.split('\n');
   let fence = null;
   const lines = source.filter(line => {
     const m = line.match(/^\s{0,3}(`{3,}|~{3,})/);
@@ -68,6 +76,10 @@ function destinations(markdown) {
   for (const m of body.matchAll(/<(?:a|img)\b[^>]*\b(?:href|src)\s*=\s*["']([^"']+)["'][^>]*>/gi)) links.push(m[1]);
   return links;
 }
+
+assert.deepEqual(destinations('<!<!---->-- [x](missing.md) -->'), [], 'nested comments must not surface a link');
+assert.deepEqual(destinations('<!-- [x](missing.md)'), [], 'unterminated comments hide the rest of the input');
+assert.deepEqual(destinations('<!-- hidden --> [x](visible.md)'), ['visible.md'], 'links outside comments still resolve');
 
 let checked = 0;
 const errors = [];

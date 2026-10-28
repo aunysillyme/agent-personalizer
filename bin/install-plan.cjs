@@ -90,7 +90,7 @@ function migrateHome(current, previous, next, markerState) {
   return { text: lines.map(line => line.raw).join(''), edited, changed };
 }
 
-function installPlan({ answers, level, targets, notesScaffolded }) {
+function installPlan({ answers, level, targets, notesScaffolded, legacyRules = false }) {
   const base = onboarding.baseFor(answers);
   const kind = onboarding.kindOf(answers);
   const plan = [];                                        // { rel, src | text }
@@ -127,7 +127,12 @@ function installPlan({ answers, level, targets, notesScaffolded }) {
     let t = fs.readFileSync(path.join(PKG, 'templates', name), 'utf8');
     if (level < 3) {
       // no local rules/: the pointers point at the rendered block below, which carries the full text
-      t = t.split('\n').filter(l => !/Rules, one file each, the owning copy/.test(l)).join('\n');
+      const core = require('../render/render.cjs').CORE_RULE_FILES;
+      t = t.split('\n').filter(l => {
+        if (/Rules, one file each, the owning copy/.test(l)) return false;
+        const rule = /\[owner: rules\/([^\]]+)\]/.exec(l);
+        return legacyRules || !rule || core.has(rule[1]);
+      }).join('\n');
       t = t.replace(/`\[owner: rules\/[^\]]+\]`/g, '`[owner: the rendered block below]`');
     }
     if (notesWhy) {

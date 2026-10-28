@@ -155,13 +155,14 @@ const cases = {
     code(uninstall(dir), 0);
     assert.deepEqual(read(dir, 'AGENTS.md'), user);
     const bare = path.join(dir, 'bare');
-    install(bare, 'gemini');
+    // Editable custom rules belong to level 3; levels 1/2 select the Core 5.
+    install(bare, 'gemini', 3);
     fs.writeFileSync(path.join(bare, 'GEMINI.md'), Buffer.concat([Buffer.from('\ufeff'), read(bare, 'GEMINI.md')]));
     code(render(bare), 0);
     code(render(bare, '--check'), 0);
     assert.deepEqual(read(bare, 'GEMINI.md').subarray(0, 3), Buffer.from('\ufeff'), 'a BOM immediately before the begin marker stays too');
     fs.writeFileSync(path.join(bare, 'USER.md'), Buffer.concat([Buffer.from('\ufeff'), read(bare, 'USER.md')]));
-    fs.mkdirSync(path.join(bare, 'rules'));
+    fs.mkdirSync(path.join(bare, 'rules'), { recursive: true });
     fs.writeFileSync(path.join(bare, 'rules/00-bom.md'), '\ufeff---\nid: 00-bom\n---\n## universal\nA BOM source still parses.\n');
     code(render(bare), 0);
     code(render(bare, '--check'), 0);

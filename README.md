@@ -64,9 +64,9 @@ The first install asks for a folder if `--dir` is missing, then which AIs you us
 
 | Level | What you get |
 |---|---|
-| **1. Profile and home files** | The profile, onboarding and target-specific instructions for the AIs you pick. |
+| **1. Profile and home files** | The profile, onboarding and five core rules for the AIs you pick. |
 | **2. Dynamic docs** | Everything above, plus local notes templates maintained under your writing policy. Cloud notes tools use connector pointers. |
-| **3. Mechanisms** | Everything above, plus local rule sources, the renderer, drift check, hook and forbidden-string gate. |
+| **3. Mechanisms** | All eleven rules, plus editable rule sources, the renderer, drift check, hook and forbidden-string gate. |
 
 For a headless install with defaults:
 
@@ -74,15 +74,25 @@ For a headless install with defaults:
 npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
 ```
 
+For every project, install one global level-1 profile:
+
+```bash
+npx agent-personalizer --global --ai claude,agents,gemini --yes
+```
+
+The source lives in `~/.agent-personalizer/`; marked blocks go to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`. User text outside the blocks stays byte for byte. `--global` supports those three targets and level 1; it excludes `--dir`. Re-run with `--global`, learn across all projects with `learn --global`, and remove owned global content with `--global --uninstall`. See [global installation](docs/install.md#every-project-with-one-profile).
+
+Levels 1 and 2 carry the Core 5: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. Level 3 retains all eleven, with each target's existing surface and signature selection.
+
 Node 22 or 24 (active LTS) is recommended; 18 or later runs. Published on npm with provenance. [Installation](docs/install.md) covers scripted answers, every flag, notes tools and manual copying.
 
-The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls and send no telemetry. Writes stay inside the folder you name, with edited files preserved and named.
+The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls and send no telemetry. Project writes stay inside the folder you name; global writes use the profile and selected home paths above. Edited source files are preserved and named.
 
 ## Privacy
 
 With your yes, learning reads up to 20 recent sessions kept by your selected Claude Code, Codex or Gemini CLI apps, plus Codex memory notes. It keeps typed messages, drops AI replies and tool output, and saves one local `.agent-personalizer/digest.md` ignored by git. The terminal lists files and counts, never message text. Your AI reads the digest, so its contents go to that provider again, like anything you paste in.
 
-Reuse only history you are allowed to share. Past sessions can include other people's details; put their names or other private terms in `check/forbidden.local.txt` before accepting. Check your agreement for work or client accounts. `npx agent-personalizer learn --forget` deletes the digest, and uninstall removes it too; both leave your AI apps' history alone. agent-personalizer is not affiliated with Anthropic, OpenAI or Google, and their saved formats can change. See [learning and privacy](docs/learning.md).
+Reuse only history you are allowed to share. Past sessions can include other people's details; put their names or other private terms in `check/forbidden.local.txt` before accepting. Check your agreement for work or client accounts. `npx agent-personalizer learn --forget` deletes the digest, and uninstall removes unchanged recorded digest files; both leave your AI apps' history alone. agent-personalizer is not affiliated with Anthropic, OpenAI or Google, and their saved formats can change. See [learning and privacy](docs/learning.md).
 
 ## Keep it in sync
 
@@ -167,11 +177,11 @@ Re-run `npx agent-personalizer --dir . --ai claude,agents --level 3 --yes --defa
 
 ### How do I uninstall agent-personalizer and keep my notes?
 
-Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files, user-written notes and a `LEARNED.md` with entries stay; the local digest is removed and untouched files return byte for byte.
+Preview with `npx agent-personalizer --uninstall --dir . --dry`, then run `npx agent-personalizer --uninstall --dir .`. Edited files, user-written notes and a `LEARNED.md` with entries stay; unchanged recorded digest files are removed and untouched files return byte for byte.
 
 ## Uninstall
 
-Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files, notes and a `LEARNED.md` with entries, removes the local digest, and lists any hook registration you must remove.
+Preview with --uninstall --dry. Removal compares recorded install hashes, keeps edited files, notes and a `LEARNED.md` with entries, removes unchanged recorded digest files, and lists any hook registration you must remove.
 
 ```bash
 npx agent-personalizer --uninstall --dir . --dry

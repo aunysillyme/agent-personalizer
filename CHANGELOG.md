@@ -6,6 +6,24 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-10-28
+
+### Added
+
+- `--global` applies a level-1 profile across Claude Code, Codex and Gemini CLI projects, with byte-preserving marked blocks, safe uninstall and shared atomic rollback (#29).
+
+### Changed
+
+- Levels 1 and 2 render the Core 5 rules; level 3 keeps all eleven and editable rule sources. Untouched older generated files refresh through recorded ownership; edited files stay for review (#33).
+
+### Fixed
+
+- Session learning selects the newest 20 usable sessions by latest message timestamp across all sources, including legacy Gemini logs, with file mtime used only when a session has no valid timestamp (#38).
+- Digest removal documentation now agrees with recorded-hash ownership and preserves edited or unrecorded files (#39).
+- Markdown link checking strips nested and unterminated HTML comments completely (CodeQL `js/incomplete-multi-character-sanitization`).
+- Security reporting links directly to private advisories and states the existing acknowledgement and fix windows (Scorecard Security-Policy).
+- Publishing uses Node 24 and checks bundled npm is at least 11.5.1, replacing the mutable global npm install while retaining the pinned setup action (Scorecard Pinned-Dependencies).
+
 ## [0.8.3] - 2026-10-19
 
 ### Changed
@@ -311,7 +329,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.0...v0.8.1

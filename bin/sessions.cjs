@@ -249,7 +249,15 @@ function parsedLine(line, state) {
 }
 
 function baseSession(file) {
-  return { source: file.source, date: new Date(file.mtimeMs).toISOString(), project: file.project, sessionId: path.basename(file.file), file: file.file, mtimeMs: file.mtimeMs, messages: [] };
+  return { source: file.source, date: new Date(file.mtimeMs).toISOString(), project: file.project, sessionId: path.basename(file.file), file: file.file, mtimeMs: file.mtimeMs, timestampMs: null, messages: [] };
+}
+
+function messageTimestamp(session, timestamp) {
+  const time = typeof timestamp === 'string' ? Date.parse(timestamp) : typeof timestamp === 'number' ? new Date(timestamp).getTime() : NaN;
+  if (Number.isFinite(time) && (session.timestampMs === null || time > session.timestampMs)) {
+    session.timestampMs = time;
+    session.date = new Date(time).toISOString();
+  }
 }
 
 async function readClaude(file, state) {
@@ -261,6 +269,7 @@ async function readClaude(file, state) {
     if (!record) return;
     if (typeof record.cwd === 'string') sessionCwd = record.cwd;
     if (typeof record.entrypoint === 'string' && record.entrypoint.startsWith('sdk')) automation = true;
+    if (record.type === 'user' || record.type === 'assistant') messageTimestamp(session, record.timestamp);
     if (record.type !== 'user') return;
     known = true;
     if (!state.allProjects && !belongsToProject(sessionCwd, state.projectDir)) {
@@ -299,7 +308,9 @@ async function readCodex(file, state) {
       if (typeof meta.cwd === 'string') session.project = path.basename(meta.cwd);
       return;
     }
-    if (record.type !== 'response_item' || !record.payload || record.payload.type !== 'message' || record.payload.role !== 'user') return;
+    if (record.type !== 'response_item' || !record.payload || record.payload.type !== 'message') return;
+    messageTimestamp(session, record.timestamp);
+    if (record.payload.role !== 'user') return;
     known = true;
     if (!projectMatches) {
       if (!state.allProjects) bump(state, 'project_unknown');
@@ -330,7 +341,9 @@ async function readGemini(file, state) {
   });
   if (!ok) return [];
   for (const message of messages) {
-    if (!message || message.type !== 'user') continue;
+    if (!message) continue;
+    messageTimestamp(session, message.timestamp);
+    if (message.type !== 'user') continue;
     const items = Array.isArray(message.content) ? message.content.filter(item => item && typeof item.text === 'string' && (!item.type || item.type === 'text')).map(item => item.text) : [];
     const text = typedText(items, state);
     if (text) session.messages.push(text);
@@ -346,16 +359,19 @@ async function readGeminiLogs(file, state) {
   function accept() {
     if (oversize) { bump(state, 'oversize_line'); return; }
     const record = parsedLine(entry, state);
-    if (!record || record.type !== 'user') return;
-    if (typeof record.sessionId !== 'string' || typeof record.message !== 'string') { bump(state, 'unknown_format'); return; }
-    const text = typedText([record.message], state);
-    if (!text) return;
+    if (!record || !['user', 'gemini', 'assistant'].includes(record.type)) return;
+    if (typeof record.sessionId !== 'string' || (record.type === 'user' && typeof record.message !== 'string')) { bump(state, 'unknown_format'); return; }
     if (!grouped.has(record.sessionId)) {
       const session = baseSession(file);
       session.sessionId = record.sessionId;
       grouped.set(record.sessionId, session);
     }
-    grouped.get(record.sessionId).messages.push(text);
+    const session = grouped.get(record.sessionId);
+    messageTimestamp(session, record.timestamp);
+    if (record.type === 'user') {
+      const text = typedText([record.message], state);
+      if (text) session.messages.push(text);
+    }
   }
   const ok = await scanLines(file.file, state, line => {
     for (const character of `${line}\n`) {
@@ -393,7 +409,7 @@ async function readGeminiLogs(file, state) {
   if (!ok) return [];
   if (!started || invalid) { bump(state, 'unknown_format'); return []; }
   if (!finished || depth) bump(state, 'malformed_line');
-  return [...grouped.values()];
+  return [...grouped.values()].filter(session => session.messages.length);
 }
 
 async function readMemory(file, state) {
@@ -420,21 +436,23 @@ async function readSessions({ home = os.homedir(), projectDir = process.cwd(), a
   const sessions = [], geminiSessions = new Map();
   const readers = { claude: readClaude, codex: readCodex, gemini: readGemini, 'gemini-logs': readGeminiLogs };
   for (const file of state.candidates) {
-    if (sessions.length >= maximum) break;
+    if (!maximum) break;
     const found = await readers[file.format](file, state);
     for (const session of found) {
       if (session.source === 'gemini-cli' && geminiSessions.has(session.sessionId)) {
         const existing = geminiSessions.get(session.sessionId);
+        if (session.timestampMs !== null) messageTimestamp(existing, session.timestampMs);
         for (const text of session.messages) {
           if (existing.messages.includes(text)) bump(state, 'duplicate_message');
           else existing.messages.push(text);
         }
-      } else if (sessions.length < maximum) {
+      } else {
         if (session.source === 'gemini-cli') geminiSessions.set(session.sessionId, session);
         sessions.push(session);
       }
     }
   }
+  sessions.sort((a, b) => (b.timestampMs ?? b.mtimeMs) - (a.timestampMs ?? a.mtimeMs) || a.file.localeCompare(b.file) || a.sessionId.localeCompare(b.sessionId));
   const memories = [];
   state.memoryFiles.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));
   for (const file of state.memoryFiles.slice(MAX_MEMORIES)) bump(state, 'memory_limit');
@@ -442,7 +460,7 @@ async function readSessions({ home = os.homedir(), projectDir = process.cwd(), a
     const memory = await readMemory(file, state);
     if (memory) memories.push(memory);
   }
-  return { sessions, memories, filesRead: state.filesRead, filesChecked: state.filesChecked, skipped: state.skipped };
+  return { sessions: sessions.slice(0, maximum), memories, filesRead: state.filesRead, filesChecked: state.filesChecked, skipped: state.skipped };
 }
 
 module.exports = { readSessions };
