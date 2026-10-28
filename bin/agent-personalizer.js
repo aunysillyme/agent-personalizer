@@ -30,12 +30,14 @@ let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
                                             [--answers <file.json> | --answers - | --defaults] [--full] [--yes]
                                             [--help | -h] [--version | -v]
+  npx agent-personalizer --global [--ai claude,agents,gemini] [--yes]
+  npx agent-personalizer --global --uninstall [--dry]
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
   npx agent-personalizer learn [--dir <folder>] [--all-projects] [--yes]
@@ -43,6 +45,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
 
   First interactive install: choose your AIs, then choose whether to read your recent sessions.
   Saved installs ask nothing and keep their AIs, level and answers unless you give replacements.
+  --global     level-1 profile in ~/.agent-personalizer, applied across projects; excludes --dir.
   --full       accepted for older commands; the interview is gone.
   --quick      accepted for older commands; the interview is gone.
   --answers    a JSON file of answers, or "-" to read JSON from stdin. Saved legacy keys stay valid.
@@ -166,7 +169,88 @@ function resolveDestination(dir) {
   return { requested, realExisting, missing, root: path.join(realExisting, ...missing) };
 }
 
+
+// One transaction for project and global plans: snapshot before writes, replace atomically, restore on failure.
+async function commitPlan(root, { writes, removals = [], outputPaths, prepare, finalize }) {
+  for (const rel of outputPaths) {
+    let parent = path.posix.dirname(rel);
+    while (parent !== '.') {
+      if (outputPaths.has(parent)) die(`${parent}: install path is both a file and a directory; nothing was written`);
+      parent = path.posix.dirname(parent);
+    }
+  }
+  const saved = new Map(), newDirectories = new Set();
+  for (const rel of outputPaths) {
+    const destination = probe(root, rel);
+    if (destination.exists) {
+      const info = fs.lstatSync(destination.full);
+      if (!info.isFile()) die(`${rel} is not a regular file; nothing was written`);
+      saved.set(rel, { bytes: fs.readFileSync(destination.full), mode: info.mode & 0o777, dev: info.dev, ino: info.ino });
+    } else saved.set(rel, null);
+    let parent = path.posix.dirname(rel);
+    while (parent !== '.') {
+      if (!probe(root, parent).exists) newDirectories.add(parent);
+      parent = path.posix.dirname(parent);
+    }
+    let ancestor = path.dirname(destination.full);
+    while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
+    try { fs.accessSync(ancestor, fs.constants.W_OK); } catch (_) { die(`${rel}: parent is not writable; nothing was written`); }
+  }
+  if (prepare) prepare(newDirectories);
+  const replace = (rel, bytes, mode) => {
+    const destination = safeDest(root, rel);
+    const tmp = path.join(path.dirname(destination.full), `.${path.basename(rel)}.${crypto.randomBytes(8).toString('hex')}.agent-personalizer.tmp`);
+    try {
+      fs.writeFileSync(tmp, bytes, { flag: 'wx', ...(mode === undefined ? {} : { mode }) });
+      if (mode !== undefined) fs.chmodSync(tmp, mode);
+      probe(root, rel);
+      fs.renameSync(tmp, destination.full);
+    } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
+  };
+  const assertSaved = rel => {
+    const destination = probe(root, rel), before = saved.get(rel);
+    if (!!before !== destination.exists) die(`${rel} changed during preflight; nothing was written`);
+    if (before) {
+      const info = fs.lstatSync(destination.full);
+      if (info.dev !== before.dev || info.ino !== before.ino || !fs.readFileSync(destination.full).equals(before.bytes)) die(`${rel} changed during preflight; nothing was written`);
+    }
+  };
+  committing = true;
+  const touched = new Set();
+  try {
+    for (const rel of outputPaths) assertSaved(rel);
+    for (const p of removals) { assertSaved(p.rel); fs.unlinkSync(probe(root, p.rel).full); touched.add(p.rel); if (p.report) console.log(p.report); }
+    for (const p of writes) {
+      assertSaved(p.rel);
+      touched.add(p.rel);
+      const mode = p.rel === 'hooks/claude-code/session-start.sh' ? 0o755 : saved.get(p.rel)?.mode;
+      replace(p.rel, p.bytes, mode);
+      if (p.report) console.log(p.report);
+    }
+    // Include renderer outputs in rollback even when it committed before reporting a failure.
+    for (const rel of outputPaths) touched.add(rel);
+    if (finalize) await finalize();
+  } catch (e) {
+    const incomplete = [];
+    for (const rel of [...touched].reverse()) {
+      try {
+        const before = saved.get(rel), destination = probe(root, rel);
+        if (before) replace(rel, before.bytes, before.mode);
+        else if (destination.exists) fs.unlinkSync(destination.full);
+      } catch (failure) { incomplete.push(`${rel}: ${failure.message}`); }
+    }
+    for (const rel of [...newDirectories].sort((a, b) => b.split('/').length - a.split('/').length)) {
+      try { const destination = probe(root, rel); if (destination.exists && fs.readdirSync(destination.full).length === 0) fs.rmdirSync(destination.full); }
+      catch (failure) { incomplete.push(`${rel}/: ${failure.message}`); }
+    }
+    console.error(incomplete.length ? `agent-personalizer: ROLLBACK INCOMPLETE\n${incomplete.join('\n')}` : 'agent-personalizer: install failed; every changed file was restored');
+    throw e;
+  } finally { committing = false; }
+
+}
+
 async function main() {
+  if (ARGS['--global']) return require('./global.cjs').run({ args: ARGS, commitPlan, probe, readConfig, ask });
   if (ARGS.command === 'learn') {
     for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry'])
       if (opt in ARGS) die(`${opt} is not a learn option`);
@@ -279,7 +363,7 @@ async function main() {
   const previousBase = prevAnswers ? onboarding.baseFor(prevAnswers) : null;
   const previousNotesExists = previousBase && !!probe(root, `${previousBase}/README.md`).exists;
   const previousNotesScaffolded = prevAnswers && onboarding.kindOf(prevAnswers) !== 'cloud' && ((cfg.level || 1) >= 2 || previousNotesExists);
-  const previousPlan = prevAnswers ? installPlan({ answers: prevAnswers, level: Math.min(cfg.level || 1, 3), targets: cfg.targets || [], notesScaffolded: previousNotesScaffolded }).plan : [];
+  const previousPlan = prevAnswers ? installPlan({ answers: prevAnswers, level: Math.min(cfg.level || 1, 3), targets: cfg.targets || [], notesScaffolded: previousNotesScaffolded, legacyRules: cfg.ruleSet !== 'core-5' }).plan : [];
 
   // ---- PREFLIGHT: refuse now, with nothing written, everything the renderer would refuse later ----
   for (const p of plan) {
@@ -298,6 +382,19 @@ async function main() {
   finally { markers.DIE_THROWS = false; }
   const TARGETS = JSON.parse(fs.readFileSync(path.join(PKG, 'render', 'targets.json'), 'utf8'));
   const preservedTargets = new Set(cfg.preservedTargets || []);
+  // A smaller rule set refreshes only an untouched older generated file. Keep an edited
+  // older target until the user explicitly re-renders or restores its recorded bytes.
+  const keptRuleTargets = new Set();
+  const coreUpgrade = cfgExists && effectiveLevel < 3 && cfg.ruleSet !== 'core-5';
+  for (const t of allTargets) {
+    if (t === 'onboarding' || (!coreUpgrade && !(cfg.keptRuleTargets || []).includes(t))) continue;
+    const rel = TARGETS[t].file, destination = probe(root, rel), hash = recordedHash(cfg, rel);
+    if (destination.exists && hash && sha256(fs.readFileSync(destination.full)) !== hash) {
+      keptRuleTargets.add(t);
+      console.log(`kept   ${rel} (edited older generated file; review it before taking the Core 5 rules)`);
+    }
+  }
+
   for (const t of allTargets) {
     const rel = TARGETS[t].file;
     const { full, exists } = probe(root, rel);
@@ -351,6 +448,7 @@ async function main() {
     return ms.kind === 'one' ? text.slice(0, ms.bStart) + text.slice(ms.eEnd) : text;
   };
   for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+    if (keptRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents')) continue;
     const prior = previousPlan.find(p => p.rel === name);
     const next = plan.find(p => p.rel === name);
     if (!prior || !next) continue;
@@ -464,83 +562,17 @@ async function main() {
     outputPaths.add(target.file);
     for (const rel of Object.values(target.boxFiles || {})) outputPaths.add(rel);
   }
-  for (const rel of outputPaths) {
-    let parent = path.posix.dirname(rel);
-    while (parent !== '.') {
-      if (outputPaths.has(parent)) die(`${parent}: install path is both a file and a directory; nothing was written`);
-      parent = path.posix.dirname(parent);
+  await commitPlan(root, { writes, removals, outputPaths,
+    prepare(newDirectories) {
+      for (const rel of newDirectories) createdDirectories.add(rel);
+      cfg = { ...cfg, targets: allTargets, level: installedLevel, ruleSet: 'core-5', keptRuleTargets: [...keptRuleTargets], onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
+      writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
+    },
+    async finalize() {
+      if (learnRequested) await require('./learn.cjs').learn({ dir: root, consented: true });
+      execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.filter(t => !keptRuleTargets.has(t)).join(',')], { stdio: 'inherit' });
     }
-  }
-  const saved = new Map(), newDirectories = new Set();
-  for (const rel of outputPaths) {
-    const destination = probe(root, rel);
-    if (destination.exists) {
-      const info = fs.lstatSync(destination.full);
-      if (!info.isFile()) die(`${rel} is not a regular file; nothing was written`);
-      saved.set(rel, { bytes: fs.readFileSync(destination.full), mode: info.mode & 0o777, dev: info.dev, ino: info.ino });
-    } else saved.set(rel, null);
-    let parent = path.posix.dirname(rel);
-    while (parent !== '.') {
-      if (!probe(root, parent).exists) newDirectories.add(parent);
-      parent = path.posix.dirname(parent);
-    }
-    let ancestor = path.dirname(destination.full);
-    while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
-    try { fs.accessSync(ancestor, fs.constants.W_OK); } catch (_) { die(`${rel}: parent is not writable; nothing was written`); }
-  }
-  for (const rel of newDirectories) createdDirectories.add(rel);
-  cfg = { ...cfg, targets: allTargets, level: installedLevel, onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
-  writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
-  const replace = (rel, bytes, mode) => {
-    const destination = safeDest(root, rel);
-    const tmp = path.join(path.dirname(destination.full), `.${path.basename(rel)}.${crypto.randomBytes(8).toString('hex')}.agent-personalizer.tmp`);
-    try {
-      fs.writeFileSync(tmp, bytes, { flag: 'wx', ...(mode === undefined ? {} : { mode }) });
-      if (mode !== undefined) fs.chmodSync(tmp, mode);
-      probe(root, rel);
-      fs.renameSync(tmp, destination.full);
-    } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
-  };
-  const assertSaved = rel => {
-    const destination = probe(root, rel), before = saved.get(rel);
-    if (!!before !== destination.exists) die(`${rel} changed during preflight; nothing was written`);
-    if (before) {
-      const info = fs.lstatSync(destination.full);
-      if (info.dev !== before.dev || info.ino !== before.ino || !fs.readFileSync(destination.full).equals(before.bytes)) die(`${rel} changed during preflight; nothing was written`);
-    }
-  };
-  committing = true;
-  const touched = new Set();
-  try {
-    for (const rel of outputPaths) assertSaved(rel);
-    for (const p of removals) { assertSaved(p.rel); fs.unlinkSync(probe(root, p.rel).full); touched.add(p.rel); console.log(p.report); }
-    for (const p of writes) {
-      assertSaved(p.rel);
-      touched.add(p.rel);
-      const mode = p.rel === 'hooks/claude-code/session-start.sh' ? 0o755 : saved.get(p.rel)?.mode;
-      replace(p.rel, p.bytes, mode);
-      if (p.report) console.log(p.report);
-    }
-    // Include renderer outputs in rollback even when it committed before reporting a failure.
-    for (const rel of outputPaths) touched.add(rel);
-    if (learnRequested) await require('./learn.cjs').learn({ dir: root, consented: true });
-    execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.join(',')], { stdio: 'inherit' });
-  } catch (e) {
-    const incomplete = [];
-    for (const rel of [...touched].reverse()) {
-      try {
-        const before = saved.get(rel), destination = probe(root, rel);
-        if (before) replace(rel, before.bytes, before.mode);
-        else if (destination.exists) fs.unlinkSync(destination.full);
-      } catch (failure) { incomplete.push(`${rel}: ${failure.message}`); }
-    }
-    for (const rel of [...newDirectories].sort((a, b) => b.split('/').length - a.split('/').length)) {
-      try { const destination = probe(root, rel); if (destination.exists && fs.readdirSync(destination.full).length === 0) fs.rmdirSync(destination.full); }
-      catch (failure) { incomplete.push(`${rel}/: ${failure.message}`); }
-    }
-    console.error(incomplete.length ? `agent-personalizer: ROLLBACK INCOMPLETE\n${incomplete.join('\n')}` : 'agent-personalizer: install failed; every changed file was restored');
-    throw e;
-  } finally { committing = false; }
+  });
 
   require('./git-exclude.cjs').protect(root);
 

@@ -2,6 +2,8 @@
 
 One rule per file. Each file is the owning copy of that rule; everything else points here. `render/render.cjs` turns these files plus `USER.md` into the per-AI instruction files.
 
+Install levels 1 and 2 render the Core 5: `00-read-the-profile-first.md`, `10-evidence-before-assertion.md`, `50-output-style.md`, `60-act-or-ask.md` and `65-ask-before-it-repeats.md`. Level 3 copies all eleven rules here for editing and renders them with the existing surface and preference filters; the signature rule still follows the signature preference. The source rule files below remain the full set.
+
 ## Format
 
 ```markdown

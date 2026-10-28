@@ -36,12 +36,20 @@ jobs:
           git checkout --quiet "$sha"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: "npm that supports trusted publishing (npm 11.5.1 or later per docs.npmjs.com/trusted-publishers; Node 22 bundles 10.x)"
+      - name: "verify trusted-publishing minimum: npm 11.5.1"
         run: |
-          npm install -g npm@latest
-          npm --version
+          npm --version | node -e '
+            const version = require("fs").readFileSync(0, "utf8").trim();
+            const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+            const [major, minor, patch] = match ? match.slice(1).map(Number) : [];
+            if (!match || !(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))))) {
+              console.error(`npm 11.5.1 or later required for trusted publishing; found ${version}`);
+              process.exit(1);
+            }
+            console.log(`npm ${version} supports trusted publishing`);
+          '
       - name: the tag must match package.json
         env:
           TAG: ${{ inputs.tag }}

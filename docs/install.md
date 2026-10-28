@@ -65,6 +65,7 @@ Use [`examples/answers.json`](../examples/answers.json) as a complete example, i
 | Flag | Purpose |
 |---|---|
 | `--dir <folder>` | Destination folder; prompted in interactive mode. |
+| `--global` | Apply a level-1 profile across projects through Claude Code, Codex and Gemini CLI home files. Excludes `--dir` and levels 2/3. |
 | `--ai claude,agents,gemini,chatgpt,prompt` | Comma-separated targets. Choose the ones you use. |
 | `--level 1`, `--level 2`, `--level 3` | Profile and home files; add local notes; add editable rules and mechanisms. |
 | `--answers <file.json>` or `--answers -` | Set onboarding answers without questions. |
@@ -80,6 +81,26 @@ For compatibility with older scripts, `--level 4` remains an alias of `--level 3
 
 Installer exit codes: `0` completed, `1` unexpected error, `2` refused or invalid input.
 
+## Every project with one profile
+
+```bash
+npx agent-personalizer --global --ai claude,agents,gemini --yes
+npx agent-personalizer --global
+npx agent-personalizer learn --global --yes
+npx agent-personalizer --global --uninstall --dry
+npx agent-personalizer --global --uninstall
+```
+
+`--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` for the selected targets. Paths use the operating system home directory, including a supplied `HOME`. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
+
+Select only `claude`, `agents` and `gemini`. Other targets, `--dir` and levels 2/3 are refused. A headless first install needs `--ai` and `--yes`; level 1 is implicit. `--answers` and `--defaults` work as with project installs. A re-run keeps saved targets and answers.
+
+Global learning always includes sessions from all projects and still needs consent. Its digest is `~/.agent-personalizer/.agent-personalizer/digest.md`; use `learn --global --forget` to remove it. The learning procedure is included in each selected home file.
+
+Global files keep user text outside the markers byte for byte, including line endings and a missing final newline. Existing files and parents must be regular files and directories, never symlinks. The whole plan is checked before writes; a failed write restores changed files and newly created empty directories through the project installer's atomic rename and rollback path.
+
+Global uninstall removes unchanged marked blocks and owned profile files. It deletes a home file only if install created it and no other content remains. Edited blocks, profiles and learned entries stay, with the configuration kept for review. Install-created empty directories are removed; other home files and settings stay in place.
+
 ## Learning commands
 
 ```bash
@@ -92,11 +113,11 @@ npx agent-personalizer learn --forget --dir .
 
 ## What each level adds
 
-- **Level 1:** `USER.md`, `LEARNED.md`, `AGENT_ONBOARDING.md`, the files for your AI targets, and `.agent-personalizer.json`. Claude Code also receives `.claude/commands/personalize.md`. Rules render from the package. With no installed apps detected, the default selection is `claude,agents`.
-- **Level 2:** a local notes scaffold with `README.md`, `sessions/TEMPLATE-week.md`, `decisions.md` and `inbox/README.md`. Disk tools use your `notes_path`; read-only and other tools use the local `notes/` fallback. Cloud tools get connector pointers and keep their notes in their service.
-- **Level 3:** your editable `rules/` copy, `render/` tools, the Claude Code session-start hook and the forbidden-string gate. [Register the hook](../hooks/README.md) in your AI settings and [configure the gate](guarantees.md#forbidden-string-gate).
+- **Level 1:** `USER.md`, `LEARNED.md`, `AGENT_ONBOARDING.md`, the files for your AI targets, and `.agent-personalizer.json`. Claude Code also receives `.claude/commands/personalize.md`. The Core 5 render from the package: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. With no installed apps detected, the default selection is `claude,agents`.
+- **Level 2:** the same five rules, plus a local notes scaffold with `README.md`, `sessions/TEMPLATE-week.md`, `decisions.md` and `inbox/README.md`. Disk tools use your `notes_path`; read-only and other tools use the local `notes/` fallback. Cloud tools get connector pointers and keep their notes in their service.
+- **Level 3:** all eleven rules (subject to target and signature selection), your editable `rules/` copy, `render/` tools, the Claude Code session-start hook and the forbidden-string gate. [Register the hook](../hooks/README.md) in your AI settings and [configure the gate](guarantees.md#forbidden-string-gate).
 
-An existing local notes scaffold is detected at any level. Edited notes and rule files stay yours and are named in the install log. Untouched installer copies update on re-runs. A `signature: no` answer omits the signature rule and its template lines; answering yes includes the signature line.
+An existing local notes scaffold is detected at any level. Edited notes and rule files stay yours and are named in the install log. Untouched installer copies update on re-runs. At level 3, a `signature: no` answer omits the signature rule and its template lines; answering yes includes the signature line.
 
 ## Updating an install
 
@@ -109,6 +130,7 @@ Re-run the installer with `npx agent-personalizer --dir .`. An existing config m
 - **Re-runs:** untouched installer files converge to the files a fresh install with the new answers would create. Current notes templates and rule copies update together. An obsolete file, such as the signing rule after `signature: no`, is removed only while it is untouched.
 - **Home pointers:** each line outside the markers that exactly matches the previous install template is updated or removed to match the new answers. An edited line stays byte for byte and the log names its file and line for manual review. Other text outside the markers stays byte for byte.
 - **Notes path:** when you change `notes_path`, the old folder stays where it is. The log names the old and new folders once. Previously installed files remain in the uninstall inventory; your own notes stay yours.
+- **Core 5 upgrade:** an untouched older level-1/2 generated file shrinks to the five rules on re-run. An edited older file stays byte for byte and is named for review; explicitly re-render it or restore its recorded bytes to take the update.
 - **Upgrades:** re-running a newer package refreshes untouched installed tools and rule copies. Recorded hashes establish ownership; older installs without hashes can be recognized from shipped release hashes. Edited copies stay byte for byte. The log identifies the edited file, its known origin version and how to take the new copy. Previously installed levels and targets remain available on a re-run.
 
 At level 3, render your edited profile and rules:
@@ -151,7 +173,7 @@ The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares f
 - **Existing home files:** user text stays; only an unchanged generated block and the blank separator line the installer added are removed, so an untouched file returns byte for byte. (A file that had no final newline before install keeps the one the installer added.)
 - **`USER.md`:** removed only when it matches its recorded install hash. Edited and pre-existing profiles stay.
 - **`LEARNED.md`:** kept once it holds anything you wrote, and kept if it existed before install. An untouched template that matches its recorded install hash is removed.
-- **Session digest:** `.agent-personalizer/digest.md`, its `.gitignore` and private folder are removed. Your AI apps' history is untouched.
+- **Session digest:** files under `.agent-personalizer/` are removed only when they match recorded install hashes. Edited or unrecorded files stay. The private folder is removed only when recorded as install-created and empty. Your AI apps' history is untouched.
 - **Notes scaffold:** unchanged historically installed templates are removed. Edited templates are kept and named; user-written notes stay byte for byte. A directory is removed only when the install recorded that it created it and it is empty.
 - **Git exclude:** after the configuration is removed, the block install added to `.git/info/exclude` for this folder is removed, and the rest of the file stays byte for byte. While an edited file keeps the configuration, the block stays too.
 - **Rules and tools:** unchanged installed copies are removed file by file, including the session-start hook. Edited copies stay.
