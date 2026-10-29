@@ -2,7 +2,7 @@
 # Matrix: Linux and macOS on Node 18, 20, 22 and 24, covering the minimum runtime and current LTS choices, plus a
 # Windows smoke job that runs the Node entry points (installer, renderer, gate, ESM install) without the sh harness.
 # What it proves: the renderer, installer, gate logic, hook and rollback paths behave exactly as
-# the 98 checks assert, with exact exit codes, on a clean machine that is not the author's.
+# the 99 checks assert, with exact exit codes, on a clean machine that is not the author's.
 # The consumer-install job installs an npm pack tarball on Linux and macOS, then verifies
 # first runs at levels 1 and 2, the ChatGPT paste files, and the installed bin version.
 # What it does NOT run: the privacy gate against the real forbidden list (check 6). That list is
@@ -52,7 +52,7 @@ jobs:
           node --check test/package-links.cjs
           sh -n test/run.sh
           sh -n test/consumer-install.sh
-      - name: harness (98 checks, exact exit codes)
+      - name: harness (99 checks, exact exit codes)
         run: sh test/run.sh
       - name: Check the Part of a set block (offline)
         run: node scripts/check-set.mjs

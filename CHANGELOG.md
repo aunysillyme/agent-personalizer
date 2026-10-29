@@ -2,9 +2,25 @@
 
 All notable changes to this repo. Format after [Keep a Changelog](https://keepachangelog.com/en/2.0.0/) 2.0.0; versions follow [SemVer](https://semver.org/). Dates are the day the change was pushed.
 
-Every entry names the adversarial audit round that produced it where one did. Audits are read-only passes against `AUDIT_BRIEF.md`; every finding is reproduced before its fix.
+Every entry names the adversarial audit round that produced it where one did. Audits are read-only passes against the stated release scope; every finding is reproduced before its fix.
 
 ## [Unreleased]
+
+## [0.8.5] - 2026-10-29
+
+### Fixed
+
+- Audit 2026-10-29: find Claude Code sessions for project paths with spaces, dots and underscores while retaining legacy folder names.
+- Audit 2026-10-29: skip whole messages and Codex memory notes that match conservative secret patterns, reporting only the skip count.
+- Audit 2026-10-29: apply the 2,000-character message cap to Codex memory notes, retaining private-term filtering and the 20-file cap.
+- Audit 2026-10-29: disclose global Codex memory scope and secret skips in consent, and document both project and global private lists.
+- Audit 2026-10-29: preserve intra-word underscores in read-first filenames while escaping hostile Markdown.
+- Audit 2026-10-29: refuse local notes paths containing .git, .github or node_modules segments, ignoring case.
+- Audit 2026-10-29: remove the uninstalled folder-template path from rendered home files and refresh all three examples.
+- Audit 2026-10-29: register the project session-start hook through CLAUDE_PROJECT_DIR so it runs from subfolders, and explain user-level absolute paths.
+- Audit 2026-10-29: align memory status, global learning help, level errors, AI target contribution steps and symlink guidance with supported behaviour; remove the inaccessible audit-brief citation.
+- Audit 2026-10-29: warn that profile and off-limits names enter home files that may be committed.
+- Audit 2026-10-29: use short temporary bases for session-path fixtures so deep TMPDIR paths do not cause false failures.
 
 ## [0.8.4] - 2026-10-28
 
@@ -331,7 +347,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.1...v0.8.2

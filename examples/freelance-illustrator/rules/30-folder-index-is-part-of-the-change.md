@@ -16,10 +16,10 @@ In practice: when you change a file in a folder, fix that folder's README in the
 Never hand-type fields the system derives (an `updated:` date pulled from version control, for instance). Edit the prose, not the derived keys.
 
 ## binding:claude
-Template: `templates/FOLDER_README.md`. The rule is restated inside the template so a folder carries its own contract.
+Restate this rule in each folder's README so the folder carries its own contract.
 
 ## binding:agents
-Same template. Check the index before reporting a write as done.
+Check the folder's README before reporting a write as done.
 
 ## origin
 Written after: an AI trusted a folder index that described a file deleted two weeks earlier, and built a plan on it. Agents read a notes folder by trusting the index over the files, because that is what an index is for.

@@ -41,6 +41,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
   npx agent-personalizer learn [--dir <folder>] [--all-projects] [--yes]
+  npx agent-personalizer learn --global [--yes]
   npx agent-personalizer learn --forget [--dir <folder>]
 
   First interactive install: choose your AIs, then choose whether to read your recent sessions.
@@ -294,7 +295,7 @@ async function main() {
       .filter(([folder]) => fs.existsSync(path.join(home, folder))).map(([, ai]) => ai) : [];
     ais = await ask('\nAIs', ais || (found.length ? found.join(',') : 'claude,agents'));
   }
-  if (!/^[1-4]$/.test(String(level))) die('level must be exactly 1, 2 or 3');
+  if (!/^[1-4]$/.test(String(level))) die('level must be 1, 2 or 3 (4 is accepted as 3)');
   level = Number(level);
   if (level === 4) console.log('note: --level 4 installs exactly what --level 3 installs. For model routing, see https://github.com/aunysillyme/model-orchestrator');
   const targets = String(ais || '').split(',').map(s => s.trim()).filter(Boolean);

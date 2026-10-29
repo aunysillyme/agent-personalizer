@@ -99,6 +99,8 @@ Global learning always includes sessions from all projects and still needs conse
 
 Global files keep user text outside the markers byte for byte, including line endings and a missing final newline. Existing files and parents must be regular files and directories, never symlinks. The whole plan is checked before writes; a failed write restores changed files and newly created empty directories through the project installer's atomic rename and rollback path.
 
+`--global` refuses a symlinked `HOME` and a symlinked `~/.claude/CLAUDE.md`, including links maintained by dotfile managers. Use a project install with `--dir` instead. For a linked `HOME`, you can set `HOME` to its real absolute directory; global home files must still be regular files. To keep a dotfile manager's symlinks, use the project install and copy the instructions through your dotfile manager.
+
 Global uninstall removes unchanged marked blocks and owned profile files. It deletes a home file only if install created it and no other content remains. Edited blocks, profiles and learned entries stay, with the configuration kept for review. Install-created empty directories are removed; other home files and settings stay in place.
 
 ## Learning commands

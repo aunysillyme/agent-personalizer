@@ -8,7 +8,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const cli = path.join(root, 'bin/agent-personalizer.js');
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-global-'));
+const temp = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'apg-'));
 const begin = '<!-- agent-personalizer:begin -->';
 const end = '<!-- agent-personalizer:end -->';
 const targets = ['.claude/CLAUDE.md', '.codex/AGENTS.md', '.gemini/GEMINI.md'];

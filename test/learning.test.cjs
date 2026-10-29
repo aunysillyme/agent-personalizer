@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-learning-'));
+const temp = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'apl-'));
 const home = path.join(temp, 'home');
 const project = path.join(temp, 'project');
 fs.mkdirSync(home); fs.mkdirSync(project);

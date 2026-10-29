@@ -1,22 +1,24 @@
 # hooks/
 
-Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.8.4/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
+Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.8.5/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
 
 Which rules? The ones with `inject: true` in their frontmatter. Keep that set small. Every injected rule costs tokens every session.
 
 ## Claude Code
 
-`claude-code/session-start.sh` prints the contract (it runs `render/render.cjs --contract`, so it needs the level-3 install beside it). Register it in `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
+`claude-code/session-start.sh` prints the contract (it runs `render/render.cjs --contract`, so it needs the level-3 install beside it). Register it in the project's `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "sh hooks/claude-code/session-start.sh" } ] }
+      { "hooks": [ { "type": "command", "command": "sh \"$CLAUDE_PROJECT_DIR/hooks/claude-code/session-start.sh\"" } ] }
     ]
   }
 }
 ```
+
+For user-level `~/.claude/settings.json`, use the absolute path to the installed project instead, for example `sh "/path/to/project/hooks/claude-code/session-start.sh"`. The script resolves its project root from its own location, so it also works when the session starts in a subfolder.
 
 The hook's stdout lands in the session context before your first message. That is the whole mechanism. If `node` is missing the hook exits non-zero and says so on stderr, so a session that starts without its contract is visible, not silent. The contract carries the onboarding block first (always-ask, off-limits, write policy, then style), so a token budget trims style before it trims a restriction.
 
