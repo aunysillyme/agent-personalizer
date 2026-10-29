@@ -62,6 +62,14 @@ const cases = {
         else assert.throws(() => context.module.exports.resolveHome(), Refusal);
       }
     }
+    // Windows: a root-relative path lands on the current drive, so only a drive or UNC root is accepted.
+    for (const [value, ok] of [['\\foo', false], ['/', false], ['\\\\', false], ['\\\\?\\C:\\x', false], ['\\\\srv\\share\\u', true], ['D:/u', true]]) {
+      const context = { module: { exports: {} }, process: { platform: 'win32', env: { USERPROFILE: value } },
+        require: name => name === 'path' ? path.win32 : { Refusal } };
+      vm.runInNewContext(source, context);
+      if (ok) assert.equal(context.module.exports.resolveHome(), value);
+      else assert.throws(() => context.module.exports.resolveHome(), Refusal);
+    }
   },
   'home-windows-userprofile'(dir) {
     const home = path.join(dir, 'home');
@@ -240,12 +248,12 @@ for (const key of ['writeFileSync', 'mkdirSync', 'renameSync', 'unlinkSync']) fs
       const inner = require('../render/render.cjs').between(rendered.toString('utf8'), 'CLAUDE.md');
       const current = fs.readFileSync(file, 'utf8');
       const ms = require('../render/render.cjs').markerState(current, 'CLAUDE.md');
-      const appended = preserved ? '\r\nAdded user line\r\n' : '';
+      const appended = '\r\nAdded user line\r\n';
       fs.appendFileSync(file, appended);
       const expected = Buffer.from(current.slice(0, ms.bStart).replace(/\n\n$/, '\n') + current.slice(ms.eEnd).replace(/^\r?\n/, '') + appended);
       run(cli, ['--uninstall', '--dir', project], dir);
       assert(fs.readFileSync(file).equals(expected), 'Uninstall preserves every outside byte, including later edits.');
-      assert.equal(cfg.installed['CLAUDE.md'], crypto.createHash('sha256').update(preserved ? Buffer.from(inner) : rendered).digest('hex'));
+      assert.equal(cfg.installed['CLAUDE.md'], crypto.createHash('sha256').update(Buffer.from(inner)).digest('hex'));
       const outside = fs.readFileSync(file, 'utf8');
       assert(outside.startsWith('\ufeff# Personal instructions\r\n') && outside.endsWith('\r\nMy own tail' + appended), 'Uninstall preserves the adopted outer user text.');
       assert(!outside.includes(begin));
