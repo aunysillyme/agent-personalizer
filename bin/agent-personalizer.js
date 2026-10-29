@@ -445,7 +445,8 @@ async function main() {
       currentRenders ||= markers.renderedContents(root, { ...cfg, targets: allTargets, level: effectiveLevel, ruleSet: 'core-5', onboarding: answers }, { profileSource, learned: entries });
       const current = fs.readFileSync(destination.full, 'utf8');
       if (markers.markerState(current, rel).kind === 'one' && markers.between(current, rel) === currentRenders.find(entry => entry.key === t).block) {
-        installedHashes[rel] = preservedTargets.has(t) ? sha256(Buffer.from(markers.between(current, rel))) : sha256(fs.readFileSync(destination.full));
+        // Adoption always marks the target preserved, so record the block hash uninstall compares for preserved files.
+        installedHashes[rel] = sha256(Buffer.from(markers.between(current, rel)));
         adoptedRuleTargets.add(t);
         preservedTargets.add(t);
         continue;
