@@ -176,7 +176,8 @@ function run(dir, dry) {
       // later package release changing rules/ or USER.md cannot make an untouched block look
       // edited (or vice versa).
       const currentBlock = renderer.between(existing, rel);
-      const blockUnedited = recorded ? (currentBlock !== null && sha256(Buffer.from(currentBlock)) === recorded) : matchesBlock;
+      // Explicit adoption of an older target can record the whole file; its outer text stays user-owned.
+      const blockUnedited = recorded ? (currentBlock !== null && (sha256(Buffer.from(currentBlock)) === recorded || sha256(bytes) === recorded)) : matchesBlock;
       if (blockUnedited) add(rel, 'strip', Buffer.from(stripBlock(existing, ms)), 'pre-existing file; removed only the marked block');
       else add(rel, 'keep', null, ms.kind === 'none' ? 'pre-existing file; block already absent' : 'edited');
       continue;

@@ -138,7 +138,7 @@ async function main() {
   write(recent, '.claude/projects/recent/empty.jsonl', user('META_EXCLUDED', { isMeta: true }), '2026-10-03T00:00:00.000Z');
   const recentResult = await readSessions({ home: recent, sources: ['claude-code'], allProjects: true });
   assert.equal(recentResult.sessions.length, 20);
-  assert.equal(recentResult.filesRead.length, 26, 'All candidate sessions are read before selecting by message recency.');
+  assert.equal(recentResult.filesRead.length, 22, 'Only the newest usable sessions and the two newer unusable files are read.');
   assert.equal(recentResult.sessions[0].messages[0], 'Recent typed message 23.');
   assert.equal(recentResult.sessions[19].messages[0], 'Recent typed message 4.');
   const fewer = await readSessions({ home: recent, sources: ['claude-code'], limit: 2, allProjects: true });

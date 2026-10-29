@@ -1,7 +1,7 @@
 'use strict';
 // Global targets have fixed home-relative names; profile ownership stays inside its own folder.
 const fs = require('fs');
-const os = require('os');
+const { resolveHome } = require('./home.cjs');
 const path = require('path');
 const renderer = require('../render/render.cjs');
 const onboarding = require('../render/onboarding.cjs');
@@ -41,7 +41,7 @@ async function run({ args, commitPlan, probe, readConfig, ask }) {
 async function execute({ args, commitPlan, probe, readConfig, ask }) {
   if ('--dir' in args) refuse('--global cannot be combined with --dir');
   if ('--level' in args && args['--level'] !== '1') refuse('--global supports only --level 1');
-  const home = os.homedir();
+  const home = resolveHome();
   const info = fs.lstatSync(home);
   if (info.isSymbolicLink() || !info.isDirectory()) refuse('global home must be a real directory, never a symlink');
   const root = fs.realpathSync(home);
@@ -124,6 +124,9 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
     const text = found.exists ? decode(fs.readFileSync(found.full), rel) : null;
     const ms = text === null ? { kind: 'none' } : renderer.markerState(text, rel);
     if (ms.kind === 'malformed') refuse(`${rel}: malformed marker block`);
+    if (ms.kind === 'one' && !Object.hasOwn(cfg.globalFiles, entry.key)) {
+      refuse(`${rel}: foreign agent-personalizer block; remove the block from <!-- agent-personalizer:begin --> through <!-- agent-personalizer:end -->, then re-run --global. Nothing was written`);
+    }
     const block = `Profile source: \`${path.join(profileRoot, 'USER.md')}\`. Read \`${path.join(profileRoot, 'AGENT_ONBOARDING.md')}\` for working preferences.\n\n` + qualify(entry.block);
     const output = renderer.splice(text, block, rel);
     if (renderer.markerState(output, rel).kind !== 'one' || renderer.between(output, rel) !== block) refuse(`${rel}: generated block would not re-parse; nothing was written`);

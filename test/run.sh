@@ -1319,6 +1319,7 @@ node test/learning.test.cjs || fail "learning privacy and rendering regressions"
 node test/release-081.test.cjs || fail "0.8.1 regression tests"
 node test/session-recency.test.cjs || fail "newest session selection regressions"
 node test/global.test.cjs || fail "global installation regressions"
+node test/audit-084.test.cjs || fail "0.8.4 follow-up audit regressions"
 pass "session learning: consent, entries, forget and uninstall; interactive re-runs preserve saved answers without prompts"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

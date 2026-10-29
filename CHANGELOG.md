@@ -18,6 +18,7 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ### Fixed
 
+- The 0.8.4 follow-up audit fixes bound Claude and Codex session reads to contenders for the newest 20, validate and clamp message timestamps to file mtime, refuse foreign global blocks and invalid HOME values before writes, adopt explicitly re-rendered Core 5 upgrades, and keep code examples containing HTML comment openers from hiding later Markdown links.
 - Session learning selects the newest 20 usable sessions by latest message timestamp across all sources, including legacy Gemini logs, with file mtime used only when a session has no valid timestamp (#38).
 - Digest removal documentation now agrees with recorded-hash ownership and preserves edited or unrecorded files (#39).
 - Markdown link checking strips nested and unterminated HTML comments completely (CodeQL `js/incomplete-multi-character-sanitization`).
