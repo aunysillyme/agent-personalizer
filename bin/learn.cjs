@@ -2,7 +2,7 @@
 // Consent separates project inspection from access to the AI apps' private history.
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const { resolveHome } = require('./home.cjs');
 const crypto = require('crypto');
 const readline = require('readline');
 const renderer = require('../render/render.cjs');
@@ -155,7 +155,7 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   const terms = list.exists ? require('../check/gate.cjs').loadList(list.full, { allowEmpty: true }).terms : [];
   const entries = renderer.readLearned(root);
   const sources = [...new Set((cfg.targets || []).map(target => SOURCE[target]).filter(Boolean))];
-  const home = os.homedir();
+  const home = resolveHome();
   const data = await require('./sessions.cjs').readSessions({ home, projectDir: root, allProjects, sources, limit: 20, privateTerms: terms });
   const now = new Date().toISOString();
   const text = digestText(data, entries, { sources, home, terms, now });

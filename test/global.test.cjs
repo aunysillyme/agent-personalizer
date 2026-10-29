@@ -69,7 +69,9 @@ try {
   const preserved = home('preserved');
   const above = '\ufeff# Existing instructions\r\nKeep these bytes.\r\n';
   const below = '\r\n# More instructions\r\nNo final newline';
-  write(preserved, targets[0], above + begin + '\r\nOld generated block.\r\n' + end + '\r\n' + below);
+  run(preserved, ['--global', '--ai', 'claude', '--yes']);
+  const owned = fs.readFileSync(path.join(preserved, targets[0]), 'utf8');
+  write(preserved, targets[0], above + owned.replace(/\n/g, '\r\n') + below);
   run(preserved, ['--global', '--ai', 'claude', '--yes']);
   const written = fs.readFileSync(path.join(preserved, targets[0]));
   assert(written.subarray(0, Buffer.byteLength(above)).equals(Buffer.from(above)), 'BOM and CRLF above the marker stay exact.');

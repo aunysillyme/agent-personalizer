@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
+const { resolveHome } = require('./home.cjs');
 const crypto = require('node:crypto');
 
 const MAX_LINE = 8 * 1024 * 1024;
@@ -253,7 +253,13 @@ function baseSession(file) {
 }
 
 function messageTimestamp(session, timestamp) {
-  const time = typeof timestamp === 'string' ? Date.parse(timestamp) : typeof timestamp === 'number' ? new Date(timestamp).getTime() : NaN;
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/;
+  let parsed = NaN;
+  if (typeof timestamp === 'string' && iso.test(timestamp)) {
+    const calendar = new Date(`${timestamp.slice(0, 10)}T00:00:00Z`);
+    if (Number.isFinite(calendar.getTime()) && calendar.toISOString().slice(0, 10) === timestamp.slice(0, 10)) parsed = Date.parse(timestamp);
+  } else if (typeof timestamp === 'number' && timestamp >= 1e11) parsed = new Date(timestamp).getTime();
+  const time = Math.min(parsed, session.mtimeMs);
   if (Number.isFinite(time) && (session.timestampMs === null || time > session.timestampMs)) {
     session.timestampMs = time;
     session.date = new Date(time).toISOString();
@@ -421,12 +427,12 @@ async function readMemory(file, state) {
   return { file: file.file, text, date: new Date(file.mtimeMs).toISOString() };
 }
 
-async function readSessions({ home = os.homedir(), projectDir = process.cwd(), allProjects = false, sources = [], limit = 20, privateTerms = [] } = {}) {
+async function readSessions({ home = resolveHome(), projectDir = process.cwd(), allProjects = false, sources = [], limit = 20, privateTerms = [] } = {}) {
   const selectedSources = new Set(Array.isArray(sources) ? sources.filter(source => SOURCES.has(source)) : []);
   const maximum = Number.isInteger(limit) && limit >= 0 ? Math.min(limit, 20) : 20;
   projectDir = path.resolve(projectDir);
   const state = {
-    home: path.resolve(home), projectDir, allProjects,
+    home: path.resolve(resolveHome(home)), projectDir, allProjects,
     geminiProjectHash: crypto.createHash('sha256').update(projectDir).digest('hex'),
     candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
     privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && fold(term).trim()).map(fold) : []
@@ -434,9 +440,15 @@ async function readSessions({ home = os.homedir(), projectDir = process.cwd(), a
   await discover(state.home, selectedSources, state);
   state.candidates.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));
   const sessions = [], geminiSessions = new Map();
+  // Multiple Gemini files can contribute to the same session, including its fallback timestamp.
+  // Keep that full merge; independent sessions admit an mtime bound.
+  const bounded = state.candidates.filter(file => file.source === 'gemini-cli').length < 2;
+  const sortKey = session => session.timestampMs ?? session.mtimeMs;
+  const compare = (a, b) => sortKey(b) - sortKey(a) || a.file.localeCompare(b.file) || a.sessionId.localeCompare(b.sessionId);
   const readers = { claude: readClaude, codex: readCodex, gemini: readGemini, 'gemini-logs': readGeminiLogs };
   for (const file of state.candidates) {
     if (!maximum) break;
+    if (bounded && sessions.length === maximum && file.mtimeMs < sortKey(sessions[maximum - 1])) break;
     const found = await readers[file.format](file, state);
     for (const session of found) {
       if (session.source === 'gemini-cli' && geminiSessions.has(session.sessionId)) {
@@ -451,8 +463,11 @@ async function readSessions({ home = os.homedir(), projectDir = process.cwd(), a
         sessions.push(session);
       }
     }
+    sessions.sort(compare);
+    if (bounded) for (const session of sessions.splice(maximum)) {
+      if (session.source === 'gemini-cli') geminiSessions.delete(session.sessionId);
+    }
   }
-  sessions.sort((a, b) => (b.timestampMs ?? b.mtimeMs) - (a.timestampMs ?? a.mtimeMs) || a.file.localeCompare(b.file) || a.sessionId.localeCompare(b.sessionId));
   const memories = [];
   state.memoryFiles.sort((a, b) => b.mtimeMs - a.mtimeMs || a.file.localeCompare(b.file));
   for (const file of state.memoryFiles.slice(MAX_MEMORIES)) bump(state, 'memory_limit');

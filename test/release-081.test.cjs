@@ -7,8 +7,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createRequire } = require('node:module');
 const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
+const sessionRequire = createRequire(path.join(ROOT, 'bin/sessions.cjs'));
 const CLI = path.join(ROOT, 'bin/agent-personalizer.js');
 const RENDER = path.join(ROOT, 'render/render.cjs');
 const CONFIG = '.agent-personalizer.json';
@@ -107,7 +109,7 @@ const cases = {
     assert.notDeepEqual(read(dir, 'CLAUDE.md'), before[0], 'a successful transaction still updates targets');
   },
   'F4-final-private-filter'() {
-    const context = { require, module: { exports: {} } };
+    const context = { require: sessionRequire, module: { exports: {} } };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
     const typedText = context.module.exports.probe;
     for (const items of [
@@ -189,7 +191,7 @@ assert 're.search(prompt.encode(), pending)' in ${JSON.stringify(python)}
     assert.equal(r.status, 0, r.stdout + r.stderr);
   },
   'A1a-newline-split-private'() {
-    const context = { require, module: { exports: {} } };
+    const context = { require: sessionRequire, module: { exports: {} } };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
     const typedText = context.module.exports.probe;
     const state = { privateTerms: ['secretfixtureperson'], skipped: {} };
@@ -197,7 +199,7 @@ assert 're.search(prompt.encode(), pending)' in ${JSON.stringify(python)}
     assert.equal(state.skipped.private_match, 1);
   },
   'A1b-spaced-term-private'() {
-    const context = { require, module: { exports: {} } };
+    const context = { require: sessionRequire, module: { exports: {} } };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
     const typedText = context.module.exports.probe;
     for (const items of [
@@ -288,7 +290,7 @@ assert 're.search(prompt.encode(), pending)' in ${JSON.stringify(python)}
     assert.equal(read(pre, '.agent-personalizer/digest.md').toString(), '# custom digest\n');
   },
   'A6-control-char-private'(dir) {
-    const context = { require, module: { exports: {} } };
+    const context = { require: sessionRequire, module: { exports: {} } };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'bin/sessions.cjs'), 'utf8') + '\nmodule.exports.probe = typedText;', context);
     const typedText = context.module.exports.probe;
     const state = { privateTerms: ['secretfixtureperson'], skipped: {} };

@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const os = require('os');
+const { resolveHome } = require('./home.cjs');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -288,7 +288,7 @@ async function main() {
     for (const k of AIS) console.log(`  ${k.padEnd(8)} ${AI_LABEL[k]}`);
     // Existence is the only inspection of app folders permitted before consent.
     const found = [['.claude', 'claude'], ['.codex', 'agents'], ['.gemini', 'gemini']]
-      .filter(([folder]) => fs.existsSync(path.join(os.homedir(), folder))).map(([, ai]) => ai);
+      .filter(([folder]) => fs.existsSync(path.join(resolveHome(), folder))).map(([, ai]) => ai);
     ais = await ask('\nAIs', ais || (found.length ? found.join(',') : 'claude,agents'));
   }
   if (!/^[1-4]$/.test(String(level))) die('level must be exactly 1, 2 or 3');
@@ -385,15 +385,8 @@ async function main() {
   // A smaller rule set refreshes only an untouched older generated file. Keep an edited
   // older target until the user explicitly re-renders or restores its recorded bytes.
   const keptRuleTargets = new Set();
+  const adoptedRuleTargets = new Set();
   const coreUpgrade = cfgExists && effectiveLevel < 3 && cfg.ruleSet !== 'core-5';
-  for (const t of allTargets) {
-    if (t === 'onboarding' || (!coreUpgrade && !(cfg.keptRuleTargets || []).includes(t))) continue;
-    const rel = TARGETS[t].file, destination = probe(root, rel), hash = recordedHash(cfg, rel);
-    if (destination.exists && hash && sha256(fs.readFileSync(destination.full)) !== hash) {
-      keptRuleTargets.add(t);
-      console.log(`kept   ${rel} (edited older generated file; review it before taking the Core 5 rules)`);
-    }
-  }
 
   for (const t of allTargets) {
     const rel = TARGETS[t].file;
@@ -440,6 +433,26 @@ async function main() {
     if (userAction === 'keep' && notesScaffolded && !current.includes(`\`${base}/README.md\``)) staleNotesInUser = true;
   }
 
+  const profileSource = ['keep', 'conflict'].includes(userAction) ? fs.readFileSync(user.full, 'utf8') : onboarding.renderUser(answers, { notesScaffolded, entries });
+  let currentRenders;
+  for (const t of allTargets) {
+    if (t === 'onboarding' || (!coreUpgrade && !(cfg.keptRuleTargets || []).includes(t))) continue;
+    const rel = TARGETS[t].file, destination = probe(root, rel), hash = recordedHash(cfg, rel);
+    if (destination.exists && hash && sha256(fs.readFileSync(destination.full)) !== hash) {
+      currentRenders ||= markers.renderedContents(root, { ...cfg, targets: allTargets, level: effectiveLevel, ruleSet: 'core-5', onboarding: answers }, { profileSource, learned: entries });
+      const current = fs.readFileSync(destination.full, 'utf8');
+      if (markers.markerState(current, rel).kind === 'one' && markers.between(current, rel) === currentRenders.find(entry => entry.key === t).block) {
+        installedHashes[rel] = sha256(fs.readFileSync(destination.full));
+        adoptedRuleTargets.add(t);
+        preservedTargets.add(t);
+        continue;
+      }
+      keptRuleTargets.add(t);
+      const quote = value => `'${value.replace(/'/g, "'\\''")}'`;
+      console.log(`kept   ${rel} (edited older generated file; re-render with: node ${quote(path.join(PKG, 'render/render.cjs'))} --dir ${quote(root)} --targets ${t})`);
+    }
+  }
+
   // Previous answers identify the exact installer lines to migrate. Each unchanged line is
   // replaced or removed on its own; all other outside-marker bytes stay exactly as read.
   const upgrades = [];
@@ -448,7 +461,7 @@ async function main() {
     return ms.kind === 'one' ? text.slice(0, ms.bStart) + text.slice(ms.eEnd) : text;
   };
   for (const name of ['CLAUDE.md', 'AGENTS.md']) {
-    if (keptRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents')) continue;
+    if (keptRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents') || adoptedRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents')) continue;
     const prior = previousPlan.find(p => p.rel === name);
     const next = plan.find(p => p.rel === name);
     if (!prior || !next) continue;
@@ -570,7 +583,7 @@ async function main() {
     },
     async finalize() {
       if (learnRequested) await require('./learn.cjs').learn({ dir: root, consented: true });
-      execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.filter(t => !keptRuleTargets.has(t)).join(',')], { stdio: 'inherit' });
+      execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.filter(t => !keptRuleTargets.has(t) && !adoptedRuleTargets.has(t)).join(',')], { stdio: 'inherit' });
     }
   });
 

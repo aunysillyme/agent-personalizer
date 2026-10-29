@@ -29,25 +29,44 @@ const files = new Set(inventory[0].files.map(file => file.path));
 function destinations(markdown) {
   // Links shown as code samples or inside comments are examples, rather than
   // navigation in the rendered Markdown. Inline code can appear in link labels.
-  let uncommented = markdown, previous;
-  do {
-    previous = uncommented;
-    uncommented = uncommented.replace(/<!--[^]*?-->/g, '');
-  } while (uncommented !== previous);
-  const unfinished = uncommented.indexOf('<!--');
-  if (unfinished !== -1) uncommented = uncommented.slice(0, unfinished);
-  const source = uncommented.split('\n');
-  let fence = null;
-  const lines = source.filter(line => {
-    const m = line.match(/^\s{0,3}(`{3,}|~{3,})/);
-    if (m) {
-      if (!fence) fence = m[1][0];
-      else if (fence === m[1][0]) fence = null;
-      return false;
+  function stripExamples(text) {
+    let output = '';
+    for (let i = 0; i < text.length;) {
+      if (i === 0 || text[i - 1] === '\n') {
+        const fence = /^ {0,3}(`{3,}|~{3,})[^\n]*(?:\n|$)/.exec(text.slice(i));
+        if (fence) {
+          const close = new RegExp('^ {0,3}' + fence[1][0] + '{' + fence[1].length + ',}[ \t\r]*$', 'gm');
+          close.lastIndex = i + fence[0].length;
+          const match = close.exec(text);
+          i = match ? close.lastIndex : text.length;
+          output += '\n';
+          continue;
+        }
+      }
+      if (text.startsWith('<!--', i)) {
+        const close = text.indexOf('-->', i + 4);
+        if (close !== -1) { i = close + 3; continue; }
+      }
+      if (text[i] === '`') {
+        const ticks = /^`+/.exec(text.slice(i))[0];
+        const runs = /`+/g;
+        runs.lastIndex = i + ticks.length;
+        let match;
+        while ((match = runs.exec(text)) && match[0].length !== ticks.length) {}
+        if (match) { i = runs.lastIndex; output += ' '; continue; }
+        output += ticks;
+        i += ticks.length;
+        continue;
+      }
+      output += text[i++];
     }
-    return !fence;
-  });
-  const body = lines.join('\n');
+    return output;
+  }
+  let body = markdown, previous;
+  do {
+    previous = body;
+    body = stripExamples(body);
+  } while (body !== previous);
   const links = [];
   for (let i = 0; i < body.length; i++) {
     if (body[i] !== ']' || body[i + 1] !== '(') continue;
@@ -69,7 +88,7 @@ function destinations(markdown) {
     }
     if (p > start) links.push(body.slice(start, p).replace(/\\([()])/g, '$1'));
   }
-  for (const line of lines) {
+  for (const line of body.split('\n')) {
     const ref = line.match(/^\s{0,3}\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))/);
     if (ref) links.push(ref[1] || ref[2]);
   }
@@ -78,8 +97,15 @@ function destinations(markdown) {
 }
 
 assert.deepEqual(destinations('<!<!---->-- [x](missing.md) -->'), [], 'nested comments must not surface a link');
-assert.deepEqual(destinations('<!-- [x](missing.md)'), [], 'unterminated comments hide the rest of the input');
+assert.deepEqual(destinations('<!-- [x](visible.md)'), ['visible.md'], 'unfinished comment openers do not truncate link checking');
 assert.deepEqual(destinations('<!-- hidden --> [x](visible.md)'), ['visible.md'], 'links outside comments still resolve');
+assert.deepEqual(destinations('Inline `<!--` then [x](visible.md)'), ['visible.md'], 'inline comment examples do not hide later links');
+assert.deepEqual(destinations('Inline ``code ` <!--`` then [x](visible.md)'), ['visible.md'], 'longer inline code delimiters protect comment examples');
+assert.deepEqual(destinations('```md\n<!--\n```\n[x](visible.md)'), ['visible.md'], 'fenced comment examples do not hide later links');
+assert.deepEqual(destinations('````md\r\n```\r\n<!--\r\n````\r\n[x](visible.md)'), ['visible.md'], 'CRLF fences close at the matching delimiter length');
+assert.deepEqual(destinations('`[x](missing.md)` [x](visible.md)'), ['visible.md'], 'inline code links are examples');
+assert.deepEqual(destinations('<!-- hidden ` --> [x](visible.md) `'), ['visible.md'], 'backticks inside comments cannot hide a later link');
+assert.deepEqual(destinations('` example [x](visible.md) ``'), ['visible.md'], 'inline code needs matching delimiter lengths');
 
 let checked = 0;
 const errors = [];
