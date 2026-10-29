@@ -155,7 +155,7 @@ In practice: when you change a file in a folder, fix that folder's README in the
 
 Never hand-type fields the system derives (an `updated:` date pulled from version control, for instance). Edit the prose, not the derived keys.
 
-Same template. Check the index before reporting a write as done.
+Check the folder's README before reporting a write as done.
 
 > Written after: an AI trusted a folder index that described a file deleted two weeks earlier, and built a plan on it. Agents read a notes folder by trusting the index over the files, because that is what an index is for.
 > Prevents: a stale index, which is worse than a missing one because it is believed.

@@ -86,7 +86,7 @@ function protect(root, log = console.log) {
   const tracked = git(where.top, ['ls-files', '--', ...PRIVATE.map(p => where.prefix ? `${where.prefix}/${p}` : p)]).out.split('\n').filter(Boolean);
   if (tracked.length) log(`WARNING: git already tracks ${tracked.join(', ')}; an exclude cannot hide a tracked file. Run git rm --cached on it if it should stay private.`);
   const shared = SHARED_PERSONAL.filter(p => fs.existsSync(path.join(root, p)));
-  if (shared.length) log(`NOTE: ${shared.join(', ')} carry your profile, entries or answers and stay committable, since projects often share them. Review them before committing.`);
+  if (shared.length) log(`NOTE: ${shared.join(', ')} carry your profile, entries and answers, including names under off-limits. CLAUDE.md, AGENTS.md and GEMINI.md may be committed. Review them before committing.`);
 }
 
 function unprotect(root, { dry = false, log = console.log } = {}) {

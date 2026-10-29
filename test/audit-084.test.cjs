@@ -10,7 +10,7 @@ const { spawnSync } = require('node:child_process');
 const { readSessions } = require('../bin/sessions.cjs');
 const root = path.resolve(__dirname, '..');
 // The CLI prints realpaths, and on macOS os.tmpdir() sits behind the /var -> /private/var link.
-const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-audit-084-')));
+const temp = fs.realpathSync(fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'ap84-')));
 const cli = path.join(root, 'bin/agent-personalizer.js');
 const renderer = path.join(root, 'render/render.cjs');
 const begin = '<!-- agent-personalizer:begin -->';

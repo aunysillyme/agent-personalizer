@@ -17,7 +17,7 @@ function bump(state, reason, count = 1) {
 
 function claudeProjectNames(projectDir) {
   const absolute = path.resolve(projectDir);
-  return [...new Set([absolute.replace(/[\\/]/g, '-'), absolute.replace(/[:\\/]/g, '-')])];
+  return [...new Set([absolute.replace(/[\\/]/g, '-'), absolute.replace(/[:\\/]/g, '-'), absolute.replace(/[^a-zA-Z0-9]/g, '-'), absolute.replace(/[^a-zA-Z0-9_]/g, '-')])];
 }
 
 function belongsToProject(cwd, projectDir) {
@@ -29,6 +29,17 @@ function belongsToProject(cwd, projectDir) {
 /* Both sides are compared in NFC and lower case: macOS often stores accents decomposed (NFD),
    which would otherwise let a listed name through. Audit 0.8.0 F2. */
 const CTRL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+const SECRETS = [
+  /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/i,
+  /sk-[A-Za-z0-9_-]{20,}/,
+  /(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]+/,
+  /AKIA[A-Z0-9]{16}/,
+  /xox[baprs]-[A-Za-z0-9-]+/,
+  /AIza[A-Za-z0-9_-]{20,}/,
+  /Bearer\s+[A-Za-z0-9._~+\/-]{20,}/i,
+  /(?:api[_-]?key|secret|token|password|passwd)["']?\s*[:=]\s*\S{8,}/i
+];
+const secretMatch = text => SECRETS.some(pattern => pattern.test(String(text).replace(CTRL, '')));
 const fold = (text) => String(text).replace(CTRL, '').normalize('NFC').toLowerCase();
 const compact = (text) => fold(text).replace(/\s+/g, '');
 function privateMatch(text, terms) {
@@ -60,6 +71,7 @@ function cutContextBlocks(text) {
 
 function typedText(items, state) {
   if (!items.length) { bump(state, 'non_typed'); return null; }
+  if (secretMatch(items.join('\n')) || secretMatch(items.join(''))) { bump(state, 'secret'); return null; }
   // A private match drops the whole message, including its other text items.
   if (privateMatch(items.join('\n'), state.privateTerms) || privateMatch(items.join(''), state.privateTerms)) { bump(state, 'private_match'); return null; }
   const kept = [];
@@ -73,6 +85,7 @@ function typedText(items, state) {
     if (text) kept.push(text);
   }
   const text = kept.join('\n');
+  if (secretMatch(text) || secretMatch(kept.join(''))) { bump(state, 'secret'); return null; }
   if (privateMatch(text, state.privateTerms) || privateMatch(kept.join(''), state.privateTerms)) { bump(state, 'private_match'); return null; }
   if (!text) { bump(state, 'empty_message'); return null; }
   if (text.length > 2000) { bump(state, 'long_message'); return null; }
@@ -423,7 +436,9 @@ async function readMemory(file, state) {
   if (!await scanLines(file.file, state, line => lines.push(line))) return null;
   const text = lines.join('\n').replace(CTRL, '').trim();
   if (!text) return null;
+  if (secretMatch(text)) { bump(state, 'secret'); return null; }
   if (privateMatch(text, state.privateTerms)) { bump(state, 'private_match'); return null; }
+  if (text.length > 2000) { bump(state, 'long_message'); return null; }
   return { file: file.file, text, date: new Date(file.mtimeMs).toISOString() };
 }
 

@@ -79,7 +79,7 @@ A word on the stories below: each is one setup's experience of what held and wha
 
 **Prevents.** The AI treating its own guess as your ruling. An inference written down without a status reads, next session, like something you decided.
 
-**Story.** A memory file said the user preferred a certain tool. The user had never said so; an earlier session had inferred it from one choice. Three sessions built on it. The status field exists so the next session can tell the difference between "she said" and "I guessed," and so a contradicted fact gets marked `superseded` with a pointer rather than silently overwritten.
+**Story.** A memory file said the user preferred a certain tool. The user had never said so; an earlier session had inferred it from one choice. Three sessions built on it. The status field exists so the next session can tell the difference between "she said" and "I guessed." When the user rejects an entry, mark it `declined` and keep the correction in its evidence rather than silently overwriting it.
 
 **Rule inside the tier.** Ask before keeping an entry as confirmed. A no is recorded as declined and never asked again. Re-render after an entry changes; `--check` catches an unrendered edit. The digest of past messages is temporary evidence, separate from the entries: `learn --forget` removes it, and uninstall keeps `LEARNED.md` once it holds anything you wrote. See [learning.md](learning.md).
 

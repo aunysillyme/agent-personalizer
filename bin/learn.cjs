@@ -21,12 +21,14 @@ agent-personalizer can read up to 20 of your most recent sessions from ${scope}
 that Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
   · ${scopeHint}
   · Only what you typed, never the AI's replies.
+  · Messages that look like secrets are skipped.
   · Stays on this computer, saved to .agent-personalizer/digest.md.
   · Your AI reads that file next time you open it, like anything you share with it.
   · Other people's details in there? Add their names to your private list first.
   · Delete it any time: npx agent-personalizer learn --forget
     (your AI app's own history stays as it is)
   · Codex's own memory notes are included when you choose Codex.
+    They are global to your Codex account, not limited to this folder.
   · When your AI reads the file, its provider sees these messages again.
   · Work or client accounts: check your agreement before reusing their sessions.
   · Not affiliated with Anthropic, OpenAI or Google. Their formats can change.

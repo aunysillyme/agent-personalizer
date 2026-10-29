@@ -10,7 +10,7 @@ const { readSessions } = require('../bin/sessions.cjs');
 const fixtureDir = path.join(__dirname, 'fixtures', 'sessions');
 const homes = [];
 function home() {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'personalizer-sessions-'));
+  const folder = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'aps-'));
   homes.push(folder);
   return folder;
 }
@@ -27,7 +27,7 @@ function fixture(folder, relative, name, mtime) {
 function user(text, extra = {}) {
   return JSON.stringify({ type: 'user', sessionId: text, entrypoint: 'cli', message: { content: text }, ...extra }) + '\n';
 }
-function claudeProject(project) { return project.replace(/[:\\/]/g, '-'); }
+function claudeProject(project) { return project.replace(/[^a-zA-Z0-9]/g, '-'); }
 function codexRecords(cwd, text) {
   return JSON.stringify({ type: 'session_meta', payload: { id: path.basename(cwd), source: 'cli', cwd } }) + '\n' +
     JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n';
@@ -184,7 +184,7 @@ async function main() {
   assert.deepEqual(stringResult.sessions.flatMap(session => session.messages), ['CODEX_STRING_KEPT shorter please']);
   console.log('ok: sessions catch split and decomposed private terms and keep Codex string content');
 
-  const scopeBase = fs.mkdtempSync(path.join(os.tmpdir(), 'personalizer-project-scope-'));
+  const scopeBase = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'aps-'));
   homes.push(scopeBase);
   const projectDir = path.join(scopeBase, 'a-b');
   const nestedDir = path.join(projectDir, 'nested');

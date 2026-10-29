@@ -14,7 +14,7 @@ const sessionRequire = createRequire(path.join(ROOT, 'bin/sessions.cjs'));
 const CLI = path.join(ROOT, 'bin/agent-personalizer.js');
 const RENDER = path.join(ROOT, 'render/render.cjs');
 const CONFIG = '.agent-personalizer.json';
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'personalizer-081-'));
+const scratch = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'ap81-'));
 const home = path.join(scratch, 'home');
 fs.mkdirSync(home);
 

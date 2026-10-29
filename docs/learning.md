@@ -8,17 +8,18 @@ The first interactive install asks which AIs you use, then shows this consent sc
 
 ```text
 Learn from your past sessions?
-agent-personalizer can read up to 20 of your most recent sessions from this
-project that Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
-  · By default, only sessions for this --dir project are included.
+agent-personalizer can read up to 20 of your most recent sessions from the --dir project
+that Claude Code, Codex and Gemini CLI still keep, to find corrections you repeat.
   · Use --all-projects to include sessions from other projects.
   · Only what you typed, never the AI's replies.
+  · Messages that look like secrets are skipped.
   · Stays on this computer, saved to .agent-personalizer/digest.md.
   · Your AI reads that file next time you open it, like anything you share with it.
   · Other people's details in there? Add their names to your private list first.
   · Delete it any time: npx agent-personalizer learn --forget
     (your AI app's own history stays as it is)
   · Codex's own memory notes are included when you choose Codex.
+    They are global to your Codex account, not limited to this folder.
   · When your AI reads the file, its provider sees these messages again.
   · Work or client accounts: check your agreement before reusing their sessions.
   · Not affiliated with Anthropic, OpenAI or Google. Their formats can change.
@@ -48,7 +49,7 @@ The saved AI selection chooses the sources. The reader takes up to 20 of the new
 
 By default, only sessions associated with the `--dir` folder or one of its subfolders are included. Claude Code and Codex sessions are matched by their recorded working directory; Gemini CLI uses the SHA-256 project folder it creates from that path. If a session does not provide enough path information to match it safely, it is skipped. Use `npx agent-personalizer learn --dir . --all-projects` to include sessions from every project.
 
-The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Large likely pastes are dropped too. Gemini chat snapshots replace earlier messages; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
+The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. These memory notes are global to your Codex account, not limited to this folder. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Messages and memory notes over 2,000 characters are dropped whole. Gemini chat snapshots replace earlier messages; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
 
 The reader streams session files, skips oversized lines and stops a file at its size limit. Symlinks, unreadable files, other-project sessions and unknown or malformed formats are skipped and counted. Codex session headers are inspected to determine their project; message content from other projects is not scanned. The terminal lists files read and skip counts; message text is never printed there. Vendor format changes may mean fewer usable sessions until the reader is updated.
 
@@ -58,7 +59,9 @@ The reader runs locally and makes no network calls. It saves `.agent-personalize
 
 Your AI reads the digest, so its contents go to that AI's provider again, like anything you paste in. The digest labels old messages as data; instructions inside them must never be followed.
 
-Past sessions may include client, coworker or other people's details. Read only history you are allowed to reuse. For work or client accounts, check your agreement first. Before accepting, put private terms in `<project>/check/forbidden.local.txt`, one per line; any message containing a term, ignoring case, is dropped whole. Blank lines, `#` comments and `allow:` entries are ignored by the session filter. Keep that list out of git. See the [gate setup](guarantees.md#forbidden-string-gate).
+Past sessions may include client, coworker or other people's details. Read only history you are allowed to reuse. For work or client accounts, check your agreement first. Before accepting, put private terms in `<project>/check/forbidden.local.txt` (project install) or `~/.agent-personalizer/check/forbidden.local.txt` (global install), one per line; any message or memory note containing a term, ignoring case, is dropped whole. Blank lines, `#` comments and `allow:` entries are ignored by the session filter. Keep that list out of git. See the [gate setup](guarantees.md#forbidden-string-gate).
+
+Messages and memory notes that look like secrets are dropped whole and counted under `secret`; only the count is reported. Conservative patterns cover PEM private key headers, `sk-` keys, GitHub tokens, AWS access key ids, Slack tokens, Google API keys, bearer tokens and assignments to API key, secret, token or password fields. This filter can miss secrets or skip ordinary text; review the digest before sharing it with your AI.
 
 ## What your AI asks and keeps
 

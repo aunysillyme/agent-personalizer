@@ -211,7 +211,7 @@ Contributions are welcome: a new AI target, a notes tool, an example user, or a 
 
 Pull requests are accepted under the [contributor license agreement](CLA.md); the checkbox in the pull request template records your agreement.
 
-The harness (`test/run.sh: 98 checks`) tests exact exit codes and adversarial fixtures. The real forbidden-list check stays local and prints a skip when the private list is absent.
+The harness (`test/run.sh: 99 checks`) tests exact exit codes and adversarial fixtures. The real forbidden-list check stays local and prints a skip when the private list is absent.
 
 ## License
 
