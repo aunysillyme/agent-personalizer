@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 const { readSessions } = require('../bin/sessions.cjs');
 const root = path.resolve(__dirname, '..');
@@ -37,7 +38,98 @@ function snapshot(dir) {
 function record(id, timestamp) {
   return JSON.stringify({ type: 'user', sessionId: id, timestamp, message: { content: id } }) + '\n';
 }
+function noHome(home, hook) {
+  const env = { ...process.env, USERPROFILE: home };
+  delete env.HOME;
+  delete env.NODE_OPTIONS;
+  if (hook) env.NODE_OPTIONS = `--require ${hook}`;
+  return env;
+}
 const cases = {
+  'home-resolution-platforms'() {
+    const source = fs.readFileSync(path.join(root, 'bin/home.cjs'), 'utf8');
+    const { Refusal } = require('../render/render.cjs');
+    for (const platform of ['linux', 'win32']) {
+      const paths = platform === 'win32' ? path.win32 : path.posix;
+      const home = platform === 'win32' ? 'C:\\fake\\home' : '/fake/home';
+      const profile = platform === 'win32' ? 'C:\\fake\\profile' : '/fake/profile';
+      for (const value of [undefined, '', 'relative/path', home]) for (const fallback of [undefined, '', 'relative/path', profile]) {
+        const context = { module: { exports: {} }, process: { platform, env: { HOME: value, USERPROFILE: fallback } },
+          require: name => name === 'path' ? paths : { Refusal } };
+        vm.runInNewContext(source, context);
+        const selected = platform === 'win32' && (value === undefined || value === '') ? fallback : value;
+        if (selected && paths.isAbsolute(selected)) assert.equal(context.module.exports.resolveHome(), selected);
+        else assert.throws(() => context.module.exports.resolveHome(), Refusal);
+      }
+    }
+  },
+  'home-windows-userprofile'(dir) {
+    const home = path.join(dir, 'home');
+    fs.mkdirSync(home);
+    const hook = write(dir, 'win32.cjs', `Object.defineProperty(process, 'platform', { value: 'win32' });
+require('node:os').homedir = () => { throw new Error('HOME fallback reached'); };
+const fs = require('node:fs'), path = require('node:path');
+for (const key of ['writeFileSync', 'mkdirSync', 'renameSync', 'unlinkSync', 'rmdirSync', 'chmodSync']) {
+  const original = fs[key];
+  fs[key] = (file, ...args) => {
+    for (const target of key === 'renameSync' ? [file, args[0]] : [file]) {
+      const rel = path.relative(process.env.USERPROFILE, path.resolve(target));
+      if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) throw new Error('write outside fake home');
+    }
+    return original(file, ...args);
+  };
+}
+`);
+    const env = noHome(home, hook);
+    run(cli, ['--global', '--ai', 'claude', '--yes'], dir, 0, { env });
+    assert(fs.existsSync(path.join(home, '.claude/CLAUDE.md')));
+    assert(fs.existsSync(path.join(home, '.agent-personalizer/.agent-personalizer.json')));
+    env.HOME = '';
+    run(cli, ['--global'], dir, 0, { env });
+    const before = snapshot(dir);
+    env.HOME = 'relative/path';
+    run(cli, ['--global'], dir, 2, { env });
+    delete env.HOME;
+    for (const value of [undefined, '', 'relative/path']) {
+      if (value === undefined) delete env.USERPROFILE;
+      else env.USERPROFILE = value;
+      run(cli, ['--global'], dir, 2, { env });
+    }
+    assert.deepEqual(snapshot(dir), before, 'Invalid home values refuse before writes.');
+  },
+  'home-linux-userprofile-refused'(dir) {
+    const hook = write(dir, 'linux.cjs', `Object.defineProperty(process, 'platform', { value: 'linux' });
+require('node:os').homedir = () => { throw new Error('HOME fallback reached'); };
+`);
+    const before = snapshot(dir);
+    run(cli, ['--global', '--ai', 'claude', '--yes'], dir, 2, { env: noHome(dir, hook) });
+    assert.deepEqual(snapshot(dir), before, 'USERPROFILE is not a fallback on Linux.');
+  },
+  'home-project-without-home'(dir) {
+    const project = path.join(dir, 'project');
+    run(cli, ['--dir', project, '--ai', 'claude', '--level', '1', '--yes'], dir, 0, { env: noHome(dir) });
+    assert.deepEqual(fs.readdirSync(dir), ['project'], 'Only the project receives files.');
+    assert(fs.existsSync(path.join(project, 'CLAUDE.md')));
+  },
+  'home-interactive-without-home'(dir) {
+    const hook = write(dir, 'interactive.cjs', `Object.defineProperty(process.stdin, 'isTTY', { value: true });
+require('node:os').homedir = () => { throw new Error('HOME fallback reached'); };
+require('node:readline').createInterface = () => ({
+  question(prompt, answer) { console.log(prompt); process.nextTick(() => answer('')); },
+  once() {}, close() {}
+});
+`);
+    for (const explicit of [false, true]) {
+      const project = path.join(dir, explicit ? 'explicit' : 'default');
+      const args = ['--dir', project, '--level', '1'];
+      if (explicit) args.push('--ai', 'claude');
+      const message = run(cli, args, dir, 0, { env: noHome(dir, hook) });
+      assert.match(message, explicit ? /AIs \[claude\]/ : /AIs \[claude,agents\]/);
+      const cfg = JSON.parse(fs.readFileSync(path.join(project, '.agent-personalizer.json')));
+      assert.deepEqual(cfg.targets.filter(t => t !== 'onboarding'), explicit ? ['claude'] : ['claude', 'agents']);
+    }
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['default', 'explicit', 'interactive.cjs']);
+  },
   async 'sessions-bounded-full-scan'(dir) {
     const expected = [];
     for (let i = 0; i < 25; i++) {
@@ -104,7 +196,8 @@ const cases = {
     const project = path.join(dir, 'project');
     run(cli, ['--dir', project, '--ai', 'claude', '--level', '1', '--yes'], dir);
     // Tripwire proves a missing HOME can never reach the passwd fallback or any write.
-    const guard = write(dir, 'home-guard.cjs', `const fs = require('node:fs');
+    const guard = write(dir, 'home-guard.cjs', `Object.defineProperty(process, 'platform', { value: 'linux' });
+const fs = require('node:fs');
 require('node:os').homedir = () => { throw new Error('HOME fallback reached'); };
 for (const key of ['writeFileSync', 'mkdirSync', 'renameSync', 'unlinkSync']) fs[key] = () => { throw new Error('write reached'); };
 `);
@@ -144,16 +237,35 @@ for (const key of ['writeFileSync', 'mkdirSync', 'renameSync', 'unlinkSync']) fs
       assert(fs.readFileSync(file).equals(rendered), 'Adoption preserves outside bytes.');
       const cfg = JSON.parse(fs.readFileSync(path.join(project, '.agent-personalizer.json')));
       assert(!cfg.keptRuleTargets.includes('claude'));
-      assert.equal(cfg.installed['CLAUDE.md'], crypto.createHash('sha256').update(rendered).digest('hex'));
+      const inner = require('../render/render.cjs').between(rendered.toString('utf8'), 'CLAUDE.md');
+      const current = fs.readFileSync(file, 'utf8');
+      const ms = require('../render/render.cjs').markerState(current, 'CLAUDE.md');
+      const appended = preserved ? '\r\nAdded user line\r\n' : '';
+      fs.appendFileSync(file, appended);
+      const expected = Buffer.from(current.slice(0, ms.bStart).replace(/\n\n$/, '\n') + current.slice(ms.eEnd).replace(/^\r?\n/, '') + appended);
       run(cli, ['--uninstall', '--dir', project], dir);
+      assert(fs.readFileSync(file).equals(expected), 'Uninstall preserves every outside byte, including later edits.');
+      assert.equal(cfg.installed['CLAUDE.md'], crypto.createHash('sha256').update(preserved ? Buffer.from(inner) : rendered).digest('hex'));
       const outside = fs.readFileSync(file, 'utf8');
-      assert(outside.startsWith('\ufeff# Personal instructions\r\n') && outside.endsWith('\r\nMy own tail'), 'Uninstall preserves the adopted outer user text.');
+      assert(outside.startsWith('\ufeff# Personal instructions\r\n') && outside.endsWith('\r\nMy own tail' + appended), 'Uninstall preserves the adopted outer user text.');
       assert(!outside.includes(begin));
     }
   },
   'package-links-inline-comment'(dir) {
     write(dir, 'package.json', JSON.stringify({ name: 'audit-links-fixture', version: '1.0.0' }));
     write(dir, 'README.md', 'Inline `<!--` example.\n\n[Broken](missing.md)\n');
+    const message = run(path.join(root, 'test/package-links.cjs'), ['--repo', dir], dir, 1);
+    assert.match(message, /README\.md: missing\.md/);
+  },
+  'package-links-blank-line'(dir) {
+    write(dir, 'package.json', JSON.stringify({ name: 'audit-links-fixture', version: '1.0.0' }));
+    write(dir, 'README.md', "It's a `x\n\n[a](missing.md)\n\nend `");
+    const message = run(path.join(root, 'test/package-links.cjs'), ['--repo', dir], dir, 1);
+    assert.match(message, /README\.md: missing\.md/);
+  },
+  'package-links-escaped-backtick'(dir) {
+    write(dir, 'package.json', JSON.stringify({ name: 'audit-links-fixture', version: '1.0.0' }));
+    write(dir, 'README.md', '\\`[a](missing.md)\\`');
     const message = run(path.join(root, 'test/package-links.cjs'), ['--repo', dir], dir, 1);
     assert.match(message, /README\.md: missing\.md/);
   }
