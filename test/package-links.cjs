@@ -16,7 +16,8 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const cache = fs.mkdtempSync(path.join(process.platform === 'win32' ? os.tmpdir() : '/tmp', 'ap-pack-cache-'));
 let packed;
 try {
-  packed = spawnSync(npm, ['pack', '--dry-run', '--json', '--cache', cache], { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+  packed = spawnSync(npm, ['pack', '--dry-run', '--json', '--cache', cache], { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
+    env: { ...process.env, HOME: cache, USERPROFILE: cache, npm_config_offline: 'true' } });
 } finally { fs.rmSync(cache, { recursive: true, force: true }); }
 if (packed.error) throw packed.error;
 if (packed.status !== 0) { console.error(packed.stderr || packed.stdout); process.exit(packed.status || 1); }
@@ -47,12 +48,20 @@ function destinations(markdown) {
         const close = text.indexOf('-->', i + 4);
         if (close !== -1) { i = close + 3; continue; }
       }
+      if (text[i] === '\\' && /[\\`]/.test(text[i + 1] || '')) {
+        output += text.slice(i, i + 2);
+        i += 2;
+        continue;
+      }
       if (text[i] === '`') {
         const ticks = /^`+/.exec(text.slice(i))[0];
         const runs = /`+/g;
         runs.lastIndex = i + ticks.length;
         let match;
-        while ((match = runs.exec(text)) && match[0].length !== ticks.length) {}
+        while ((match = runs.exec(text))) {
+          if (/\n[ \t\r]*\n/.test(text.slice(i + ticks.length, match.index))) { match = null; break; }
+          if (match[0].length === ticks.length) break;
+        }
         if (match) { i = runs.lastIndex; output += ' '; continue; }
         output += ticks;
         i += ticks.length;
@@ -106,6 +115,11 @@ assert.deepEqual(destinations('````md\r\n```\r\n<!--\r\n````\r\n[x](visible.md)'
 assert.deepEqual(destinations('`[x](missing.md)` [x](visible.md)'), ['visible.md'], 'inline code links are examples');
 assert.deepEqual(destinations('<!-- hidden ` --> [x](visible.md) `'), ['visible.md'], 'backticks inside comments cannot hide a later link');
 assert.deepEqual(destinations('` example [x](visible.md) ``'), ['visible.md'], 'inline code needs matching delimiter lengths');
+assert.deepEqual(destinations("It's a `x\n\n[a](missing.md)\n\nend `"), ['missing.md'], 'inline code cannot cross a blank line');
+assert.deepEqual(destinations('`x\r\n \t\r\n[a](missing.md)\r\nend `'), ['missing.md'], 'blank lines may contain whitespace and CRLF');
+assert.deepEqual(destinations('\\`[a](missing.md)\\`'), ['missing.md'], 'escaped backticks do not open inline code');
+assert.deepEqual(destinations('\\\\`[a](hidden.md)` [a](visible.md)'), ['visible.md'], 'an escaped backslash leaves a code delimiter');
+assert.deepEqual(destinations('`x\n[a](hidden.md)` [a](visible.md)'), ['visible.md'], 'inline code may cross a single newline');
 
 let checked = 0;
 const errors = [];

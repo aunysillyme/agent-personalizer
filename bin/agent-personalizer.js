@@ -287,8 +287,11 @@ async function main() {
     console.log('\nWhich AIs do you use? Comma-separated from:');
     for (const k of AIS) console.log(`  ${k.padEnd(8)} ${AI_LABEL[k]}`);
     // Existence is the only inspection of app folders permitted before consent.
-    const found = [['.claude', 'claude'], ['.codex', 'agents'], ['.gemini', 'gemini']]
-      .filter(([folder]) => fs.existsSync(path.join(resolveHome(), folder))).map(([, ai]) => ai);
+    let home;
+    try { home = resolveHome(); }
+    catch (e) { if (!(e instanceof markers.Refusal)) throw e; }
+    const found = home ? [['.claude', 'claude'], ['.codex', 'agents'], ['.gemini', 'gemini']]
+      .filter(([folder]) => fs.existsSync(path.join(home, folder))).map(([, ai]) => ai) : [];
     ais = await ask('\nAIs', ais || (found.length ? found.join(',') : 'claude,agents'));
   }
   if (!/^[1-4]$/.test(String(level))) die('level must be exactly 1, 2 or 3');
@@ -442,7 +445,7 @@ async function main() {
       currentRenders ||= markers.renderedContents(root, { ...cfg, targets: allTargets, level: effectiveLevel, ruleSet: 'core-5', onboarding: answers }, { profileSource, learned: entries });
       const current = fs.readFileSync(destination.full, 'utf8');
       if (markers.markerState(current, rel).kind === 'one' && markers.between(current, rel) === currentRenders.find(entry => entry.key === t).block) {
-        installedHashes[rel] = sha256(fs.readFileSync(destination.full));
+        installedHashes[rel] = preservedTargets.has(t) ? sha256(Buffer.from(markers.between(current, rel))) : sha256(fs.readFileSync(destination.full));
         adoptedRuleTargets.add(t);
         preservedTargets.add(t);
         continue;

@@ -91,7 +91,7 @@ npx agent-personalizer --global --uninstall --dry
 npx agent-personalizer --global --uninstall
 ```
 
-`--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` for the selected targets. Paths use the operating system home directory, including a supplied `HOME`. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
+`--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` for the selected targets. Paths use `HOME`, with `USERPROFILE` as the Windows fallback when `HOME` is missing or empty. The selected value must be a non-empty absolute path. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
 
 Select only `claude`, `agents` and `gemini`. Other targets, `--dir` and levels 2/3 are refused. A headless first install needs `--ai` and `--yes`; level 1 is implicit. `--answers` and `--defaults` work as with project installs. A re-run keeps saved targets and answers.
 
