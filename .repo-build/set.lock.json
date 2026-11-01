@@ -1,8 +1,9 @@
 {
   "source": "https://raw.githubusercontent.com/aunysillyme/.github/HEAD/set.json",
-  "commit": "0f5ccb4061cfa78517cad74de9db4a5ff5e35d98",
-  "sha256": "2862ca03edd2a7c0409af085788414bf7505cda2fa9d7040666ee8cddef3c456",
-  "vendored_sha256": "2862ca03edd2a7c0409af085788414bf7505cda2fa9d7040666ee8cddef3c456",
+  "commit": "bbddbe1a0a826f77b068d15a1bfe8f4bdd41a0e7",
+  "sha256": "5a2077665ab401ccce28d00c249cae4d98f24c1b0ab7ae69f0ccc809294fa26e",
+  "vendored_sha256": "5a2077665ab401ccce28d00c249cae4d98f24c1b0ab7ae69f0ccc809294fa26e",
   "renderer_sha256": "557b390c9641660808952f9c4faa828387ee9b5dd9b0c6f1487c4b73133329e4",
-  "fetched": "2026-10-19"
+  "check_sha256": "ed6c28d5daf466a639e3768b0438019f5cf9a92c62b6b12718c68e04e4104c11",
+  "fetched": "2026-10-31"
 }

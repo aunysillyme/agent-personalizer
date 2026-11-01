@@ -20,6 +20,16 @@
       "name": "website-build-skill",
       "url": "https://github.com/aunysillyme/website-build-skill",
       "line": "A skill pack that turns your AI into an expert website builder: current research, design, code, accessibility, speed, SEO and security, alone or as a team."
+    },
+    {
+      "name": "lean-browser-use",
+      "url": "https://github.com/aunysillyme/lean-browser-use",
+      "line": "Cut browser use cost by about 25% in Claude Code: fresh runner subagent, bulk reads, three guards and a token meter. One npx command"
+    },
+    {
+      "name": "lean-computer-use",
+      "url": "https://github.com/aunysillyme/lean-computer-use",
+      "line": "Background Mac computer control for AI agents: desk tools, a fresh runner subagent, retry guards and a transcript token meter, installed with one command"
     }
   ]
 }
