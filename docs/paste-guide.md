@@ -8,10 +8,11 @@ The renderer writes one file per AI. This page says where each AI reads it, and 
 | `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md` and `AGENTS.md`. Paste it wherever the AI has no file access (below). |
 | `AGENTS.md` | Codex CLI, Cursor, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` for all projects. Nothing to paste. |
 | `GEMINI.md` | Gemini CLI | Automatically, from the folder; `--global` writes `~/.gemini/GEMINI.md` for all projects. Nothing to paste. |
+| `SOUL.md` | Hermes Agent | `--global --ai hermes` appends a marked block to `~/.hermes/SOUL.md`. In a project, use `--ai agents` for `AGENTS.md`. A different `HERMES_HOME` changes where Hermes reads the global file. |
 | `chatgpt-box1.txt`, `chatgpt-box2.txt` and `chatgpt-custom-instructions.md` | ChatGPT | Profile and response text to paste, with a preview and counts. |
 | `system-prompt.md` | anything with a system-prompt field, shared bots, API calls | Paste as the system prompt. Universal rules only, no profile, safe to share. |
 
-Use `npx agent-personalizer --global --ai claude,agents,gemini --yes` for one profile across projects. Its source lives in `~/.agent-personalizer/`; re-run with `--global` after editing it and start a new client session. Global mode accepts only these three targets and level 1, excludes `--dir`, preserves text outside its markers and supports `--global --uninstall`. See [global installation](install.md#every-project-with-one-profile).
+Use `npx agent-personalizer --global --ai claude,agents,gemini,hermes --yes` for one profile across projects. Its source lives in `~/.agent-personalizer/`; re-run with `--global` after editing it and start a new client session. Global mode accepts these four targets and level 1, excludes `--dir`, preserves text outside its markers and supports `--global --uninstall`. See [global installation](install.md#every-project-with-one-profile).
 
 ---
 

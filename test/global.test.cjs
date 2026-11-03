@@ -26,7 +26,7 @@ function write(folder, rel, bytes) {
 }
 function run(folder, args, expected = 0, extra = {}) {
   const out = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8',
-    env: { ...process.env, HOME: folder, USERPROFILE: folder, ...extra } });
+    env: { ...process.env, HOME: folder, USERPROFILE: folder, HERMES_HOME: '', ...extra } });
   assert.equal(out.status, expected, `${args.join(' ')}\n${out.stdout}${out.stderr}`);
   return out.stdout + out.stderr;
 }
@@ -46,6 +46,50 @@ function snapshot(folder) {
   return result;
 }
 try {
+  const hermes = home('hermes');
+  const hermesFile = '.hermes/SOUL.md';
+  run(hermes, ['--global', '--ai', 'hermes', '--yes']);
+  const hermesText = fs.readFileSync(path.join(hermes, hermesFile), 'utf8');
+  assert.equal(hermesText.split(begin).length, 2);
+  assert.equal(hermesText.split(end).length, 2);
+  assert(hermesText.includes('Rendered instructions for Hermes Agent'));
+  assert(hermesText.includes('### Read the profile first'));
+  const hermesFirst = snapshot(hermes);
+  run(hermes, ['--global']);
+  assert.deepEqual(snapshot(hermes), hermesFirst);
+  run(hermes, ['--global', '--uninstall']);
+  assert(!fs.existsSync(path.join(hermes, hermesFile)));
+  console.log('ok: Hermes fresh install renders rules, re-runs idempotently and uninstalls');
+
+  const hermesSeeded = home('hermes-seeded');
+  const seed = Buffer.from('\ufeff# Soul\r\nSeeded content without a final newline');
+  write(hermesSeeded, hermesFile, seed);
+  run(hermesSeeded, ['--global', '--ai', 'hermes', '--yes']);
+  assert(fs.readFileSync(path.join(hermesSeeded, hermesFile)).subarray(0, seed.length).equals(seed));
+  const seededFirst = snapshot(hermesSeeded);
+  run(hermesSeeded, ['--global']);
+  assert.deepEqual(snapshot(hermesSeeded), seededFirst);
+  run(hermesSeeded, ['--global', '--uninstall']);
+  assert(fs.readFileSync(path.join(hermesSeeded, hermesFile)).equals(seed));
+  console.log('ok: Hermes preserves seeded bytes and restores them on uninstall');
+
+  const project = home('hermes-project');
+  assert.match(run(project, ['--dir', project, '--ai', 'hermes', '--level', '1', '--yes'], 2), /Hermes reads AGENTS\.md.*--ai agents.*--global --ai hermes/);
+  assert.deepEqual(snapshot(project), {});
+  console.log('ok: Hermes project target points to agents and writes nothing');
+
+  const alternate = home('hermes-alternate');
+  const elsewhere = home('hermes-elsewhere');
+  const warning = run(alternate, ['--global', '--ai', 'hermes', '--yes'], 0, { HERMES_HOME: elsewhere });
+  assert.match(warning, /Hermes reads SOUL\.md from HERMES_HOME; the block was written to ~\/\.hermes\/SOUL\.md/);
+  assert.equal(warning.split('Warning:').length, 2);
+  assert.deepEqual(snapshot(elsewhere), {});
+  assert(fs.existsSync(path.join(alternate, hermesFile)));
+  const same = run(alternate, ['--global'], 0, { HERMES_HOME: path.join(alternate, '.hermes') });
+  assert(!same.includes('Warning:'));
+  run(alternate, ['--global', '--uninstall']);
+  console.log('ok: alternate HERMES_HOME warns and receives no writes');
+
   const fresh = home('fresh');
   run(fresh, install);
   for (const rel of targets) {

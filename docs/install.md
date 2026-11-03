@@ -65,7 +65,7 @@ Use [`examples/answers.json`](../examples/answers.json) as a complete example, i
 | Flag | Purpose |
 |---|---|
 | `--dir <folder>` | Destination folder; prompted in interactive mode. |
-| `--global` | Apply a level-1 profile across projects through Claude Code, Codex and Gemini CLI home files. Excludes `--dir` and levels 2/3. |
+| `--global` | Apply a level-1 profile across projects through Claude Code, Codex, Gemini CLI and Hermes Agent home files. Excludes `--dir` and levels 2/3. |
 | `--ai claude,agents,gemini,chatgpt,prompt` | Comma-separated targets. Choose the ones you use. |
 | `--level 1`, `--level 2`, `--level 3` | Profile and home files; add local notes; add editable rules and mechanisms. |
 | `--answers <file.json>` or `--answers -` | Set onboarding answers without questions. |
@@ -84,14 +84,14 @@ Installer exit codes: `0` completed, `1` unexpected error, `2` refused or invali
 ## Every project with one profile
 
 ```bash
-npx agent-personalizer --global --ai claude,agents,gemini --yes
+npx agent-personalizer --global --ai claude,agents,gemini,hermes --yes
 npx agent-personalizer --global
 npx agent-personalizer learn --global --yes
 npx agent-personalizer --global --uninstall --dry
 npx agent-personalizer --global --uninstall
 ```
 
-`--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` for the selected targets. Paths use `HOME`, with `USERPROFILE` as the Windows fallback when `HOME` is missing or empty. The selected value must be a non-empty absolute path. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
+`--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` and `~/.hermes/SOUL.md` for the selected targets. For Hermes in a project, use `--ai agents` to write `AGENTS.md`. Hermes reads its global `SOUL.md` from `HERMES_HOME` when set; the installer warns if that differs from `~/.hermes`. Paths use `HOME`, with `USERPROFILE` as the Windows fallback when `HOME` is missing or empty. The selected value must be a non-empty absolute path. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
 
 Select only `claude`, `agents` and `gemini`. Other targets, `--dir` and levels 2/3 are refused. A headless first install needs `--ai` and `--yes`; level 1 is implicit. `--answers` and `--defaults` work as with project installs. A re-run keeps saved targets and answers.
 

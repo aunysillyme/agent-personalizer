@@ -24,7 +24,7 @@ const onboarding = require(path.join(PKG, 'render', 'onboarding.cjs'));
 const markers = require(path.join(PKG, 'render', 'render.cjs'));   // markerState, for the preflight; render.cjs runs nothing on require
 const { installPlan, validateInventory, knownVersions, ownership, migrateHome, recordedHash } = require('./install-plan.cjs');
 const AIS = ['claude', 'agents', 'gemini', 'chatgpt', 'prompt'];
-const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex / Cursor / anything that reads AGENTS.md', gemini: 'Gemini', chatgpt: 'ChatGPT custom instructions', prompt: 'a plain system prompt (shareable, no profile)' };
+const AI_LABEL = { claude: 'Claude (Claude Code, Claude apps)', agents: 'Codex / Cursor / Hermes / anything that reads AGENTS.md', gemini: 'Gemini', chatgpt: 'ChatGPT custom instructions', prompt: 'a plain system prompt (shareable, no profile)' };
 
 let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
@@ -36,7 +36,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
                                             [--answers <file.json> | --answers - | --defaults] [--full] [--yes]
                                             [--help | -h] [--version | -v]
-  npx agent-personalizer --global [--ai claude,agents,gemini] [--yes]
+  npx agent-personalizer --global [--ai claude,agents,gemini,hermes] [--yes]
   npx agent-personalizer --global --uninstall [--dry]
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
@@ -143,7 +143,7 @@ function readConfig(root, level) {
     if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die('.agent-personalizer.json must be an object');
     if ('targets' in cfg) {
       if (!Array.isArray(cfg.targets)) die('.agent-personalizer.json "targets" must be a list');
-      const KNOWN = [...AIS, 'onboarding'];
+      const KNOWN = [...AIS, 'hermes', 'onboarding'];
       const bad = cfg.targets.filter(t => !KNOWN.includes(t));
       if (bad.length) die(`.agent-personalizer.json lists unknown target(s): ${bad.join(', ')} (known: ${KNOWN.join(', ')}); fix or remove them`);
       if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
@@ -252,6 +252,7 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
 
 async function main() {
   if (ARGS['--global']) return require('./global.cjs').run({ args: ARGS, commitPlan, probe, readConfig, ask });
+  if (ARGS['--ai'] && ARGS['--ai'].split(',').some(t => t.trim() === 'hermes')) die('Hermes reads AGENTS.md inside a project; use --ai agents (or --global --ai hermes for every Hermes session).');
   if (ARGS.command === 'learn') {
     for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry'])
       if (opt in ARGS) die(`${opt} is not a learn option`);

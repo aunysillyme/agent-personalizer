@@ -8,7 +8,7 @@ const onboarding = require('../render/onboarding.cjs');
 const { sha256, validateInventory } = require('./install-plan.cjs');
 const SOURCE = '.agent-personalizer';
 const CONFIG = `${SOURCE}/.agent-personalizer.json`;
-const TARGETS = { claude: '.claude/CLAUDE.md', agents: '.codex/AGENTS.md', gemini: '.gemini/GEMINI.md' };
+const TARGETS = { claude: '.claude/CLAUDE.md', agents: '.codex/AGENTS.md', gemini: '.gemini/GEMINI.md', hermes: '.hermes/SOUL.md' };
 const HASH = /^[a-f0-9]{64}$/;
 const refuse = message => { throw new renderer.Refusal(message); };
 
@@ -29,7 +29,7 @@ function validateGlobal(cfg) {
     if (!Object.hasOwn(TARGETS, key) || !info || typeof info.created !== 'boolean' || !HASH.test(info.blockHash) || !HASH.test(info.fileHash)
         || !['', '\n', '\n\n'].includes(info.separator) || typeof info.appended !== 'boolean') refuse('invalid global target ownership');
   }
-  if (cfg.globalDirectories !== undefined && (!Array.isArray(cfg.globalDirectories) || cfg.globalDirectories.some(rel => ![SOURCE, '.claude', '.codex', '.gemini'].includes(rel)))) refuse('invalid global directory inventory');
+  if (cfg.globalDirectories !== undefined && (!Array.isArray(cfg.globalDirectories) || cfg.globalDirectories.some(rel => ![SOURCE, '.claude', '.codex', '.gemini', '.hermes'].includes(rel)))) refuse('invalid global directory inventory');
 }
 
 async function run({ args, commitPlan, probe, readConfig, ask }) {
@@ -67,10 +67,10 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
   const interactive = !!process.stdin.isTTY && !args['--yes'];
   if (!stored.cfgExists && !interactive && (!args['--yes'] || !args['--ai'])) refuse('non-interactive --global needs --ai and --yes');
   let ais = args['--ai'] || (stored.cfgExists ? stored.cfg.targets.filter(t => t !== 'onboarding').join(',') : 'claude,agents');
-  if (interactive && !stored.cfgExists) ais = await ask('Global AIs (claude,agents,gemini)', ais);
+  if (interactive && !stored.cfgExists) ais = await ask('Global AIs (claude,agents,gemini,hermes)', ais);
   const targets = ais.split(',').map(s => s.trim()).filter(Boolean);
   if (!targets.length || new Set(targets).size !== targets.length) refuse('choose each global AI once');
-  for (const key of targets) if (!Object.hasOwn(TARGETS, key)) refuse(`--global supports only claude, agents and gemini (unsupported target: ${key})`);
+  for (const key of targets) if (!Object.hasOwn(TARGETS, key)) refuse(`--global supports only claude, agents, gemini and hermes (unsupported target: ${key})`);
   if (args['--answers'] && args['--defaults']) refuse('--answers and --defaults are exclusive');
   let answers = stored.prevAnswers || onboarding.defaults();
   if (args['--answers']) {
@@ -139,10 +139,15 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
   const outputPaths = new Set([CONFIG, ...writes.map(p => p.rel)]);
   await commitPlan(root, { writes, outputPaths,
     prepare(newDirectories) {
-      cfg.globalDirectories = [...new Set([...(old.globalDirectories || []), ...[...newDirectories].filter(rel => [SOURCE, '.claude', '.codex', '.gemini'].includes(rel))])].sort();
+      cfg.globalDirectories = [...new Set([...(old.globalDirectories || []), ...[...newDirectories].filter(rel => [SOURCE, '.claude', '.codex', '.gemini', '.hermes'].includes(rel))])].sort();
       writes.push({ rel: CONFIG, bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n') });
     }
   });
+  if (targets.includes('hermes') && process.env.HERMES_HOME) {
+    let hermesHome = path.resolve(process.env.HERMES_HOME);
+    try { hermesHome = fs.realpathSync(hermesHome); } catch (_) {}
+    if (hermesHome !== path.join(root, '.hermes')) console.warn('Warning: Hermes reads SOUL.md from HERMES_HOME; the block was written to ~/.hermes/SOUL.md.');
+  }
   if (learnRequested) await require('./learn.cjs').learn({ dir: profileRoot, consented: true, allProjects: true });
   console.log(`Global profile installed. Re-run with --global after editing ${profileRoot}.`);
 }

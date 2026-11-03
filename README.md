@@ -79,10 +79,10 @@ npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults
 For every project, install one global level-1 profile:
 
 ```bash
-npx agent-personalizer --global --ai claude,agents,gemini --yes
+npx agent-personalizer --global --ai claude,agents,gemini,hermes --yes
 ```
 
-The source lives in `~/.agent-personalizer/`; marked blocks go to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`. User text outside the blocks stays byte for byte. `--global` supports those three targets and level 1; it excludes `--dir`. Re-run with `--global`, learn across all projects with `learn --global`, and remove owned global content with `--global --uninstall`. See [global installation](docs/install.md#every-project-with-one-profile).
+The source lives in `~/.agent-personalizer/`; marked blocks go to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` and `~/.hermes/SOUL.md` for the selected targets. User text outside the blocks stays byte for byte. For Hermes in a project, use `--ai agents` for `AGENTS.md`. `--global` supports these four targets and level 1; it excludes `--dir`. Re-run with `--global`, learn across all projects with `learn --global`, and remove owned global content with `--global --uninstall`. See [global installation](docs/install.md#every-project-with-one-profile).
 
 Levels 1 and 2 carry the Core 5: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. Level 3 retains all eleven, with each target's existing surface and signature selection.
 
