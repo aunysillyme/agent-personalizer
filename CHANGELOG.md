@@ -6,6 +6,8 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-11-03
+
 ### Added
 
 - Add Hermes Agent as a global target with a marked block in `~/.hermes/SOUL.md`; project installs use the `agents` target.
@@ -351,7 +353,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.2...v0.8.3
