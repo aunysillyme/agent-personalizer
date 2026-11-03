@@ -1,6 +1,6 @@
 # agent-personalizer
 
-> Answer a few questions once, and every AI you use gets the same profile and the rules it can carry: Claude Code, Codex, Cursor, Gemini CLI and ChatGPT, rendered from one source and kept in sync.
+> Answer a few questions once, and every AI you use gets the same profile and the rules it can carry: Claude Code, Codex, Cursor, Gemini CLI, Hermes Agent and ChatGPT, rendered from one source and kept in sync.
 
 Install with `npx agent-personalizer`. Node 22 or 24 (active LTS) is recommended; 18 or later runs. Headless setup: `npx agent-personalizer --dir . --ai claude,agents --level 1 --yes --defaults`.
 

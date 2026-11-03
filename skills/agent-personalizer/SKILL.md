@@ -1,6 +1,6 @@
 ---
 name: agent-personalizer
-description: Install and run agent-personalizer to create AI custom instructions from approved entries, a profile and rules for Claude Code, Codex, Cursor, Gemini CLI and ChatGPT. Use when a user wants shared instructions kept in sync from one source.
+description: Install and run agent-personalizer to create AI custom instructions from approved entries, a profile and rules for Claude Code, Codex, Cursor, Gemini CLI, Hermes Agent and ChatGPT. Use when a user wants shared instructions kept in sync from one source.
 ---
 
 ## When to use
