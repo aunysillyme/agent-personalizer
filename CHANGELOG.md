@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-03
+
+### Changed
+
+- Name Hermes Agent among the supported AIs in the package description, README, llms.txt, the skill description and the project page.
+
 ## [0.8.6] - 2026-11-03
 
 ### Added
@@ -353,7 +359,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.3...v0.8.4
