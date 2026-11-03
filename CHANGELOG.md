@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+### Added
+
+- Add Hermes Agent as a global target with a marked block in `~/.hermes/SOUL.md`; project installs use the `agents` target.
+
 ## [0.8.5] - 2026-10-29
 
 ### Fixed

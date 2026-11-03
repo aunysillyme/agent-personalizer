@@ -324,7 +324,7 @@ function renderRule(rule, target) {
    stored answers (defaults when none are stored, so a rule set without saved answers still renders) */
 function rulesFor(rules, key, answers) {
   const a = answers || onboarding.defaults();
-  return rules.filter(r => (!Array.isArray(r.meta.surfaces) || r.meta.surfaces.includes(key))
+  return rules.filter(r => (!Array.isArray(r.meta.surfaces) || r.meta.surfaces.includes(key) || (key === 'hermes' && r.meta.surfaces.includes('agents')))
     && (!r.meta.requires || a[r.meta.requires.answer] === r.meta.requires.value));
 }
 const rulesAtLevel = (rules, cfg) => cfg && (cfg.level === 1 || cfg.level === 2) ? rules.filter(r => CORE_RULE_FILES.has(r.file)) : rules;
@@ -412,7 +412,7 @@ function renderTarget(key, target, profile, rules, cfg, root, learned) {
   if (target.profile && profile) lines.push('## Profile', '', profile.body, '');
   if (target.personal && target.profile) {
     lines.push(onboarding.entriesBlock(learned), '', `_LEARNED.md source: ${learned.hash}_`, '');
-    if (['claude', 'agents', 'gemini'].includes(key)) lines.push(onboarding.learningProcedure(), '');
+    if (['claude', 'agents', 'gemini', 'hermes'].includes(key)) lines.push(onboarding.learningProcedure(), '');
   }
   lines.push('## Rules', '');
   for (const r of rulesFor(rules, key, answers)) lines.push(renderRule(r, target), '');

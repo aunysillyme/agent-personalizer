@@ -23,6 +23,14 @@
     "profile": true,
     "header": "Rendered instructions for Gemini"
   },
+  "hermes": {
+    "file": "SOUL.md",
+    "binding": "hermes",
+    "personal": true,
+    "origin": true,
+    "profile": true,
+    "header": "Rendered instructions for Hermes Agent"
+  },
   "chatgpt": {
     "file": "chatgpt-custom-instructions.md",
     "binding": "chatgpt",
