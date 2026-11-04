@@ -1363,7 +1363,7 @@ expect 2 "edited wrapper uninstall" node bin/agent-personalizer.js --dir "$T" --
 cp "$T/wrapper-copy" "$T/.git/hooks/pre-commit"; chmod 755 "$T/.git/hooks/pre-commit"
 expect 0 "precommit uninstall" node bin/agent-personalizer.js --dir "$T" --uninstall
 cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit" || fail "original hook not restored"
-[ "$(stat -f %Lp "$T/.git/hooks/pre-commit" 2>/dev/null || stat -c %a "$T/.git/hooks/pre-commit")" = 751 ] || fail "original mode changed"
+[ "$(stat -c %a "$T/.git/hooks/pre-commit" 2>/dev/null || stat -f %Lp "$T/.git/hooks/pre-commit")" = 751 ] || fail "original mode changed"
 for level in 1 2; do expect 2 "precommit level $level" node bin/agent-personalizer.js --dir "$T" --ai agents --level "$level" --precommit --yes; done
 mk; N="$MK"; expect 2 "precommit without git" node bin/agent-personalizer.js --dir "$N" --ai agents --level 3 --precommit --yes
 mk; S="$MK"; git -C "$S" init -q; rm -rf "$S/.git/hooks"; ln -s "$N" "$S/.git/hooks"
