@@ -68,6 +68,7 @@ Use [`examples/answers.json`](../examples/answers.json) as a complete example, i
 | `--global` | Apply a level-1 profile across projects through Claude Code, Codex, Gemini CLI and Hermes Agent home files. Excludes `--dir` and levels 2/3. |
 | `--ai claude,agents,gemini,chatgpt,prompt` | Comma-separated targets. Choose the ones you use. |
 | `--level 1`, `--level 2`, `--level 3` | Profile and home files; add local notes; add editable rules and mechanisms. |
+| `--compact` | Save compact rule rendering for file targets. See [compact mode and the file budget](tiers.md#compact-mode-and-file-budget). |
 | `--answers <file.json>` or `--answers -` | Set onboarding answers without questions. |
 | `--defaults` | Accept default answers. |
 | `--yes` | Run without interactive prompts. |
@@ -142,7 +143,7 @@ node render/render.cjs --dir .
 node render/render.cjs --dir . --check
 ```
 
-The check returns `0` silently for current files, `1` for drift, and `2` for invalid inputs. `--targets claude,agents` selects specific renders; `--rules <folder>` selects a rule source. `--strict` returns `1` and writes nothing when a ChatGPT box is over the configured budget. Run `node render/render.cjs --help` for contract and target options.
+The check returns `0` for current files, `1` for drift, and `2` for invalid inputs. It reports files over budget even when current. `--targets claude,agents` selects specific renders; `--rules <folder>` selects a rule source. `--compact` saves compact rendering on a write. `--strict` returns `1` and writes nothing when a ChatGPT box or instruction file is over budget. Run `node render/render.cjs --help` for contract and target options.
 
 Re-paste changed text into chat apps. In ChatGPT, open Settings → Personalization and enable customization. Copy `chatgpt-box1.txt` (profile) and `chatgpt-box2.txt` (response instructions) into the fields your current interface provides, checking its displayed limits. See the [paste guide](paste-guide.md) for the files each app needs.
 

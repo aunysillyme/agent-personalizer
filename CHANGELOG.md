@@ -6,6 +6,10 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+### Added
+
+- Add opt-in compact rule rendering and a warn-only instruction file size budget.
+
 ## [0.8.7] - 2026-11-03
 
 ### Changed

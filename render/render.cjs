@@ -12,7 +12,8 @@
                       or this repo), else the rules/ folder beside this renderer's own package (a level-1
                       or level-2 install renders from the package's rules and copies none). Refused if
                       neither exists.
-  --strict            with the ChatGPT target: exit 1 and write nothing when a box is over its budget.
+  --strict            exit 1 and write nothing when an output is over its budget.
+  --compact           shorten non-injected rules in file targets and save the preference.
 
   --dir               project folder holding USER.md and rules/ (default: cwd). The folder you
                       name is followed once (realpath); nothing beneath it may be a symlink.
@@ -87,7 +88,9 @@ const CORE_RULE_FILES = new Set(['00-read-the-profile-first.md', '10-evidence-be
 
 
 const VALUE_OPTS = ['--dir', '--targets', '--contract-target', '--rules'];
-const FLAG_OPTS = ['--check', '--contract', '--no-personal', '--strict', '--help', '-h', '--version', '-v'];
+const FLAG_OPTS = ['--check', '--contract', '--no-personal', '--strict', '--compact', '--help', '-h', '--version', '-v'];
+const FILE_TARGETS = new Set(['claude', 'agents', 'gemini', 'hermes']);
+const FILE_BUDGET = 20000;
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -232,6 +235,7 @@ function readConfig(root) {
     if (new Set(cfg.targets).size !== cfg.targets.length) die('config: .agent-personalizer.json lists a target twice');
   }
   if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`config: .agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
+  if ('compact' in cfg && typeof cfg.compact !== 'boolean') die('config: "compact" must be true or false');
   validatePreservedTargets(cfg);
   if ('onboarding' in cfg) {
     try { cfg.onboarding = onboarding.validate(cfg.onboarding); } catch (e) { die(`config: onboarding answers: ${e.message}`); }
@@ -415,7 +419,14 @@ function renderTarget(key, target, profile, rules, cfg, root, learned) {
     if (['claude', 'agents', 'gemini', 'hermes'].includes(key)) lines.push(onboarding.learningProcedure(), '');
   }
   lines.push('## Rules', '');
-  for (const r of rulesFor(rules, key, answers)) lines.push(renderRule(r, target), '');
+  for (const r of rulesFor(rules, key, answers)) {
+    if (cfg && cfg.compact && FILE_TARGETS.has(key) && r.meta.inject !== true) {
+      const practice = r.sections.universal.split('\n').find(line => line.startsWith('In practice:'));
+      if (!practice) die(`${r.file}: compact mode needs an In practice: line in the universal block`);
+      const link = cfg.level === 1 || cfg.level === 2 ? `https://github.com/aunysillyme/agent-personalizer/blob/v${onboarding.VERSION}/rules/${r.file}` : `rules/${r.file}`;
+      lines.push(`- **${r.meta.title || r.meta.id || r.file}**: ${practice} [Full rule](${link})`, '');
+    } else lines.push(renderRule(r, target), '');
+  }
   return lines.join('\n').trimEnd();
 }
 
@@ -469,6 +480,8 @@ function report(label, existing, current, block, raw) {
 }
 
 function main() {
+  renderTarget.overBudget = [];
+  renderTarget.fileBudget = [];
   ARGS = parseArgs();
   if (arg('--version', false) || arg('-v', false)) { process.stdout.write(onboarding.VERSION + '\n'); return; }
   if (arg('--help', false) || arg('-h', false)) { const src = fs.readFileSync(__filename, 'utf8'); process.stdout.write(src.slice(src.indexOf('/*') + 2, src.indexOf('*/')).trim() + `\n\nagent-personalizer renderer ${onboarding.VERSION}\n`); return; }
@@ -506,7 +519,8 @@ function main() {
   }
 
   let targets;
-  const cfg = readConfig(root);
+  let cfg = readConfig(root);
+  if (arg('--compact', false)) cfg = { ...cfg, compact: true };
   const explicit = arg('--targets', null);
   if (explicit) targets = explicit.split(',').map(s => s.trim()).filter(Boolean);
   else if (cfg) {
@@ -535,10 +549,12 @@ function main() {
       catch (_) { die(`${target.file}: not writable. Nothing was written`); }
     }
     const current = existing == null ? null : between(existing, target.file);
-    const body = check ? null : splice(existing, block, target.file);
+    const body = splice(existing, block, target.file);
     // the generated file must itself re-parse to exactly one block, or the next render would refuse it
     if (body != null) { const st = markerState(body, `${target.file} (generated)`); if (st.kind !== 'one' || between(body, `${target.file} (generated)`) !== block) die(`${target.file}: generated content would not re-parse cleanly; a fence in USER.md or a rule is unbalanced. Nothing was written`); }
-    const output = body == null ? null : (hasBom ? '\ufeff' + body : body);
+    const output = hasBom ? '\ufeff' + body : body;
+    if (FILE_TARGETS.has(key) && output.length > FILE_BUDGET)
+      renderTarget.fileBudget.push(`${target.file} (${output.length} characters, budget ${FILE_BUDGET}; --compact shortens rules)`);
     const mode = existing == null ? 0o644 : (fs.statSync(file).mode & 0o777);
     const entry = { key, target, file, block, current, existing, existingBytes, output, mode, report: report(target.file, existing, current, block, false) };
     if (!target.boxes) return entry;
@@ -559,13 +575,14 @@ function main() {
     });
     return [entry, ...raws];
   }).flat();
-  if (arg('--strict', false) && (renderTarget.overBudget || []).length) {
+  if (arg('--strict', false) && ((renderTarget.overBudget || []).length || renderTarget.fileBudget.length)) {
     for (const o of renderTarget.overBudget) console.error(`render: OVER BUDGET  ${o}`);
-    console.error('render: --strict: a box is over its budget. Nothing was written');
+    for (const o of renderTarget.fileBudget) console.error(`OVER BUDGET  ${o}`);
+    console.error('render: --strict: an output is over its budget. Nothing was written');
     process.exit(1);
   }
   if (!check) {
-    const config = installedConfig(root, plan);
+    const config = installedConfig(root, plan, !!arg('--compact', false));
     if (config) plan.push(config);
   }
 
@@ -576,6 +593,7 @@ function main() {
   if (finals.some(f => /\.agent-personalizer\.(tmp|bak)$/.test(f))) die('a target file name uses the staging suffix. Nothing was written');
 
   if (check) {
+    for (const o of renderTarget.fileBudget) console.log(`OVER BUDGET  ${o}`);
     let drift = 0;
     for (const p of plan) {
       if (p.current === null) { console.log(`DRIFT  ${p.target.file}: ${p.raw ? 'missing' : 'missing or no marker block'}`); drift++; }
@@ -641,6 +659,7 @@ function main() {
   for (const c of committed) if (c.bak) tryUnlink(c.bak, leftovers, 'backup not removed');
   for (const s of staged) if (s.report) console.log(s.report);
   for (const o of (renderTarget.overBudget || [])) console.log(`OVER BUDGET  ${o} (written in full; trim by hand, bottom up)`);
+  for (const o of renderTarget.fileBudget) console.log(`OVER BUDGET  ${o}`);
   if (leftovers.length) {
     console.error('render: every target was written, but CLEANUP INCOMPLETE. Remove these by hand (they hold copies of the previous targets):');
     for (const l of leftovers) console.error(`  ${l}`);
@@ -652,13 +671,18 @@ function main() {
    only from bytes already recorded as ours; an edited outer file keeps its old hash so uninstall
    retains it. Preserved targets record only the block. User bytes are never adopted on re-render.
    A config predating the installed map stays without it so legacy recipe fallback still applies. */
-function installedConfig(root, plan) {
+function installedConfig(root, plan, compact) {
   const cfgPath = path.join(root, '.agent-personalizer.json');
-  if (!mustBe(cfgPath, 'file', '.agent-personalizer.json')) return null;
-  const raw = readJson(cfgPath, 'config');
-  try { fs.accessSync(cfgPath, fs.constants.W_OK); }
+  const exists = mustBe(cfgPath, 'file', '.agent-personalizer.json');
+  if (!exists && !compact) return null;
+  const raw = exists ? readJson(cfgPath, 'config') : {};
+  if (compact) raw.compact = true;
+  try { fs.accessSync(exists ? cfgPath : root, fs.constants.W_OK); }
   catch (_) { die('.agent-personalizer.json: not writable. Nothing was written'); }
-  if (!raw.installed || typeof raw.installed !== 'object' || Array.isArray(raw.installed)) return null;
+  if (!raw.installed || typeof raw.installed !== 'object' || Array.isArray(raw.installed)) {
+    if (!compact) return null;
+    return { file: cfgPath, target: { file: '.agent-personalizer.json' }, output: JSON.stringify(raw, null, 2) + '\n', mode: exists ? fs.statSync(cfgPath).mode & 0o777 : 0o644 };
+  }
   const installed = { ...raw.installed };
   for (const p of plan) {
     const preserved = !p.raw && Array.isArray(raw.preservedTargets) && raw.preservedTargets.includes(p.key);
@@ -686,6 +710,7 @@ function renderedContents(root, cfg, options = {}) {
   const learned = options.learned || readLearned(root);
   renderTarget.boxes = null;
   renderTarget.overBudget = [];
+  renderTarget.fileBudget = [];
   return cfg.targets.flatMap(key => {
     const target = TARGETS[key];
     if (!target) die(`unknown target "${key}"`);
@@ -703,5 +728,5 @@ function renderedContents(root, cfg, options = {}) {
 /* parseFrontmatter and parseSections are exported so another renderer can read the same rule-file
    format with the same validation (for example one that renders CLAUDE.md sections and session-start
    hook bodies from rules in this format). Set DIE_THROWS to get a Refusal instead of an exit. */
-module.exports = { CORE_RULE_FILES, readLearned, pendingDigest, main, fenceMap, markerState, splice, between, preflightSources, parseFrontmatter, parseSections, readConfig, validatePreservedTargets, renderedContents, Refusal, DIE_THROWS: false };
+module.exports = { CORE_RULE_FILES, FILE_BUDGET, readLearned, pendingDigest, main, fenceMap, markerState, splice, between, preflightSources, parseFrontmatter, parseSections, readConfig, validatePreservedTargets, renderedContents, Refusal, DIE_THROWS: false };
 if (require.main === module) main();

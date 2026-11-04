@@ -51,7 +51,7 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
   const stored = readConfig(profileRoot, 1);
   if (stored.cfgExists) validateGlobal(stored.cfg);
   if (args.command === 'learn') {
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry']) if (opt in args) refuse(`${opt} is not a learn option`);
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact', '--uninstall', '--dry']) if (opt in args) refuse(`${opt} is not a learn option`);
     if (args['--forget'] && (args['--all-projects'] || args['--yes'])) refuse('--forget cannot be combined with --all-projects or --yes');
     if (!stored.cfgExists) refuse(`missing config: expected ${path.join(root, CONFIG)}`);
     const learning = require('./learn.cjs');
@@ -59,7 +59,7 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
   }
   if (args['--forget'] || args['--all-projects']) refuse('--forget and --all-projects need learn');
   if (args['--uninstall']) {
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full']) if (opt in args) refuse(`${opt} is an install option; --uninstall reads the stored config`);
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact']) if (opt in args) refuse(`${opt} is an install option; --uninstall reads the stored config`);
     if (!stored.cfgExists) refuse(`missing config: expected ${path.join(root, CONFIG)}`);
     return uninstall({ root, cfg: stored.cfg, dry: !!args['--dry'], commitPlan, probe });
   }
@@ -110,6 +110,7 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
   if (!learnedBytes) writeSource('LEARNED.md', plannedLearned, true);
   const cfg = { ...old, global: true, targets: [...targets, 'onboarding'], level: 1, ruleSet: 'core-5', onboarding: onboarding.sparse(answers), installed,
     createdDirectories: old.createdDirectories || [], globalFiles: { ...(old.globalFiles || {}) }, toolingVersion: require('../package.json').version };
+  if (args['--compact']) cfg.compact = true;
   const renderCfg = { ...cfg, onboarding: answers };
   const rendered = renderer.renderedContents(profileRoot, renderCfg, { profileSource: decode(user, 'USER.md'), learned });
   const qualify = text => text
@@ -129,6 +130,7 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
     }
     const block = `Profile source: \`${path.join(profileRoot, 'USER.md')}\`. Read \`${path.join(profileRoot, 'AGENT_ONBOARDING.md')}\` for working preferences.\n\n` + qualify(entry.block);
     const output = renderer.splice(text, block, rel);
+    if (output.length > renderer.FILE_BUDGET) console.log(`OVER BUDGET  ${rel} (${output.length} characters, budget ${renderer.FILE_BUDGET}; --compact shortens rules)`);
     if (renderer.markerState(output, rel).kind !== 'one' || renderer.between(output, rel) !== block) refuse(`${rel}: generated block would not re-parse; nothing was written`);
     const prior = ms.kind === 'one' ? cfg.globalFiles[entry.key] : null;
     cfg.globalFiles[entry.key] = { created: !found.exists || !!cfg.globalFiles[entry.key]?.created, blockHash: blockHash(output, rel), fileHash: sha256(Buffer.from(output)),
