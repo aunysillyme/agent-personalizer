@@ -9,6 +9,7 @@ Every entry names the adversarial audit round that produced it where one did. Au
 ### Added
 
 - Add opt-in compact rule rendering and a warn-only instruction file size budget.
+- Add an opt-in level-3 git pre-commit hook for the forbidden-string gate.
 
 ## [0.8.7] - 2026-11-03
 
