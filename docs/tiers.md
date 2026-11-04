@@ -43,6 +43,14 @@ A word on the stories below: each is one setup's experience of what held and wha
 
 ---
 
+## Compact mode and file budget
+
+Use `--compact` on the installer or renderer to save `compact: true` in `.agent-personalizer.json`. Re-renders and `--check` use that preference. Set it to `false` to return to full rules. For Claude, agents, Gemini and Hermes file targets, each non-injected rule becomes its title, universal `In practice:` line and a link to the full rule. Levels 1 and 2 link to the version-pinned public rule; level 3 links to the editable local rule. Rules marked `inject: true` stay in full. ChatGPT and prompt targets are unchanged. A custom rule needs an `In practice:` line for compact mode.
+
+The four file targets have a 20,000-character warning budget for the whole rendered file, including text outside the generated block. Hermes may truncate context files above roughly that size. A warning leaves the file intact and exits 0; renderer `--strict` exits 1 and writes nothing when a file or ChatGPT box exceeds its budget.
+
+---
+
 ## Tier 3: session-start injection
 
 **What.** The handful of rules that must win at the moment of decision, injected in full at the start of every session. Not pointers. Full text.

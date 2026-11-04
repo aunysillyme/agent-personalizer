@@ -10,7 +10,7 @@ Contributions are welcome: a **new AI target**, a **notes tool**, an **example u
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 99 checks, exact exit codes, Linux and macOS
+npm test            # sh test/run.sh: 100 checks, exact exit codes, Linux and macOS
 node test/rollback.test.js "$(mktemp -d)"   # after copying examples/freelance-illustrator into it
 node check/gate.cjs --self-test
 ```

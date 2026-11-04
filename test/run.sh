@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 99 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 100 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -1325,5 +1325,9 @@ pass "session learning: consent, entries, forget and uninstall; interactive re-r
 # 99. Audit 2026-10-29: session privacy, literal paths, reserved segments, installed pointers and hook registration.
 node test/audit-085.test.cjs || fail "0.8.5 audit regressions, including no templates/ paths in installed home files"
 pass "0.8.5 audit: session discovery and privacy, safe paths, installed pointers, hook registration and release guidance"
+
+# 100. Compact rule rendering and instruction file budgets.
+node test/compact.test.cjs || fail "compact rendering and file budget"
+pass "compact rules, saved preference, links, injected rules and file budget"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

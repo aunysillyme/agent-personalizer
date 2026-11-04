@@ -30,7 +30,7 @@ let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--compact', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
@@ -52,6 +52,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   --answers    a JSON file of answers, or "-" to read JSON from stdin. Saved legacy keys stay valid.
   --defaults   accept defaults on first install; a re-run keeps saved answers.
   --yes        scripted first install: needs --dir, --ai and --level. Never reads session history.
+  --compact    shorten non-injected rules in file targets; save this preference for re-renders.
   learn        with your yes, write a local digest for up to five evidence-backed questions.
   --all-projects  include sessions from projects other than --dir; default reads only --dir.
   --forget     with learn, remove the digest; your AI apps' own history stays as it is.
@@ -149,6 +150,7 @@ function readConfig(root, level) {
       if (new Set(cfg.targets).size !== cfg.targets.length) die('.agent-personalizer.json lists a target twice');
     }
     if ('level' in cfg && !(Number.isInteger(cfg.level) && cfg.level >= 1 && cfg.level <= 4)) die(`.agent-personalizer.json "level" must be an integer 1-4 (found ${JSON.stringify(cfg.level)})`);
+    if ('compact' in cfg && typeof cfg.compact !== 'boolean') die('.agent-personalizer.json "compact" must be true or false');
     try { validateInventory(cfg); } catch (e) { die(`.agent-personalizer.json: ${e.message}; nothing was written`); }
     markers.DIE_THROWS = true;
     try { markers.validatePreservedTargets(cfg); }
@@ -254,7 +256,7 @@ async function main() {
   if (ARGS['--global']) return require('./global.cjs').run({ args: ARGS, commitPlan, probe, readConfig, ask });
   if (ARGS['--ai'] && ARGS['--ai'].split(',').some(t => t.trim() === 'hermes')) die('Hermes reads AGENTS.md inside a project; use --ai agents (or --global --ai hermes for every Hermes session).');
   if (ARGS.command === 'learn') {
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--uninstall', '--dry'])
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact', '--uninstall', '--dry'])
       if (opt in ARGS) die(`${opt} is not a learn option`);
     if (ARGS['--forget'] && ARGS['--all-projects']) die('--all-projects cannot be used with --forget');
     if (ARGS['--forget'] && ARGS['--yes']) die('--forget and --yes are exclusive');
@@ -265,7 +267,7 @@ async function main() {
   if (ARGS['--all-projects']) die('--all-projects needs learn');
   if (ARGS['--uninstall']) {
     if (!ARGS['--dir']) die('--uninstall needs --dir <folder>');
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full'])
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact'])
       if (opt in ARGS) die(`${opt} is an install option; --uninstall reads the stored config`);
     return require('./uninstall.cjs').uninstall(ARGS['--dir'], { dry: !!ARGS['--dry'] });
   }
@@ -585,6 +587,7 @@ async function main() {
     prepare(newDirectories) {
       for (const rel of newDirectories) createdDirectories.add(rel);
       cfg = { ...cfg, targets: allTargets, level: installedLevel, ruleSet: 'core-5', keptRuleTargets: [...keptRuleTargets], onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
+      if (ARGS['--compact']) cfg.compact = true;
       writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
     },
     async finalize() {
