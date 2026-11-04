@@ -61,6 +61,8 @@ The gate checks listed strings against file text and relative paths. In a git wo
 - **Exit `1`:** one or more listed strings were found.
 - **Exit `2`:** setup was refused, including a missing, empty or tracked private list.
 
+At level 3, install with `--precommit` to run this gate before each git commit. A missing or empty list blocks the commit and names the setup path. The hook runs before any existing pre-commit hook, which is preserved as `pre-commit.agent-personalizer-original` and restored on uninstall if unchanged. Edited wrappers or originals require manual restoration. Shared hooks folders and symlinks are refused. Git can bypass hooks with `--no-verify`; run the gate separately when needed.
+
 Keep the list current. Review binaries, git history and personal terms outside that list separately; the gate checks the listed strings in the files it scans. Use `node check/gate.cjs --self-test` to verify detection with a seeded fixture.
 
 ## Session privacy

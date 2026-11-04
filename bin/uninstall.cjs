@@ -84,6 +84,7 @@ function run(dir, dry) {
   if (!Array.isArray(cfg.targets) || !cfg.targets.length || !cfg.onboarding || !Number.isInteger(cfg.level))
     refuse(`${CONFIG} needs stored targets, level and onboarding answers for --uninstall`);
   try { validateInventory(cfg); } catch (e) { refuse(`${CONFIG}: ${e.message}; nothing was removed`); }
+  const hookPlan = cfg.precommit ? { ...require('./precommit.cjs').plan(root, cfg.precommit), root } : null;
   const modern = Object.hasOwn(cfg, 'installed');
   const answers = cfg.onboarding;
   const level = Math.min(cfg.level, 3);
@@ -257,6 +258,7 @@ function run(dir, dry) {
     try { fs.accessSync(path.dirname(path.join(root, rel)), fs.constants.W_OK); }
     catch (_) { refuse(`${rel}: parent directory is not writable; nothing was removed`); }
   }
+  if (hookPlan) require('./precommit.cjs').remove(hookPlan, dry);
   const label = dry ? 'would ' : '';
   if (dry) console.log('Dry run: preview only; no files changed.');
   if (learned && !learnedUntouched) console.log('kept   LEARNED.md (your entries)');
@@ -297,7 +299,15 @@ function run(dir, dry) {
     }
     console.log(`${label}remove ${CONFIG}`);
     require('./git-exclude.cjs').unprotect(root, { dry });
-  } else console.log(`kept   ${CONFIG} (tracked files remain; review the kept paths above)`);
+  } else {
+    if (hookPlan && !dry) {
+      const full = probe(CONFIG);
+      if (!full || !fs.readFileSync(full).equals(observations.get(CONFIG).bytes)) refuse(`${CONFIG} changed; update it by hand`);
+      delete cfg.precommit;
+      fs.writeFileSync(full, JSON.stringify(cfg, null, 2) + '\n');
+    }
+    console.log(`kept   ${CONFIG} (tracked files remain; review the kept paths above)`);
+  }
   if (level >= 3) console.log('Manual step: remove any SessionStart entry for hooks/claude-code/session-start.sh from .claude/settings.json or ~/.claude/settings.json if you registered it. Settings are kept.');
 }
 

@@ -100,7 +100,7 @@ function refuseTrackedList(file) {
 function loadList(file, { allowEmpty = false } = {}) {
   let st = null;
   try { st = fs.lstatSync(file); } catch (_) { st = null; }
-  if (!st) die(`${file} not found.\nCopy check/forbidden.example.txt to that path and fill it in. The gate does not pass without it.`);
+  if (!st) die(`${file} not found. Copy check/forbidden.example.txt to that path and fill it in; see docs/guarantees.md#forbidden-string-gate.`);
   if (st.isSymbolicLink()) die(`${file} is a symlink; the list must be a regular file (a link can point at a tracked copy)`);
   if (!st.isFile()) die(`${file} is not a regular file`);
   const real = fs.realpathSync(file);                   // the REAL path: an alias through a symlinked directory must not hide the repository that tracks it
@@ -117,7 +117,7 @@ function loadList(file, { allowEmpty = false } = {}) {
       allow.push(a);
     } else terms.push(line);
   });
-  if (!terms.length && !allowEmpty) die('forbidden list has no terms.');
+  if (!terms.length && !allowEmpty) die(`${file} has no terms. Fill it in; see docs/guarantees.md#forbidden-string-gate.`);
   return { terms, allow, real };
 }
 

@@ -1,8 +1,10 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 100 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 101 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
+GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_GLOBAL
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 fail() { echo "FAIL: $1"; exit 1; }
@@ -38,6 +40,11 @@ pass "gate self-test: red on seeded hits, green on allowed string, binary skippe
 # 4. the gate fails closed (exit 2) without its list, and on an empty allow entry
 expect 2 "gate with no list" node check/gate.cjs --list /nonexistent/forbidden.txt
 mk; T="$MK"; printf 'x\nallow:\n' > "$T/list.txt"; echo hello > "$T/a.md"
+node check/gate.cjs --list /nonexistent/forbidden.txt > "$T/missing.out" 2>&1; got=$?
+[ "$got" -eq 2 ] && grep -q '/nonexistent/forbidden.txt' "$T/missing.out" && grep -q 'docs/guarantees.md#forbidden-string-gate' "$T/missing.out" || fail "missing list diagnostic"
+printf '# no terms\n' > "$T/empty.txt"
+node check/gate.cjs --dir "$T" --list "$T/empty.txt" > "$T/empty.out" 2>&1; got=$?
+[ "$got" -eq 2 ] && grep -q "$T/empty.txt" "$T/empty.out" && grep -q 'docs/guarantees.md#forbidden-string-gate' "$T/empty.out" || fail "empty list diagnostic"
 expect 2 "gate with empty allow" node check/gate.cjs --dir "$T" --list "$T/list.txt"
 pass "gate exits 2 when the list is missing or malformed"
 
@@ -1329,5 +1336,51 @@ pass "0.8.5 audit: session discovery and privacy, safe paths, installed pointers
 # 100. Compact rule rendering and instruction file budgets.
 node test/compact.test.cjs || fail "compact rendering and file budget"
 pass "compact rules, saved preference, links, injected rules and file budget"
+# 101. Opt-in pre-commit gate wraps and restores an existing hook.
+mk; T="$MK"; git -C "$T" init -q || fail "precommit git init"
+git -C "$T" config user.name Test; git -C "$T" config user.email test@example.invalid
+printf '#!/bin/sh\nprintf ran > "$(git rev-parse --show-toplevel)/foreign-ran"\nexit 0\n' > "$T/.git/hooks/pre-commit"
+chmod 751 "$T/.git/hooks/pre-commit"; cp -p "$T/.git/hooks/pre-commit" "$T/foreign-copy"
+expect 0 "precommit install" node bin/agent-personalizer.js --dir "$T" --ai agents --level 3 --precommit --yes
+[ -x "$T/.git/hooks/pre-commit" ] && cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit.agent-personalizer-original" || fail "wrapper or original"
+printf 'acme-client-x\n' > "$T/check/forbidden.local.txt"
+printf 'note for acme-client-x\n' > "$T/leak.md"; git -C "$T" add leak.md
+git -C "$T" commit -qm test > "$T/commit.out" 2>&1; got=$?
+[ "$got" -ne 0 ] && grep -q leak.md "$T/commit.out" && [ ! -e "$T/foreign-ran" ] || fail "staged term did not block"
+printf 'safe\n' > "$T/leak.md"; git -C "$T" add leak.md
+rm "$T/check/forbidden.local.txt"
+git -C "$T" commit -qm test > "$T/commit.out" 2>&1; got=$?
+[ "$got" -ne 0 ] && grep -q 'check/forbidden.local.txt' "$T/commit.out" || fail "missing list did not block"
+printf 'acme-client-x\n' > "$T/check/forbidden.local.txt"
+# The saved copy and output are untracked; their names and contents are safe.
+git -C "$T" commit -qm test > "$T/commit.out" 2>&1 || fail "clean commit"
+[ -f "$T/foreign-ran" ] || fail "original hook did not run"
+expect 0 "precommit rerun" node bin/agent-personalizer.js --dir "$T" --yes
+cp "$T/.git/hooks/pre-commit" "$T/wrapper-copy"
+printf '# edited\n' >> "$T/.git/hooks/pre-commit"
+expect 2 "edited wrapper rerun" node bin/agent-personalizer.js --dir "$T" --yes
+expect 2 "edited wrapper uninstall" node bin/agent-personalizer.js --dir "$T" --uninstall
+cp "$T/wrapper-copy" "$T/.git/hooks/pre-commit"; chmod 755 "$T/.git/hooks/pre-commit"
+expect 0 "precommit uninstall" node bin/agent-personalizer.js --dir "$T" --uninstall
+cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit" || fail "original hook not restored"
+[ "$(stat -f %Lp "$T/.git/hooks/pre-commit" 2>/dev/null || stat -c %a "$T/.git/hooks/pre-commit")" = 751 ] || fail "original mode changed"
+for level in 1 2; do expect 2 "precommit level $level" node bin/agent-personalizer.js --dir "$T" --ai agents --level "$level" --precommit --yes; done
+mk; N="$MK"; expect 2 "precommit without git" node bin/agent-personalizer.js --dir "$N" --ai agents --level 3 --precommit --yes
+mk; S="$MK"; git -C "$S" init -q; rm -rf "$S/.git/hooks"; ln -s "$N" "$S/.git/hooks"
+expect 2 "symlinked hooks" node bin/agent-personalizer.js --dir "$S" --ai agents --level 3 --precommit --yes
+[ ! -e "$N/pre-commit" ] || fail "symlink followed"
+mk; M="$MK"; git -C "$M" init -q
+printf '#!/bin/sh\n# >>> agent-personalizer:begin\necho hi\n' > "$M/.git/hooks/pre-commit"; cp "$M/.git/hooks/pre-commit" "$M/copy"
+expect 2 "malformed hook" node bin/agent-personalizer.js --dir "$M" --ai agents --level 3 --precommit --yes
+cmp "$M/copy" "$M/.git/hooks/pre-commit" || fail "malformed hook changed"
+mk; H="$MK"; git -C "$H" init -q; git -C "$H" config core.hooksPath "$N"
+expect 2 "shared hooks folder" node bin/agent-personalizer.js --dir "$H" --ai agents --level 3 --precommit --yes
+[ ! -e "$N/pre-commit" ] || fail "shared hooks folder changed"
+mk; W="$MK"; git -C "$T" worktree add -q -b fixture "$W" HEAD || fail "linked worktree setup"
+expect 0 "linked worktree install" node bin/agent-personalizer.js --dir "$W" --ai agents --level 3 --precommit --yes
+[ -x "$T/.git/hooks/pre-commit" ] || fail "worktree hook absent"
+expect 0 "linked worktree uninstall" node bin/agent-personalizer.js --dir "$W" --uninstall
+cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit" || fail "worktree original not restored"
+pass "precommit gate: staged hit, missing list, clean commit, restoration and refusals"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"

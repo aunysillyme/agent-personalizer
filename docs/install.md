@@ -67,6 +67,7 @@ Use [`examples/answers.json`](../examples/answers.json) as a complete example, i
 | `--dir <folder>` | Destination folder; prompted in interactive mode. |
 | `--global` | Apply a level-1 profile across projects through Claude Code, Codex, Gemini CLI and Hermes Agent home files. Excludes `--dir` and levels 2/3. |
 | `--ai claude,agents,gemini,chatgpt,prompt` | Comma-separated targets. Choose the ones you use. |
+| `--precommit` | Opt in to the git pre-commit gate at level 3; saved for later runs. |
 | `--level 1`, `--level 2`, `--level 3` | Profile and home files; add local notes; add editable rules and mechanisms. |
 | `--compact` | Save compact rule rendering for file targets. See [compact mode and the file budget](tiers.md#compact-mode-and-file-budget). |
 | `--answers <file.json>` or `--answers -` | Set onboarding answers without questions. |

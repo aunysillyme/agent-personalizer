@@ -30,7 +30,7 @@ let committing = false;
 function die(msg) { if (committing) throw new markers.Refusal(msg); console.error(`agent-personalizer: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--ai', '--level', '--answers'];
-const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--compact', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
+const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--defaults', '--quick', '--full', '--compact', '--precommit', '--uninstall', '--dry', '--help', '--version', '-h', '-v'];
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
@@ -56,6 +56,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   learn        with your yes, write a local digest for up to five evidence-backed questions.
   --all-projects  include sessions from projects other than --dir; default reads only --dir.
   --forget     with learn, remove the digest; your AI apps' own history stays as it is.
+  --precommit  install the level-3 forbidden-string gate as a git pre-commit hook.
   --uninstall  remove unchanged installed files; keep edited files and LEARNED.md with entries.
   --dry        preview --uninstall without changing files.
   Levels: 1 profile, onboarding and home file(s); nothing else (the rules render from the package)
@@ -253,10 +254,11 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
 }
 
 async function main() {
+  if (ARGS['--global'] && ARGS['--precommit']) die('--precommit needs a level 3 project install');
   if (ARGS['--global']) return require('./global.cjs').run({ args: ARGS, commitPlan, probe, readConfig, ask });
   if (ARGS['--ai'] && ARGS['--ai'].split(',').some(t => t.trim() === 'hermes')) die('Hermes reads AGENTS.md inside a project; use --ai agents (or --global --ai hermes for every Hermes session).');
   if (ARGS.command === 'learn') {
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact', '--uninstall', '--dry'])
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact', '--precommit', '--uninstall', '--dry'])
       if (opt in ARGS) die(`${opt} is not a learn option`);
     if (ARGS['--forget'] && ARGS['--all-projects']) die('--all-projects cannot be used with --forget');
     if (ARGS['--forget'] && ARGS['--yes']) die('--forget and --yes are exclusive');
@@ -267,7 +269,7 @@ async function main() {
   if (ARGS['--all-projects']) die('--all-projects needs learn');
   if (ARGS['--uninstall']) {
     if (!ARGS['--dir']) die('--uninstall needs --dir <folder>');
-    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact'])
+    for (const opt of ['--ai', '--level', '--answers', '--defaults', '--quick', '--full', '--compact', '--precommit'])
       if (opt in ARGS) die(`${opt} is an install option; --uninstall reads the stored config`);
     return require('./uninstall.cjs').uninstall(ARGS['--dir'], { dry: !!ARGS['--dry'] });
   }
@@ -300,6 +302,8 @@ async function main() {
   }
   if (!/^[1-4]$/.test(String(level))) die('level must be 1, 2 or 3 (4 is accepted as 3)');
   level = Number(level);
+  const precommitEnabled = !!ARGS['--precommit'] || !!stored.cfg.precommit;
+  if (precommitEnabled && level < 3) die('--precommit requires level 3');
   if (level === 4) console.log('note: --level 4 installs exactly what --level 3 installs. For model routing, see https://github.com/aunysillyme/model-orchestrator');
   const targets = String(ais || '').split(',').map(s => s.trim()).filter(Boolean);
   const bad = targets.filter(t => !AIS.includes(t));
@@ -338,6 +342,11 @@ async function main() {
   let cfg = storedConfig.cfg;
   if (prevAnswers && !answersFile && answersSource.startsWith('defaults')) {
     answers = prevAnswers; answersSource = 'kept from .agent-personalizer.json';
+  }
+  let hookPlan;
+  if (precommitEnabled) {
+    try { hookPlan = require('./precommit.cjs').plan(root, cfg.precommit || null); }
+    catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
   }
   const allTargets = [...new Set([...targets, 'onboarding'])];
   const installedLevel = level;
@@ -586,13 +595,14 @@ async function main() {
   await commitPlan(root, { writes, removals, outputPaths,
     prepare(newDirectories) {
       for (const rel of newDirectories) createdDirectories.add(rel);
-      cfg = { ...cfg, targets: allTargets, level: installedLevel, ruleSet: 'core-5', keptRuleTargets: [...keptRuleTargets], onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
+      cfg = { ...cfg, ...(hookPlan ? { precommit: hookPlan.saved } : {}), targets: allTargets, level: installedLevel, ruleSet: 'core-5', keptRuleTargets: [...keptRuleTargets], onboarding: onboarding.sparse(answers), preservedTargets: [...preservedTargets].filter(t => allTargets.includes(t)), installed: installedHashes, createdDirectories: [...createdDirectories].sort(), toolingVersion, toolingVersions };
       if (ARGS['--compact']) cfg.compact = true;
       writes.push({ rel: '.agent-personalizer.json', bytes: Buffer.from(JSON.stringify(cfg, null, 2) + '\n'), report: `${cfgExists ? 'update' : 'wrote '} .agent-personalizer.json (onboarding: ${answersSource})` });
     },
     async finalize() {
       if (learnRequested) await require('./learn.cjs').learn({ dir: root, consented: true });
       execFileSync(process.execPath, [path.join(PKG, 'render', 'render.cjs'), '--dir', root, '--targets', allTargets.filter(t => !keptRuleTargets.has(t) && !adoptedRuleTargets.has(t)).join(',')], { stdio: 'inherit' });
+      if (hookPlan) require('./precommit.cjs').install(hookPlan);
     }
   });
 
