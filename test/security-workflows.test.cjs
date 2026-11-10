@@ -23,5 +23,10 @@ assert.match(verify, /npm install --ignore-scripts --no-audit --no-fund "\$tarba
 assert.match(verify, /agent-personalizer" --help/);
 assert.match(verify, /actions\/upload-artifact@[0-9a-f]{40}/);
 assert.match(release, /actions\/download-artifact@[0-9a-f]{40}/);
+assert.match(release, /env:\n\s+TAG: \$\{\{ inputs\.tag \}\}\n\s+run: \|/);
+assert(!/\$\{\{[^}]*\}\}/.test(release.split('\n').filter((l) => !/^\s+TAG: /.test(l) && !/^\s+(name|path|node-version):/.test(l)).join('\n').replace(/uses:.*/g, '')), 'no direct interpolation outside env');
+assert.match(release, /want="agent-personalizer-\$\{TAG#v\}\.tgz"/);
+assert.match(release, /test "\$\{1##\*\/\}" = "\$want"/);
+assert(release.indexOf('${1##*/}" = "$want"') < release.indexOf('npm publish'), 'name check runs before npm publish');
 assert.match(release, /npm publish "\$1" --provenance --access public/);
 console.log('PASS security: checkout credentials and verified release artifact');

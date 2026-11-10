@@ -46,7 +46,7 @@ const { execFileSync } = require('child_process');
 const SKIP_DIRS = new Set(['.git']);   // --all means every file; git mode lets .gitignore decide about node_modules
 const PRIVATE_CLASSES = [
   ['P_PATH', /\/(?:Users|home)\/(?!you\b|user\b|example\b|runner\b|name\b)[^/\s"'`),;]+/i],
-  ['P_TOKEN', /(?:gh[pousr]_|github_pat_|npm_)[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[A-Za-z0-9_-]{30,}|-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/]
+  ['P_TOKEN', /(?<![A-Za-z0-9_-])(?:(?:gh[pousr]_|github_pat_|npm_)[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[A-Za-z0-9_-]{30,})|-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/]
 ];
 
 function die(msg) { console.error(`GATE SETUP ERROR: ${msg}`); process.exit(2); }

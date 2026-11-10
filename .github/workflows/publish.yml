@@ -100,8 +100,12 @@ jobs:
             if (!match || !(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))))) process.exit(1);
           '
       - name: publish with provenance
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           set -eu
           set -- ./release/*.tgz
           test "$#" -eq 1 && test -f "$1"
+          want="agent-personalizer-${TAG#v}.tgz"
+          test "${1##*/}" = "$want" || { echo "tarball ${1##*/} is not $want"; exit 1; }
           npm publish "$1" --provenance --access public

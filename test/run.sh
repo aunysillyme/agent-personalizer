@@ -1385,6 +1385,7 @@ pass "precommit gate: staged hit, missing list, clean commit, restoration and re
 
 node test/security-workflows.test.cjs || fail "workflow security regression"
 node test/security-hardening.test.cjs || fail "history privacy regression"
+node test/security-gate-token.test.cjs || fail "gate token boundary regression"
 node test/security-website.test.mjs || fail "nested HTML sanitization regression"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"
