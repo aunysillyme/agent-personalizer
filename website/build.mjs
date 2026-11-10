@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, existsSyn
 import { join, dirname, resolve, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { visibleText } from './facts.mjs';
+import { visibleText, removeRepeated } from './facts.mjs';
 import { renderProjectsPopup } from './lib/projects-popup-render.mjs';
 import { pages } from './pages.mjs';
 import { content } from './content.mjs';
@@ -70,12 +70,13 @@ function uniqueId(text, ids) {
 // Source HTML is data. Only tags constructed by this renderer reach the page.
 export function renderMarkdown(markdown, { source = 'README.md', ids = new Set(), routes = sourceRoutes() } = {}) {
   const references = new Map();
-  markdown = markdown.replace(/^---\n[^]*?\n---\n/, '').replace(/<!--[^]*?-->/g, '');
+  markdown = removeRepeated(markdown.replace(/^---\n[^]*?\n---\n/, ''), /<!--[^]*?-->/g);
   markdown = markdown.replace(/^\[([^\]]+)\]:\s*(\S+).*$/gm, (_, label, href) => { references.set(label.toLowerCase(), href); return ''; });
   function inline(value, tokens = []) {
     const save = html => { tokens.push(html); return `\u0000${tokens.length - 1}\u0000`; };
     value = value.replace(/`([^`]+)`/g, (_, code) => save(`<code>${escape(code)}</code>`));
-    value = value.replace(/<(script|style|iframe|object|svg)\b[^>]*>[^]*?<\/\1\s*>/gi, '').replace(/<\/?[a-z][^>]*>/gi, '');
+    value = removeRepeated(value, /<(script|style|iframe|object|svg)\b[^>]*>[^]*?<\/\1\s*>/gi);
+    value = removeRepeated(value, /<\/?[a-z][^>]*>/gi);
     value = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, href) => {
       const src = rewriteUrl(href, source, { image: true, routes });
       return save(src ? `<img src="${escape(src)}" alt="${escape(alt)}" loading="lazy">` : '');
@@ -287,15 +288,15 @@ function validateRendered(documents) {
   }
 }
 
-function markdownTwin(html, page) {
+export function markdownTwin(html, page) {
   let body = html.match(/<main\b[^>]*>([^]*?)<\/main>/)?.[1] || '';
   body = body.replace(/<details class="mobile-nav">[^]*?<\/details>/g, '').replace(/<footer\b[^>]*>[^]*?<\/footer>/g, '').replace(/<nav\b[^>]*>[^]*?<\/nav>/g, '');
   body = body.replace(/<h([1-6])\b[^>]*>([^]*?)<\/h\1>/g, (_, depth, text) => `\n\n${'#'.repeat(Number(depth))} ${visibleText(text)}\n\n`)
     .replace(/<a href="([^"]+)"[^>]*>([^]*?)<\/a>/g, (_, href, text) => `[${visibleText(text)}](${href.startsWith('/') ? origin : ''}${href.replace(/&amp;/g, '&')})`)
     .replace(/<pre><code>([^]*?)<\/code><\/pre>/g, (_, code) => `\n\n\`\`\`\n${decode(code)}\n\`\`\`\n\n`)
     .replace(/<code>([^]*?)<\/code>/g, (_, code) => `\`${decode(code)}\``)
-    .replace(/<\/(?:p|div|section|article|details|tr|li|figure|summary)>/g, '\n\n').replace(/<\/(?:th|td)>/g, ' | ')
-    .replace(/<[^>]+>/g, '');
+    .replace(/<\/(?:p|div|section|article|details|tr|li|figure|summary)>/g, '\n\n').replace(/<\/(?:th|td)>/g, ' | ');
+  body = removeRepeated(body, /<[^>]+>/g);
   return `Canonical: ${origin}${page.route}\n\n${decode(body).replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
 }
 

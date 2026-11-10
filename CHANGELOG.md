@@ -6,6 +6,12 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-10
+
+### Security
+
+- Harden release automation, HTML sanitization and privacy checks.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added
@@ -366,7 +372,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.7...v0.9.0
 [0.8.7]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.5...v0.8.6

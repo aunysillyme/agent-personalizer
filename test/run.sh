@@ -845,7 +845,7 @@ pass "(#9) gate skips working-tree reads through a symlinked parent and says so;
 mk; R="$MK"; mk; L="$MK"; printf 'zzqqxx-no-such-term\n' > "$L/list.txt"
 { git -C "$R" init -q && printf clean > "$R/zzqqxx-no-such-term.md" && git -C "$R" add .; } || fail "filename fixture"
 node check/gate.cjs --dir "$R" --list "$L/list.txt" > "$L/o.txt" 2>&1; got=$?; [ "$got" -eq 1 ] || fail "forbidden term in a filename passed (exit $got)"
-grep -q 'zzqqxx-no-such-term.md (path)  "zzqqxx-no-such-term"' "$L/o.txt" || fail "path hit not labelled"
+grep -Fq '[redacted].md (path)  P_LIST' "$L/o.txt" && ! grep -q 'zzqqxx-no-such-term' "$L/o.txt" || fail "path hit not labelled or value exposed"
 printf 'zzqqxx-no-such-term\nallow:zzqqxx-no-such-term.md\n' > "$L/list2.txt"
 expect 0 "allowed filename" node check/gate.cjs --dir "$R" --list "$L/list2.txt"
 mkdir -p "$R/sub"; printf clean > "$R/sub/ok.md"; git -C "$R" add .
@@ -987,7 +987,7 @@ pass "every rule carries an In practice line"
 expect 0 "CLA workflow and template agreement" node test/cla.test.js
 grep -q '^  workflow_dispatch:' .github/workflows/publish.yml || fail "publish.yml is not manual"
 grep -q 'id-token: write' .github/workflows/publish.yml || fail "publish.yml lacks id-token: write"
-grep -q 'npm publish --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
+grep -q 'npm publish "\$1" --provenance --access public' .github/workflows/publish.yml || fail "publish.yml does not publish with provenance"
 node test/publish-version.test.cjs || fail "trusted-publishing npm version gate"
 grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
 grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep -q 'rev-parse "refs/tags/\$TAG^{commit}"' .github/workflows/publish.yml || fail "publish.yml does not resolve the input through refs/tags"
@@ -1382,5 +1382,10 @@ expect 0 "linked worktree install" node bin/agent-personalizer.js --dir "$W" --a
 expect 0 "linked worktree uninstall" node bin/agent-personalizer.js --dir "$W" --uninstall
 cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit" || fail "worktree original not restored"
 pass "precommit gate: staged hit, missing list, clean commit, restoration and refusals"
+
+node test/security-workflows.test.cjs || fail "workflow security regression"
+node test/security-hardening.test.cjs || fail "history privacy regression"
+node test/security-gate-token.test.cjs || fail "gate token boundary regression"
+node test/security-website.test.mjs || fail "nested HTML sanitization regression"
 
 echo; echo "all executed checks passed; $(grep -c '^[[:space:]]*pass \"' test/run.sh) numbered checks (skips shown above)"
