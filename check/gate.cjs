@@ -9,6 +9,7 @@
 
   usage:
     node check/gate.cjs [--dir <root>] [--list <file>]     scan; exit 0 clean, 1 on hits, 2 on setup error
+    node check/gate.cjs --history [--dir <root>] [--list <file>]  scan current files and reachable history
     node check/gate.cjs --self-test                        prove the gate can go red on a seeded hit
     node check/gate.cjs --help | -h · --version | -v
 
@@ -33,7 +34,9 @@
   A working-tree path whose parent directory is a symlink is NOT read (the file would be outside
   the scan root); the index blob for that path is still scanned, and the skip is counted and
   printed. What this gate is: a check for the exact strings you listed. What it is not: a proof
-  that no personal data ships. Unknown terms, history and binary files are outside it.
+  that no personal data ships. Unknown terms and binary files in the working tree are outside it. --history also
+  checks reachable blobs, filenames, commit messages and tag names, including binary blobs,
+  against the list, private home paths and credential-shaped strings.
 */
 const fs = require('fs');
 const path = require('path');
@@ -41,11 +44,15 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 
 const SKIP_DIRS = new Set(['.git']);   // --all means every file; git mode lets .gitignore decide about node_modules
+const PRIVATE_CLASSES = [
+  ['P_PATH', /\/(?:Users|home)\/(?!you\b|user\b|example\b|runner\b|name\b)[^/\s"'`),;]+/i],
+  ['P_TOKEN', /(?:gh[pousr]_|github_pat_|npm_)[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[A-Za-z0-9_-]{30,}|-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/]
+];
 
 function die(msg) { console.error(`GATE SETUP ERROR: ${msg}`); process.exit(2); }
 
 const VALUE_OPTS = ['--dir', '--list'];
-const FLAG_OPTS = ['--self-test', '--all', '--help', '-h', '--version', '-v'];
+const FLAG_OPTS = ['--self-test', '--all', '--history', '--help', '-h', '--version', '-v'];
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
 function parseArgs() {
   const out = {};
@@ -152,6 +159,33 @@ function allowedSpans(lineLower, allow) {
    A tracked submodule (gitlink, mode 160000) is refused: its files are not in this index. */
 function git(root, args, input) {
   return execFileSync('git', ['-C', root, ...args], { input, maxBuffer: 1 << 28 });
+}
+
+/* Scan every reachable object and every name in every reachable tree. A git failure,
+   malformed object or oversized response refuses the scan rather than dropping coverage. */
+function* historyItems(root) {
+  const repo = git(root, ['rev-parse', '--show-toplevel']).toString('utf8').trim();
+  const commits = git(repo, ['rev-list', '--all']).toString('ascii').trim().split('\n').filter(Boolean);
+  const objects = git(repo, ['rev-list', '--objects', '--all', '--no-object-names']).toString('ascii').trim().split('\n').filter(Boolean);
+  for (const oid of commits) {
+    const bytes = git(repo, ['cat-file', 'commit', oid]);
+    const boundary = bytes.indexOf(Buffer.from('\n\n'));
+    if (boundary < 0) throw Error('malformed commit');
+    yield { rel: '', label: `history:${oid}:message`, bytes: bytes.subarray(boundary + 2), history: true };
+    const entries = git(repo, ['ls-tree', '-r', '-z', '--full-tree', oid]);
+    for (const entry of entries.toString('utf8').split('\0').filter(Boolean)) {
+      const tab = entry.indexOf('\t');
+      if (tab < 0) throw Error('malformed tree entry');
+      yield { rel: entry.slice(tab + 1), label: `history:${oid}:filename`, bytes: Buffer.alloc(0), history: true, nameOnly: true };
+    }
+  }
+  for (const oid of objects) {
+    if (!/^[0-9a-f]{40,64}$/.test(oid)) throw Error('malformed object id');
+    if (git(repo, ['cat-file', '-t', oid]).toString('ascii').trim() !== 'blob') continue;
+    yield { rel: '', label: `history:${oid}:blob`, bytes: git(repo, ['cat-file', 'blob', oid]), history: true };
+  }
+  const tags = git(repo, ['for-each-ref', '--format=%(refname:strip=2)', 'refs/tags']).toString('utf8').split('\n').filter(Boolean);
+  for (const tag of tags) yield { rel: tag, label: 'history:tag', bytes: Buffer.alloc(0), history: true, nameOnly: true };
 }
 
 function* gitItems(root) {
@@ -265,7 +299,7 @@ function fileSet(root, all) {
   return { items: walkItems(root), mode: 'walk' };
 }
 
-function scan(root, list, listFile, all) {
+function scan(root, list, listFile, all, history = false) {
   root = fs.realpathSync(root);                         // every caller, self-test included, compares real paths
   const hits = [];
   const scannedPaths = new Set();
@@ -276,22 +310,35 @@ function scan(root, list, listFile, all) {
   scan.mode = set.mode;
   // The list file is excluded by its exact resolved path, never by its display label, and
   // only as a working-tree copy: if git has it in the INDEX it would ship, so that is exit 2.
-  for (const item of set.items) {
+  let items = set.items;
+  if (history) {
+    if (!insideGitRepo(root)) die('--history requires a git work tree');
+    try { items = [...items, ...historyItems(root)]; } catch (e) { die(`history enumeration failed: ${e.message}`); }
+  }
+  for (const item of items) {
     if (skipPath && path.resolve(root, item.rel) === skipPath) {
       if (/\(index/.test(item.label)) die(`the forbidden list itself is tracked by git (${item.rel}). It must never ship: run \`git rm --cached ${item.rel}\` and add it to .gitignore.`);
       continue;
     }
     files++;
+    if (history) {
+      for (const [rule, pattern] of PRIVATE_CLASSES) {
+        if (pattern.test(item.rel)) hits.push({ file: item.history ? item.label : '(path)', line: 0, rule });
+        if (!item.nameOnly) item.bytes.toString('utf8').split('\n').forEach((line, n) => {
+          if (pattern.test(line)) hits.push({ file: item.history ? item.label : item.rel, line: n + 1, rule });
+        });
+      }
+    }
     // the PATH first: one scan per item, labelled "(path)", never covered by allow spans of the text
-    if (!scannedPaths.has(item.rel)) {
-      scannedPaths.add(item.rel);
+    if (!scannedPaths.has(item.rel) || item.history) {
+      if (!item.history) scannedPaths.add(item.rel);
       const lower = item.rel.toLowerCase(), spans = allowedSpans(lower, list.allow);
       for (const term of list.terms) {
         const t = term.toLowerCase(); let i = lower.indexOf(t);
-        while (i !== -1) { if (!spans.some(([x, y]) => i >= x && i + t.length <= y)) hits.push({ file: `${item.rel} (path)`, line: 0, term }); i = lower.indexOf(t, i + 1); }
+        while (i !== -1) { if (!spans.some(([x, y]) => i >= x && i + t.length <= y)) hits.push({ file: item.history ? item.label : `${item.rel} (path)`, line: 0, rule: 'P_LIST' }); i = lower.indexOf(t, i + 1); }
       }
     }
-    if (isBinary(item.bytes)) continue;
+    if (!item.history && isBinary(item.bytes)) continue;
     const lines = item.bytes.toString('utf8').split('\n');
     lines.forEach((line, n) => {
       const lower = line.toLowerCase();
@@ -301,7 +348,7 @@ function scan(root, list, listFile, all) {
         let i = lower.indexOf(t);
         while (i !== -1) {
           const inside = spans.some(([a, b]) => i >= a && i + t.length <= b);
-          if (!inside) hits.push({ file: item.label, line: n + 1, term });
+          if (!inside) hits.push({ file: item.label, line: n + 1, rule: 'P_LIST' });
           i = lower.indexOf(t, i + 1);
         }
       }
@@ -344,11 +391,23 @@ function main() {
   root = fs.realpathSync(root);                         // same canonical form as the list path, so the exclusion compares like with like
   const listFile = path.resolve(arg('--list', path.join(__dirname, 'forbidden.local.txt')));
   const all = !!arg('--all', false);
-  const { hits, files, skipped } = scan(root, loadList(listFile), listFile, all);
-  for (const k of skipped) console.log(`skipped  ${k} (outside the scan root; not read)`);
+  const history = !!arg('--history', false);
+  let list;
+  if (history && !arg('--list', null)) {
+    try { fs.lstatSync(listFile); list = loadList(listFile); }
+    catch (e) { if (e.code === 'ENOENT') list = { terms: [], allow: [] }; else die(`cannot inspect private list (${e.code || 'unknown error'})`); }
+  } else list = loadList(listFile);
+  const redact = text => {
+    const clean = list.terms.reduce((value, term) => value.replace(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '[redacted]'), text);
+    return PRIVATE_CLASSES.some(([, pattern]) => pattern.test(clean)) ? '[redacted path]' : clean;
+  };
+  const { hits, files, skipped } = scan(root, list, listFile, all, history);
+  for (const k of skipped) console.log(`skipped  ${redact(k)} (outside the scan root; not read)`);
   if (hits.length) {
     console.log(`GATE FAILED: ${hits.length} hit(s)`);
-    for (const h of hits) console.log(`  ${h.file}${h.line ? ':' + h.line : ''}  "${h.term}"`);
+    for (const h of hits) {
+      console.log(`  ${redact(h.file)}${h.line ? ':' + h.line : ''}  ${h.rule}`);
+    }
     process.exit(1);
   }
   console.log(`gate clean: 0 hits across ${files} files, text and paths (${scan.mode === 'git' ? 'files git would ship, index blobs included' : 'every file under --dir'}; ${skipped.length} skipped)`);
