@@ -75,7 +75,7 @@ export const content = {
     label: 'ILLUSTRATIVE FLOW',
     steps: [
       { title: 'Profile', text: 'USER.md owns the profile' },
-      { title: 'Render', text: 'Each AI gets its own file' },
+      { title: 'Render', text: "Each AI gets its own file" },
       { title: 'Check', text: 'The drift check fails loudly' },
     ],
   },
@@ -107,17 +107,54 @@ export const content = {
   release: { suffix: 'not released yet', pending: 'not released yet', link: 'Full changelog', changelog: 'Full changelog', text: 'Read the changelog for the package history.' },
   social: { name: 'agent-personalizer', description: 'AI custom instructions from approved entries', alt: "agent-personalizer: one profile and rule source for your AI tools, rendered into each AI's own file." },
   socialAlt: "agent-personalizer: one profile and rule source for your AI tools, rendered into each AI's own file.",
-  discovery: { install: 'Install:', pages: 'Site pages', source: 'Package sources', readme: 'GitHub README: package overview and setup', npm: 'npm package: package metadata and installation' },
+  discovery: { install: 'Install:', pages: 'Documentation', source: 'Source & Package', readme: 'GitHub Repository', npm: 'npm Package' },
   notFound: { title: 'Page not found', text: 'Open the overview or choose a page from the documentation.', link: 'Open the overview' },
   documents: {
-    landing: { title: 'agent-personalizer | One profile for every AI you use', description: 'AI custom instructions from approved entries: a profile and rules for Claude Code, Codex, Cursor, Gemini CLI, Hermes Agent and ChatGPT, kept in sync from one source.', h1: 'Every AI you use. The same understanding.' },
-    overview: { title: 'Overview | agent-personalizer', description: 'Read the package overview, setup levels, privacy, sync, uninstall and common questions.', h1: 'Overview' },
-    how: { title: 'How it works | agent-personalizer', description: 'Where style, home files, session contracts, rule owners and memory belong across five instruction tiers.', h1: 'How it works' },
-    guides: { title: 'Guides | agent-personalizer', description: 'Which file each AI reads, how to refresh pasted instructions, plus notes connectors and approval steps.', h1: 'Guides' },
-    install: { title: 'Install | agent-personalizer', description: 'Interactive setup, scripted answers, every flag, updates, learning commands and removal.', h1: 'Install' },
-    learning: { title: 'Learning and privacy | agent-personalizer', description: 'Consent, session sources, evidence-backed questions, shared entries and forgetting the digest.', h1: 'Learning and privacy' },
-    proof: { title: 'Proof | agent-personalizer', description: 'Source-backed package facts with build-time checks, plus the rendering, drift and preflight guarantees.', h1: 'Proof' },
-    changelog: { title: 'Changelog | agent-personalizer', description: 'Read the package changelog from the repository.', h1: 'Changelog' },
+    landing: {
+      title: 'agent-personalizer | One Profile for Every AI Coding Tool',
+      description: 'Sync one approved profile and rule source into CLAUDE.md, AGENTS.md, GEMINI.md, Cursor, Hermes SOUL.md and ChatGPT with local drift checks via npx.',
+      h1: 'Overview',
+    },
+    overview: {
+      title: 'Overview & Setup Levels | agent-personalizer',
+      description: 'How agent-personalizer renders USER.md and LEARNED.md into native instruction files for Claude Code, Codex, Cursor, Gemini CLI, Hermes and ChatGPT.',
+      h1: 'Overview',
+    },
+    how: {
+      title: 'Five Instruction Tiers & Architecture | agent-personalizer',
+      description: 'Learn where communication style, home config, session contracts, repo rules and learned memory belong across five structured AI instruction tiers.',
+      h1: 'How it works',
+    },
+    guides: {
+      title: 'Paste Guide & Companion Connectors | agent-personalizer',
+      description: 'See which instruction file each AI tool reads automatically, how to refresh ChatGPT paste exports and how optional notes connectors handle consent.',
+      h1: 'Guides',
+    },
+    install: {
+      title: 'Install, CLI Flags & Removal | agent-personalizer',
+      description: 'Install agent-personalizer interactively or headlessly via npx: --dir, --ai, --level flags, drift check commands, safe updates and clean removal.',
+      h1: 'Install',
+    },
+    learning: {
+      title: 'Consent-First Session Learning | agent-personalizer',
+      description: 'How optional session learning works locally: explicit opt-in consent, evidence-backed preference prompts, approved entries and digest deletion.',
+      h1: 'Learning and privacy',
+    },
+    proof: {
+      title: 'Enforced Checks & Package Facts | agent-personalizer',
+      description: 'Inspect build-checked package facts, deterministic rendering checks, generated-file drift detection, preflight backups and zero-telemetry operation.',
+      h1: 'Proof',
+    },
+    guarantees: {
+      title: 'Rendering & Local Safety Guarantees | agent-personalizer',
+      description: 'Read what agent-personalizer guarantees in code: local-only execution, user-owned file edits, loud drift failures and forbidden-string leak checks.',
+      h1: 'Guarantees',
+    },
+    changelog: {
+      title: 'Release Notes & Changelog | agent-personalizer',
+      description: 'Published npm version history and changelog for agent-personalizer, covering supported AI targets, renderer rules, drift checks and CLI updates.',
+      h1: 'Changelog',
+    },
   },
 };
 

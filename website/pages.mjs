@@ -8,6 +8,6 @@ export const pages = [
   page('install', '/docs/install/', ['docs/install.md']),
   page('learning', '/docs/learning/', ['docs/learning.md']),
   page('proof', '/docs/proof/', ['docs/guarantees.md']),
-  { route: '/docs/guarantees/', title: 'Guarantees | agent-personalizer', description: 'Read the rendering, drift detection and local operation guarantees.', h1: 'Guarantees', sources: ['docs/guarantees.md'] },
+  page('guarantees', '/docs/guarantees/', ['docs/guarantees.md']),
   page('changelog', '/docs/changelog/', ['CHANGELOG.md']),
 ];
