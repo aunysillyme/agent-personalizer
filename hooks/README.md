@@ -1,6 +1,6 @@
 # hooks/
 
-Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.9.1/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
+Tier 3 from the tiers doc (https://github.com/aunysillyme/agent-personalizer/blob/v0.10.0/docs/tiers.md): the few rules that must be in context at the moment of decision, injected in full at the start of every session. Injection puts the text in front of the model; whether the model follows it is up to the model and the host. This is the strongest placement available, not a guarantee.
 
 Which rules? The ones with `inject: true` in their frontmatter. Keep that set small. Every injected rule costs tokens every session.
 
@@ -25,6 +25,22 @@ The hook's stdout lands in the session context before your first message. That i
 The contract is target-aware: `--contract-target claude` applies each rule's `surfaces` filter. Personal blocks are included by default because the hook runs in your own project; add `--no-personal` for a shared machine.
 
 **Subagents do not get SessionStart.** A subagent you spawn from a session sees none of this unless you pass it in the task. That is why the rendered `CLAUDE.md` also carries pointers to every rule: the pointer survives, the injection does not.
+
+## Gemini CLI
+
+`gemini-cli/session-start.sh` wraps `--contract --contract-target gemini` in Gemini CLI's structured `SessionStart` JSON output (`hookSpecificOutput.additionalContext`), so the contract enters model context rather than displaying only as a terminal status message. Register it in the project's `.gemini/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "sh \"$GEMINI_PROJECT_DIR/hooks/gemini-cli/session-start.sh\"" } ] }
+    ]
+  }
+}
+```
+
+For user-level `~/.gemini/settings.json`, use the absolute path to the installed project instead, for example `sh "/path/to/project/hooks/gemini-cli/session-start.sh"`.
 
 ## Everything else (plain-prompt fallback)
 

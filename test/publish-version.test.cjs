@@ -12,4 +12,7 @@ for (const [version, expected] of [['10.9.9', 1], ['11.4.9', 1], ['11.5.0', 1], 
   assert.ifError(result.error);
   assert.equal(result.status, expected, version + ': ' + result.stdout + result.stderr);
 }
-console.log('PASS publishing: workflow rejects npm below 11.5.1 and accepts supported releases');
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
+const fallback = JSON.parse(fs.readFileSync(path.join(__dirname, '../website/release-fallback.json'), 'utf8'));
+assert.equal(fallback.version, pkg.version, 'website/release-fallback.json must match package.json version');
+console.log('PASS publishing: workflow rejects npm below 11.5.1, accepts supported releases, and pins release-fallback.json');

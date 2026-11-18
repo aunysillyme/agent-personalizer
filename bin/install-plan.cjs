@@ -3,11 +3,10 @@
 // the static release table recognizes untouched copies from before hashes were recorded.
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const { sha256 } = require('./cli-util.cjs');
 const PKG = path.resolve(__dirname, '..');
 const onboarding = require('../render/onboarding.cjs');
-const RUNTIME_FILES = ['render/render.cjs', 'render/targets.json', 'render/onboarding.cjs', 'hooks/README.md', 'hooks/claude-code/session-start.sh', 'check/gate.cjs', 'check/forbidden.example.txt'];
-const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const RUNTIME_FILES = ['render/render.cjs', 'render/targets.json', 'render/onboarding.cjs', 'hooks/README.md', 'hooks/claude-code/session-start.sh', 'hooks/gemini-cli/session-start.sh', 'check/gate.cjs', 'check/forbidden.example.txt'];
 const stripSignature = text => text.split('\n').filter(line => !line.includes('40-sign-every-edit.md') && !/^`?Last edited by:/.test(line)).join('\n');
 
 function recordedHash(cfg, rel) {
@@ -102,6 +101,7 @@ function installPlan({ answers, level, targets, notesScaffolded, legacyRules = f
   // Entries belong to the user as soon as the template is written, even untouched.
   plan.push({ rel: 'LEARNED.md', text: fs.readFileSync(path.join(PKG, 'templates', 'LEARNED.md'), 'utf8'), firstOnly: true });
   if (targets.includes('claude')) plan.push({ rel: '.claude/commands/personalize.md', text: onboarding.learningProcedure() + '\n' });
+  if (targets.includes('gemini')) plan.push({ rel: '.gemini/commands/personalize.toml', text: onboarding.geminiPersonalizeToml() });
   // rules/ is copied at level 3, where it becomes yours to edit; levels 1 and 2 render from the package's rules
   if (level >= 3) for (const f of fs.readdirSync(path.join(PKG, 'rules')).sort()) {
     if (noSig && f === '40-sign-every-edit.md') continue;
@@ -145,6 +145,7 @@ function installPlan({ answers, level, targets, notesScaffolded, legacyRules = f
   const POINTER = 'pointer file; the renderer fills its block below';
   if (targets.includes('claude')) plan.push({ rel: 'CLAUDE.md', text: home('CLAUDE.md'), note: POINTER });
   if (targets.includes('agents')) plan.push({ rel: 'AGENTS.md', text: home('AGENTS.md'), note: POINTER });
+  if (targets.includes('gemini')) plan.push({ rel: 'GEMINI.md', text: home('GEMINI.md'), note: POINTER });
   if (level >= 2 && kind !== 'cloud') {                   // a cloud tool's notes are not local files; no folder named after a workspace
     mdCopy(`${base}/README.md`, path.join(PKG, 'templates', 'FOLDER_README.md'));
     mdCopy(`${base}/sessions/TEMPLATE-week.md`, path.join(PKG, 'templates', 'session-log.md'));

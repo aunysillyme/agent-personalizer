@@ -55,7 +55,7 @@ The four file targets have a 20,000-character warning budget for the whole rende
 
 **What.** The handful of rules that must win at the moment of decision, injected in full at the start of every session. Not pointers. Full text.
 
-**Where.** A session-start hook (Claude Code has these). For AIs without hooks, a block you paste at the top of the first message, or a saved prompt that starts every session.
+**Where.** A session-start hook (Claude Code and Gemini CLI both support `SessionStart` hooks; see [`hooks/README.md`](../hooks/README.md)). For AIs without hooks, a block you paste at the top of the first message, or a saved prompt that starts every session.
 
 **Prevents.** A tool's own instructions beating yours by default. Installed skills, plugins and tool descriptions each say "use me." A rule that says "use the other one first" loses that argument if it is only stated in a document the AI may or may not have opened. Injection makes sure your rule is at least in the room; it does not settle the argument on every host.
 

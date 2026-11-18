@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_FILE = 64 * 1024 * 1024;
+const MAX_META = 1024 * 1024;
 const MAX_MEMORIES = 20;
 const SOURCES = new Set(['claude-code', 'codex', 'gemini-cli']);
 const CONTEXT_HEADERS = ['# AGENTS.md instructions', '# Files mentioned by the user', '# Response annotations', '# Browser comments'];
@@ -22,7 +23,9 @@ function claudeProjectNames(projectDir) {
 
 function belongsToProject(cwd, projectDir) {
   if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) return false;
-  const relative = path.relative(projectDir, path.resolve(cwd));
+  const left = process.platform === 'win32' ? path.resolve(projectDir).toLowerCase() : path.resolve(projectDir);
+  const right = process.platform === 'win32' ? path.resolve(cwd).toLowerCase() : path.resolve(cwd);
+  const relative = path.relative(left, right);
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
@@ -98,6 +101,16 @@ function textItems(content, type) {
   return content.filter(item => item && typeof item === 'object' && item.type === type && typeof item.text === 'string').map(item => item.text);
 }
 
+function geminiMessageItems(content) {
+  if (typeof content === 'string') return [content];
+  if (!Array.isArray(content)) return [];
+  return content.flatMap(item => {
+    if (typeof item === 'string') return [item];
+    if (item && typeof item === 'object' && typeof item.text === 'string' && (!item.type || item.type === 'text')) return [item.text];
+    return [];
+  });
+}
+
 async function statPath(file, kind, state, count = false) {
   if (count) state.filesChecked += 1;
   try {
@@ -123,6 +136,70 @@ async function children(dir, state) {
 async function candidate(file, source, project, format, state) {
   const stat = await statPath(file, 'file', state, true);
   if (stat) state.candidates.push({ file, source, project, format, mtimeMs: stat.mtimeMs });
+}
+
+// Streamed bounded read for small metadata files (projects.json, .project_root) without counting as a session file.
+async function readSmallMeta(file, state) {
+  const relative = path.relative(state.home, file);
+  if (relative.startsWith(`..${path.sep}`) || relative === '..' || path.isAbsolute(relative)) return null;
+  let current = state.home;
+  if (!await statPath(current, 'directory', state)) return null;
+  for (const name of relative.split(path.sep).slice(0, -1)) {
+    current = path.join(current, name);
+    if (!await statPath(current, 'directory', state)) return null;
+  }
+  const before = await statPath(file, 'file', state);
+  if (!before || before.size > MAX_META) return null;
+  try {
+    const handle = await fs.promises.open(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    try {
+      const after = await handle.stat();
+      if (!after.isFile() || before.ino !== after.ino || before.dev !== after.dev || after.size > MAX_META) return null;
+      const chunks = [];
+      let total = 0;
+      const stream = handle.createReadStream({ autoClose: false, highWaterMark: 16 * 1024, start: 0, end: MAX_META - 1 });
+      for await (const chunk of stream) {
+        total += chunk.length;
+        if (total > MAX_META) return null;
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks, total).toString('utf8');
+    } finally { await handle.close(); }
+  } catch { return null; }
+}
+
+async function geminiProjectDirs(app, tmp, state) {
+  const slugs = new Set([state.geminiProjectHash]);
+  const registries = [...new Set([path.join(app, 'projects.json'), path.join(state.home, '.gemini', 'projects.json')])];
+  for (const regFile of registries) {
+    const registryText = await readSmallMeta(regFile, state);
+    if (!registryText) continue;
+    try {
+      const parsed = JSON.parse(registryText);
+      if (parsed && typeof parsed === 'object' && parsed.projects && typeof parsed.projects === 'object' && !Array.isArray(parsed.projects)) {
+        for (const [registeredPath, slug] of Object.entries(parsed.projects)) {
+          if (typeof slug === 'string' && slug && !slug.includes('/') && !slug.includes('\\') && slug !== '.' && slug !== '..' && belongsToProject(registeredPath, state.projectDir)) {
+            slugs.add(slug);
+          }
+        }
+      }
+    } catch { /* ignore malformed registry */ }
+  }
+  for (const name of await children(tmp, state)) {
+    if (slugs.has(name)) continue;
+    const marker = await readSmallMeta(path.join(tmp, name, '.project_root'), state);
+    if (marker && belongsToProject(marker.trim(), state.projectDir)) slugs.add(name);
+  }
+  return [...slugs];
+}
+
+async function collectMemoryDir(dir, state) {
+  for (const name of await children(dir, state)) {
+    if (!name.endsWith('.md')) continue;
+    const file = path.join(dir, name);
+    const stat = await statPath(file, 'file', state, true);
+    if (stat) state.memoryFiles.push({ file, mtimeMs: stat.mtimeMs });
+  }
 }
 
 async function discover(home, sources, state) {
@@ -157,33 +234,35 @@ async function discover(home, sources, state) {
         }
       }
       await walk(path.join(app, 'sessions'));
-      const memories = path.join(app, 'memories');
-      for (const name of await children(memories, state)) {
-        if (!name.endsWith('.md')) continue;
-        const file = path.join(memories, name);
-        const stat = await statPath(file, 'file', state, true);
-        if (stat) state.memoryFiles.push({ file, mtimeMs: stat.mtimeMs });
+      await collectMemoryDir(path.join(app, 'memories'), state);
+      const memoriesV2 = path.join(app, 'memories_v2');
+      if (await statPath(memoriesV2, 'directory', state)) {
+        await collectMemoryDir(memoriesV2, state);
+        await collectMemoryDir(path.join(memoriesV2, 'rollout_summaries'), state);
       }
     }
   }
   if (sources.has('gemini-cli')) {
-    const app = path.join(home, '.gemini');
-    if (await statPath(app, 'directory', state)) {
+    const geminiRoots = [path.join(home, '.gemini')];
+    const cacheRoot = path.join(home, '.cache');
+    if (await statPath(cacheRoot, 'directory', state)) geminiRoots.push(path.join(cacheRoot, '.gemini'));
+    for (const app of geminiRoots) {
+      if (!await statPath(app, 'directory', state)) continue;
       const tmp = path.join(app, 'tmp');
-      if (await statPath(tmp, 'directory', state)) {
-        const projects = state.allProjects ? await children(tmp, state) : [state.geminiProjectHash];
-        for (const project of projects) {
-          const dir = path.join(tmp, project);
-          if (!await statPath(dir, 'directory', state)) continue;
-          for (const name of await children(path.join(dir, 'chats'), state)) {
-            if (name.startsWith('session-') && name.endsWith('.jsonl')) await candidate(path.join(dir, 'chats', name), 'gemini-cli', project, 'gemini', state);
-          }
-          const logs = path.join(dir, 'logs.json');
-          try {
-            await fs.promises.lstat(logs);
-            await candidate(logs, 'gemini-cli', project, 'gemini-logs', state);
-          } catch (error) { if (error.code !== 'ENOENT') bump(state, 'unreadable'); }
+      if (!await statPath(tmp, 'directory', state)) continue;
+      const projects = state.allProjects ? await children(tmp, state) : await geminiProjectDirs(app, tmp, state);
+      for (const project of projects) {
+        const dir = path.join(tmp, project);
+        if (!await statPath(dir, 'directory', state)) continue;
+        for (const name of await children(path.join(dir, 'chats'), state)) {
+          if (name.startsWith('session-') && name.endsWith('.jsonl')) await candidate(path.join(dir, 'chats', name), 'gemini-cli', project, 'gemini', state);
+          else if (name.startsWith('session-') && name.endsWith('.json')) await candidate(path.join(dir, 'chats', name), 'gemini-cli', project, 'gemini-json', state);
         }
+        const logs = path.join(dir, 'logs.json');
+        try {
+          await fs.promises.lstat(logs);
+          await candidate(logs, 'gemini-cli', project, 'gemini-logs', state);
+        } catch (error) { if (error.code !== 'ENOENT') bump(state, 'unreadable'); }
       }
     }
   }
@@ -346,28 +425,109 @@ async function readCodex(file, state) {
   return session.messages.length ? [session] : [];
 }
 
+function finalizeGeminiMessages(session, messages, state) {
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    messageTimestamp(session, message.timestamp);
+    if (message.type !== 'user') continue;
+    const text = typedText(geminiMessageItems(message.content), state);
+    if (text) session.messages.push(text);
+  }
+}
+
 async function readGemini(file, state) {
   const session = baseSession(file);
-  let known = false, messages = [];
+  let known = false, automation = false;
+  const byId = new Map();
+  const putMessage = message => {
+    if (!message || typeof message !== 'object') return;
+    const key = typeof message.id === 'string' && message.id ? message.id : Symbol();
+    byId.set(key, message);
+  };
   const ok = await scanLines(file.file, state, line => {
     const record = parsedLine(line, state);
     if (!record) return;
     if (typeof record.sessionId === 'string') { session.sessionId = record.sessionId; known = true; }
-    if (record.$set && Object.prototype.hasOwnProperty.call(record.$set, 'messages')) {
-      if (Array.isArray(record.$set.messages)) { messages = record.$set.messages; known = true; }
-      else bump(state, 'unknown_format');
+    if (record.kind === 'subagent') { automation = true; known = true; }
+    if (typeof record.startTime === 'string') messageTimestamp(session, record.startTime);
+    if (typeof record.lastUpdated === 'string') messageTimestamp(session, record.lastUpdated);
+    if (record.$set && typeof record.$set === 'object' && !Array.isArray(record.$set)) {
+      known = true;
+      if (typeof record.$set.sessionId === 'string') session.sessionId = record.$set.sessionId;
+      if (record.$set.kind === 'subagent') automation = true;
+      if (typeof record.$set.lastUpdated === 'string') messageTimestamp(session, record.$set.lastUpdated);
+      if (Object.prototype.hasOwnProperty.call(record.$set, 'messages')) {
+        if (Array.isArray(record.$set.messages)) {
+          byId.clear();
+          for (const msg of record.$set.messages) putMessage(msg);
+        } else bump(state, 'unknown_format');
+      }
+      return;
+    }
+    if (typeof record.$rewindTo === 'string') {
+      known = true;
+      if (!byId.has(record.$rewindTo)) byId.clear();
+      else {
+        let drop = false;
+        for (const key of [...byId.keys()]) {
+          if (key === record.$rewindTo) drop = true;
+          if (drop) byId.delete(key);
+        }
+      }
+      return;
+    }
+    if (record.$patch && typeof record.$patch === 'object' && !Array.isArray(record.$patch)) {
+      known = true;
+      const patch = record.$patch;
+      const updates = Array.isArray(patch.updates) ? patch.updates : (typeof patch.id === 'string' ? [patch] : []);
+      for (const u of updates) {
+        if (!u || typeof u !== 'object' || typeof u.id !== 'string' || !byId.has(u.id)) continue;
+        const current = byId.get(u.id);
+        const next = { ...current };
+        if (Object.prototype.hasOwnProperty.call(u, 'content')) next.content = u.content;
+        if (Object.prototype.hasOwnProperty.call(u, 'displayContent')) next.displayContent = u.displayContent;
+        byId.set(u.id, next);
+      }
+      if (Array.isArray(patch.removeIds)) {
+        for (const id of patch.removeIds) if (typeof id === 'string') byId.delete(id);
+      }
+      if (Array.isArray(patch.orderIds)) {
+        const reordered = new Map();
+        for (const id of patch.orderIds) if (typeof id === 'string' && byId.has(id)) reordered.set(id, byId.get(id));
+        for (const [k, v] of byId.entries()) if (!reordered.has(k)) reordered.set(k, v);
+        byId.clear();
+        for (const [k, v] of reordered.entries()) byId.set(k, v);
+      }
+      return;
+    }
+    if (typeof record.type === 'string' && ['user', 'gemini', 'assistant', 'info', 'error', 'warning'].includes(record.type)) {
+      known = true;
+      putMessage(record);
     }
   });
   if (!ok) return [];
-  for (const message of messages) {
-    if (!message) continue;
-    messageTimestamp(session, message.timestamp);
-    if (message.type !== 'user') continue;
-    const items = Array.isArray(message.content) ? message.content.filter(item => item && typeof item.text === 'string' && (!item.type || item.type === 'text')).map(item => item.text) : [];
-    const text = typedText(items, state);
-    if (text) session.messages.push(text);
-  }
+  if (automation) { bump(state, 'automation_session'); return []; }
+  finalizeGeminiMessages(session, byId.values(), state);
   if (!known) bump(state, 'unknown_format');
+  return session.messages.length ? [session] : [];
+}
+
+async function readGeminiJson(file, state) {
+  const session = baseSession(file);
+  const lines = [];
+  const ok = await scanLines(file.file, state, line => { lines.push(line); });
+  if (!ok) return [];
+  let record;
+  try { record = JSON.parse(lines.join('\n')); }
+  catch { bump(state, 'malformed_line'); return []; }
+  if (!record || Array.isArray(record) || typeof record !== 'object') { bump(state, 'unknown_format'); return []; }
+  if (record.kind === 'subagent') { bump(state, 'automation_session'); return []; }
+  const known = typeof record.sessionId === 'string' || Array.isArray(record.messages);
+  if (!known) { bump(state, 'unknown_format'); return []; }
+  if (typeof record.sessionId === 'string') session.sessionId = record.sessionId;
+  if (typeof record.startTime === 'string') messageTimestamp(session, record.startTime);
+  if (typeof record.lastUpdated === 'string') messageTimestamp(session, record.lastUpdated);
+  if (Array.isArray(record.messages)) finalizeGeminiMessages(session, record.messages, state);
   return session.messages.length ? [session] : [];
 }
 
@@ -460,7 +620,7 @@ async function readSessions({ home = resolveHome(), projectDir = process.cwd(), 
   const bounded = state.candidates.filter(file => file.source === 'gemini-cli').length < 2;
   const sortKey = session => session.timestampMs ?? session.mtimeMs;
   const compare = (a, b) => sortKey(b) - sortKey(a) || a.file.localeCompare(b.file) || a.sessionId.localeCompare(b.sessionId);
-  const readers = { claude: readClaude, codex: readCodex, gemini: readGemini, 'gemini-logs': readGeminiLogs };
+  const readers = { claude: readClaude, codex: readCodex, gemini: readGemini, 'gemini-json': readGeminiJson, 'gemini-logs': readGeminiLogs };
   for (const file of state.candidates) {
     if (!maximum) break;
     if (bounded && sessions.length === maximum && file.mtimeMs < sortKey(sessions[maximum - 1])) break;

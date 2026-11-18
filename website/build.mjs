@@ -164,7 +164,7 @@ function docsBody(root, page) {
   return `<article class="markdown">${page.sources.map(source => {
     let markdown = read(root, source).replace(/^# [^\n]+\n/, '');
     if (source === 'README.md') markdown = markdown.replace(/<!-- set:start -->[^]*?<!-- set:end -->/, `## Part of a set\n\n${siblings(root).map(link => `[${link.name}](${link.href})`).join(' · ')}`);
-    return `<section class="source-section"><p class="source-note">${escape(content.sourceLabel)} <a href="${repository}/blob/main/${escape(source)}" target="_blank" rel="noopener noreferrer">${escape(source)}</a></p>${renderMarkdown(markdown, { source, ids })}</section>`;
+    return `<section class="source-section" id="${uniqueId(`source-${source.replace(/^docs\/|\.md$/g, '')}`, ids)}"><p class="source-note">${escape(content.sourceLabel)} <a href="${repository}/blob/main/${escape(source)}" target="_blank" rel="noopener noreferrer">${escape(source)}</a></p>${renderMarkdown(markdown, { source, ids })}</section>`;
   }).join('')}</article>`;
 }
 
@@ -241,7 +241,7 @@ function buildJsonLd(page, facts) {
           url: `${origin}/`,
           applicationCategory: 'DeveloperApplication',
           operatingSystem: 'macOS, Linux, Windows',
-          softwareRequirements: 'Node.js 18 or later',
+          softwareRequirements: 'Node.js 22 or later',
           softwareVersion: facts.version,
           isAccessibleForFree: true,
           license: 'https://spdx.org/licenses/MIT.html',
@@ -252,8 +252,8 @@ function buildJsonLd(page, facts) {
         {
           '@type': 'Person',
           '@id': 'https://aunysillyme.dev/#person',
-          name: 'Auny Hossain',
-          alternateName: ['Auny', 'AunySillyMe'],
+          name: 'Auny',
+          alternateName: ['AunySillyMe'],
           url: 'https://aunysillyme.dev/',
           worksFor: {
             '@type': 'Organization',

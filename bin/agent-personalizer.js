@@ -11,13 +11,13 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { resolveHome } = require('./home.cjs');
+const { sha256, parseCliArgs } = require('./cli-util.cjs');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
-const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-// CLAUDE.md and AGENTS.md are written here as a pointer template only; render.cjs (run at the
+// CLAUDE.md, AGENTS.md and GEMINI.md are written here as a pointer template only; render.cjs (run at the
 // end of main()) splices in the rendered block and records the final bytes it wrote, so their
 // hash is recorded there, once, against the complete file.
-const HOME_NAMES = new Set(['CLAUDE.md', 'AGENTS.md']);
+const HOME_NAMES = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']);
 
 const PKG = path.resolve(__dirname, '..');
 const onboarding = require(path.join(PKG, 'render', 'onboarding.cjs'));
@@ -34,14 +34,14 @@ const FLAG_OPTS = ['--global', '--forget', '--all-projects', '--yes', '--default
 const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).version}
 
   npx agent-personalizer [--dir <folder>] [--ai claude,agents,gemini,chatgpt,prompt] [--level 1|2|3]
-                                            [--answers <file.json> | --answers - | --defaults] [--full] [--yes]
-                                            [--help | -h] [--version | -v]
-  npx agent-personalizer --global [--ai claude,agents,gemini,hermes] [--yes]
+                                            [--answers <file.json> | --answers - | --defaults] [--compact]
+                                            [--precommit] [--full] [--yes] [--help | -h] [--version | -v]
+  npx agent-personalizer --global [--ai claude,agents,gemini,hermes] [--compact] [--yes]
   npx agent-personalizer --global --uninstall [--dry]
   npx agent-personalizer --uninstall --dir <folder> [--dry]
 
   npx agent-personalizer learn [--dir <folder>] [--all-projects] [--yes]
-  npx agent-personalizer learn --global [--yes]
+  npx agent-personalizer learn --global [--yes | --forget]
   npx agent-personalizer learn --forget [--dir <folder>]
 
   First interactive install: choose your AIs, then choose whether to read your recent sessions.
@@ -65,25 +65,7 @@ const USAGE = `agent-personalizer ${require(path.join(PKG, 'package.json')).vers
   exit codes: 0 ok · 1 unexpected error · 2 refused or invalid input
 `;
 /* Parse argv once, strictly: value options at most once each, flags at most once, nothing unknown. */
-function parseArgs() {
-  const out = {};
-  const argv = process.argv.slice(2);
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (i === 0 && a === 'learn') { out.command = a; continue; }
-    if (VALUE_OPTS.includes(a)) {
-      if (a in out) die(`${a} given more than once`);
-      const v = argv[i + 1];
-      if (v === undefined || v === '' || v.startsWith('--')) die(`${a} needs a non-empty value`);
-      out[a] = v; i++;
-    } else if (FLAG_OPTS.includes(a)) {
-      if (a in out) die(`${a} given more than once`);
-      out[a] = true;
-    } else die(`unknown option "${a}" (known: ${[...VALUE_OPTS, ...FLAG_OPTS].join(', ')})`);
-  }
-  return out;
-}
-const ARGS = parseArgs();
+const ARGS = parseCliArgs(process.argv.slice(2), { valueOpts: VALUE_OPTS, flagOpts: FLAG_OPTS, commands: ['learn'], onError: die });
 function arg(name, dflt) { return name in ARGS ? ARGS[name] : dflt; }
 if (ARGS['--help'] || ARGS['-h']) { process.stdout.write(USAGE); process.exit(0); }
 if (ARGS['--version'] || ARGS['-v']) { process.stdout.write(require(path.join(PKG, 'package.json')).version + '\n'); process.exit(0); }
@@ -227,7 +209,7 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
     for (const p of writes) {
       assertSaved(p.rel);
       touched.add(p.rel);
-      const mode = p.rel === 'hooks/claude-code/session-start.sh' ? 0o755 : saved.get(p.rel)?.mode;
+      const mode = (p.rel === 'hooks/claude-code/session-start.sh' || p.rel === 'hooks/gemini-cli/session-start.sh') ? 0o755 : saved.get(p.rel)?.mode;
       replace(p.rel, p.bytes, mode);
       if (p.report) console.log(p.report);
     }
@@ -477,15 +459,22 @@ async function main() {
     const ms = markers.markerState(text, name);
     return ms.kind === 'one' ? text.slice(0, ms.bStart) + text.slice(ms.eEnd) : text;
   };
-  for (const name of ['CLAUDE.md', 'AGENTS.md']) {
-    if (keptRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents') || adoptedRuleTargets.has(name === 'CLAUDE.md' ? 'claude' : 'agents')) continue;
+  for (const [name, targetKey] of [['CLAUDE.md', 'claude'], ['AGENTS.md', 'agents'], ['GEMINI.md', 'gemini']]) {
+    if (keptRuleTargets.has(targetKey) || adoptedRuleTargets.has(targetKey)) continue;
     const prior = previousPlan.find(p => p.rel === name);
     const next = plan.find(p => p.rel === name);
     if (!prior || !next) continue;
     const { full, exists } = probe(root, name);
     if (!exists || !fs.lstatSync(full).isFile()) continue;
     const current = fs.readFileSync(full, 'utf8');
-    if (outside(current, name) !== outside(prior.text, name)) preservedTargets.add(name === 'CLAUDE.md' ? 'claude' : 'agents');
+    // Pre-0.10.0 GEMINI.md had no pointer header; adopt the new pointer template cleanly if untouched.
+    if (name === 'GEMINI.md' && markers.markerState(current, name).kind === 'one' && outside(current, name).trim() === '' && installedHashes[name] === sha256(fs.readFileSync(full))) {
+      const upgraded = markers.splice(next.text, markers.between(current, name), name);
+      upgrades.push({ rel: name, bytes: Buffer.from(upgraded), report: `update ${name} (added pointer header)` });
+      installedHashes[name] = sha256(Buffer.from(upgraded));
+      continue;
+    }
+    if (outside(current, name) !== outside(prior.text, name)) preservedTargets.add(targetKey);
     const migration = migrateHome(current, prior.text, next.text, text => markers.markerState(text, name));
     for (const line of migration.edited) console.log(`kept   ${name} (edited pointer; manual review): ${line}`);
     if (migration.changed) {
@@ -620,7 +609,7 @@ async function main() {
   // Which of the files just written an AI picks up on its own, and which a human still has to paste.
   // Claude Code reads CLAUDE.md from the folder; claude.ai reads no files at all, and the success
   // text used to say nothing about that.
-  const AUTO = { claude: 'CLAUDE.md (Claude Code)', agents: 'AGENTS.md (Codex, Cursor, anything that reads AGENTS.md)', gemini: 'GEMINI.md (Gemini CLI)' };
+  const AUTO = { claude: 'CLAUDE.md (Claude Code)', agents: 'AGENTS.md (Codex, Cursor, Hermes Agent, anything that reads AGENTS.md)', gemini: 'GEMINI.md (Gemini CLI, Google Antigravity)' };
   const PASTE = {
     claude: 'claude.ai and the Claude apps read no files: paste the body of USER.md, then AGENT_ONBOARDING.md, into the project or profile instructions',
     chatgpt: 'ChatGPT: open Settings → Personalization and enable customization. Copy the exported profile (chatgpt-box1.txt) and response instructions (chatgpt-box2.txt) into the fields your current interface provides, checking its displayed limits',
@@ -639,7 +628,7 @@ async function main() {
     `Which file each AI reads, and what to re-paste after you change an answer: ${DOCS}/paste-guide.md`,
   ].filter(Boolean).join('\n     '));
   if (level >= 2 && kind !== 'cloud') steps.push(`Read ${base}/README.md before letting an AI write into ${base}/.`);
-  if (level >= 3) steps.push('Register hooks/claude-code/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
+  if (level >= 3) steps.push('Register hooks/claude-code/session-start.sh or hooks/gemini-cli/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
   console.log('\nNext:');
   steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
   if (answers.notes_tool === 'obsidian') console.log(answers.obsidian_tc === 'yes'

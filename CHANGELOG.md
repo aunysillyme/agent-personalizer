@@ -6,6 +6,27 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-18
+
+### Added
+
+- Add `templates/GEMINI.md` pointer headers, `## binding:gemini` rule sections, `.gemini/commands/personalize.toml` for `/personalize`, `hooks/gemini-cli/session-start.sh` emitting `SessionStart` `additionalContext` JSON, and Google Antigravity (`~/.gemini/config/GEMINI.md`, 24,000-byte cap) documentation (#48).
+- Read Codex `memories_v2/` (`MEMORY.md`, `memory_summary.md`, `rollout_summaries/*.md`) alongside legacy `~/.codex/memories/` (#46).
+- Ship `skills/agent-personalizer/SKILL.md` in the npm package (#50).
+
+### Changed
+
+- Require Node.js 22 or later and run CI on Node 22, 24 and 26 (Active LTS) (#49).
+- Pack `examples/answers.json` instead of full rendered example subdirectories, remove unused pre-0.8.0 interview exports from `render/onboarding.cjs`, share CLI helpers in `bin/cli-util.cjs`, and make `test/rollback.test.js` self-seeding (#50).
+- Document ChatGPT's 5,000-character paid and 1,500-character Free/Go limits, update `--global` and Hermes Agent target lists across docs and issue templates, add `/docs/guides/` section anchors, and expand CLI `--help` synopses (#49).
+
+### Fixed
+
+- Audit 2026-11-17: resolve Gemini CLI `v0.42+` project slugs from `projects.json` and `.project_root` (including subfolders and `~/.cache/.gemini/tmp`), and reconstruct Gemini CLI `v0.40+` append-only `.jsonl` (`MessageRecord`, string and part-array `content`, `$patch`, `$rewindTo`), `session-*.json` files and `subagent` filtering (#46).
+- Audit 2026-11-17: normalize Unicode to `NFC` in `check/gate.cjs` and collapse whitespace in `bin/learn.cjs` path redaction (#47).
+- Audit 2026-11-17: scope `bin/global.cjs` path qualification to installer boilerplate and rules so user `USER.md` prose and `LEARNED.md` entries are never rewritten, and isolate `HOME` in `scripts/record-demo.sh` (#47).
+- Audit 2026-11-17: sync and pin `website/release-fallback.json` to `package.json`, fix the `docs/install.md` `--global` target list, and tailor the `learn --global` completion hint (#48, #49).
+
 ## [0.9.1] - 2026-11-10
 
 ### Security
@@ -372,7 +393,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.7...v0.9.0
 [0.8.7]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.6...v0.8.7

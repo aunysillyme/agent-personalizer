@@ -18,7 +18,10 @@ The ten-word summary is the audit trail a human reads first. Say what changed, n
 Name and model as the platform reports them, e.g. `Claude <model-id>`.
 
 ## binding:agents
-Name and model as the platform reports them, e.g. `Codex <model-id>`.
+Name and model as the platform reports them, e.g. `Codex <model-id>`, `Cursor <model-id>` or `Hermes <model-id>`.
+
+## binding:gemini
+Name and model as the platform reports them, e.g. `Gemini <model-id>`.
 
 ## origin
 Written after: three AIs and one human edited the same file over a month and nobody could say which change came from whom, or which model had written the paragraph that turned out to be wrong.

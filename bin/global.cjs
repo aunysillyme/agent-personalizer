@@ -112,13 +112,13 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
     createdDirectories: old.createdDirectories || [], globalFiles: { ...(old.globalFiles || {}) }, toolingVersion: require('../package.json').version };
   if (args['--compact']) cfg.compact = true;
   const renderCfg = { ...cfg, onboarding: answers };
-  const rendered = renderer.renderedContents(profileRoot, renderCfg, { profileSource: decode(user, 'USER.md'), learned });
   const qualify = text => text
-    .replace(/`USER\.md` sits next to `(?:CLAUDE|AGENTS)\.md`\./g, 'Read `USER.md` from the global profile source.')
+    .replace(/`USER\.md` sits next to `(?:CLAUDE|AGENTS|GEMINI)\.md`\.(?: In (?:Claude Code|Gemini CLI and Google Antigravity), `(?:CLAUDE|GEMINI)\.md` loads automatically;)?/g, 'Read `USER.md` from the global profile source.')
     .replace(/"npx agent-personalizer --dir \.", or "node render\/render\.cjs --dir \." at level 3/g, '"npx agent-personalizer --global"')
     .replace(/(^|[^A-Za-z0-9_./-])(USER\.md|LEARNED\.md|AGENT_ONBOARDING\.md|\.agent-personalizer\.json|\.agent-personalizer\/digest\.md)(?![A-Za-z0-9_/-])/g, (_, prefix, rel) => prefix + path.join(profileRoot, rel));
+  const rendered = renderer.renderedContents(profileRoot, renderCfg, { profileSource: decode(user, 'USER.md'), learned, boilerplate: qualify });
   for (const entry of rendered) {
-    if (entry.key === 'onboarding') { writeSource(entry.rel, Buffer.from(renderer.splice(null, qualify(entry.block), entry.rel))); continue; }
+    if (entry.key === 'onboarding') { writeSource(entry.rel, Buffer.from(renderer.splice(null, entry.block, entry.rel))); continue; }
     const rel = TARGETS[entry.key];
     const found = probe(root, rel);
     if (found.exists && !fs.lstatSync(found.full).isFile()) refuse(`${rel} is not a regular file`);
@@ -128,7 +128,7 @@ async function execute({ args, commitPlan, probe, readConfig, ask }) {
     if (ms.kind === 'one' && !Object.hasOwn(cfg.globalFiles, entry.key)) {
       refuse(`${rel}: foreign agent-personalizer block; remove the block from <!-- agent-personalizer:begin --> through <!-- agent-personalizer:end -->, then re-run --global. Nothing was written`);
     }
-    const block = `Profile source: \`${path.join(profileRoot, 'USER.md')}\`. Read \`${path.join(profileRoot, 'AGENT_ONBOARDING.md')}\` for working preferences.\n\n` + qualify(entry.block);
+    const block = `Profile source: \`${path.join(profileRoot, 'USER.md')}\`. Read \`${path.join(profileRoot, 'AGENT_ONBOARDING.md')}\` for working preferences.\n\n` + entry.block;
     const output = renderer.splice(text, block, rel);
     if (output.length > renderer.FILE_BUDGET) console.log(`OVER BUDGET  ${rel} (${output.length} characters, budget ${renderer.FILE_BUDGET}; --compact shortens rules)`);
     if (renderer.markerState(output, rel).kind !== 'one' || renderer.between(output, rel) !== block) refuse(`${rel}: generated block would not re-parse; nothing was written`);

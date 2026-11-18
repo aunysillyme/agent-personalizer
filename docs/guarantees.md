@@ -55,7 +55,7 @@ Fill it with the identifiers you want to catch and add `check/forbidden.local.tx
 node check/gate.cjs --dir .
 ```
 
-The gate checks listed strings against file text and relative paths. In a git work tree it scans staged blobs, changed working copies and untracked files that git would include. `--all` scans the folder directly. It never follows symlinks.
+The gate normalizes Unicode to NFC and checks listed strings (ignoring case) against file text and relative paths. In a git work tree it scans staged blobs, changed working copies and untracked files that git would include. `--all` scans the folder directly. It never follows symlinks.
 
 - **Exit `0`:** the scan completed with no listed strings found.
 - **Exit `1`:** one or more listed strings were found.

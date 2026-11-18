@@ -4,7 +4,7 @@ The installer writes a profile, a learning log, an onboarding manual and the ins
 
 ## Requirements
 
-Node 22 or 24 (active LTS) is recommended; 18 or later runs. The installer, renderer and gate run on macOS, Linux and Windows. The shell harness and session-start hook need a POSIX shell; use WSL or Git Bash on Windows.
+Node 24 or 26 (active LTS) is recommended; 22 or later runs. The installer, renderer and gate run on macOS, Linux and Windows. The shell harness and session-start hooks need a POSIX shell; use WSL or Git Bash on Windows.
 
 ## Interactive setup
 
@@ -95,7 +95,7 @@ npx agent-personalizer --global --uninstall
 
 `--global` keeps the level-1 profile source (`USER.md`, `LEARNED.md`, onboarding and configuration) in `~/.agent-personalizer/`. It writes a marked block to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` and `~/.hermes/SOUL.md` for the selected targets. For Hermes in a project, use `--ai agents` to write `AGENTS.md`. Hermes reads its global `SOUL.md` from `HERMES_HOME` when set; the installer warns if that differs from `~/.hermes`. Paths use `HOME`, with `USERPROFILE` as the Windows fallback when `HOME` is missing or empty. The selected value must be a non-empty absolute path. Global instructions name the profile's full path so they work from any project. Start a new AI session to load them; client instruction precedence still applies.
 
-Select only `claude`, `agents` and `gemini`. Other targets, `--dir` and levels 2/3 are refused. A headless first install needs `--ai` and `--yes`; level 1 is implicit. `--answers` and `--defaults` work as with project installs. A re-run keeps saved targets and answers.
+Select only `claude`, `agents`, `gemini` and `hermes`. Other targets, `--dir` and levels 2/3 are refused. A headless first install needs `--ai` and `--yes`; level 1 is implicit. `--answers` and `--defaults` work as with project installs. A re-run keeps saved targets and answers.
 
 Global learning always includes sessions from all projects and still needs consent. Its digest is `~/.agent-personalizer/.agent-personalizer/digest.md`; use `learn --global --forget` to remove it. The learning procedure is included in each selected home file.
 
@@ -117,9 +117,9 @@ npx agent-personalizer learn --forget --dir .
 
 ## What each level adds
 
-- **Level 1:** `USER.md`, `LEARNED.md`, `AGENT_ONBOARDING.md`, the files for your AI targets, and `.agent-personalizer.json`. Claude Code also receives `.claude/commands/personalize.md`. The Core 5 render from the package: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. With no installed apps detected, the default selection is `claude,agents`.
+- **Level 1:** `USER.md`, `LEARNED.md`, `AGENT_ONBOARDING.md`, the files for your AI targets, and `.agent-personalizer.json`. Claude Code receives `.claude/commands/personalize.md` and Gemini CLI receives `.gemini/commands/personalize.toml`. The Core 5 render from the package: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. With no installed apps detected, the default selection is `claude,agents`.
 - **Level 2:** the same five rules, plus a local notes scaffold with `README.md`, `sessions/TEMPLATE-week.md`, `decisions.md` and `inbox/README.md`. Disk tools use your `notes_path`; read-only and other tools use the local `notes/` fallback. Cloud tools get connector pointers and keep their notes in their service.
-- **Level 3:** all eleven rules (subject to target and signature selection), your editable `rules/` copy, `render/` tools, the Claude Code session-start hook and the forbidden-string gate. [Register the hook](../hooks/README.md) in your AI settings and [configure the gate](guarantees.md#forbidden-string-gate).
+- **Level 3:** all eleven rules (subject to target and signature selection), your editable `rules/` copy, `render/` tools, the Claude Code and Gemini CLI session-start hooks and the forbidden-string gate. [Register the hook](../hooks/README.md) in your AI settings and [configure the gate](guarantees.md#forbidden-string-gate).
 
 An existing local notes scaffold is detected at any level. Edited notes and rule files stay yours and are named in the install log. Untouched installer copies update on re-runs. At level 3, a `signature: no` answer omits the signature rule and its template lines; answering yes includes the signature line.
 
@@ -158,7 +158,7 @@ npm_config_cache=./.npm-cache npx agent-personalizer
 
 ## Manual copying
 
-For a setup without Node, download this repository and copy [`templates/USER.md`](../templates/USER.md) plus [`templates/CLAUDE.md`](../templates/CLAUDE.md) or [`templates/AGENTS.md`](../templates/AGENTS.md) into your project. Fill in the profile and adapt the home template's pointers to the files you keep. For a chat app, paste the profile body into its instruction field.
+For a setup without Node, download this repository and copy [`templates/USER.md`](../templates/USER.md) plus [`templates/CLAUDE.md`](../templates/CLAUDE.md), [`templates/AGENTS.md`](../templates/AGENTS.md) or [`templates/GEMINI.md`](../templates/GEMINI.md) into your project. Fill in the profile and adapt the home template's pointers to the files you keep. For a chat app, paste the profile body into its instruction field.
 
 Consent-gated session learning, automatic rendering and the drift check are available when you use the Node installer. [The paste guide](paste-guide.md) covers manual app setup.
 
@@ -181,7 +181,7 @@ The uninstaller reads `/path/to/project/.agent-personalizer.json` and compares f
 - **Notes scaffold:** unchanged historically installed templates are removed. Edited templates are kept and named; user-written notes stay byte for byte. A directory is removed only when the install recorded that it created it and it is empty.
 - **Git exclude:** after the configuration is removed, the block install added to `.git/info/exclude` for this folder is removed, and the rest of the file stays byte for byte. While an edited file keeps the configuration, the block stays too.
 - **Rules and tools:** unchanged installed copies are removed file by file, including the session-start hook. Edited copies stay.
-- **Hook registration:** remove the matching `SessionStart` entry from `.claude/settings.json` or `~/.claude/settings.json` yourself. The uninstaller prints this step; it never edits settings outside the installation.
+- **Hook registration:** remove any matching `SessionStart` entry from `.claude/settings.json`, `~/.claude/settings.json`, `.gemini/settings.json` or `~/.gemini/settings.json` yourself. The uninstaller prints this step; it never edits settings outside the installation.
 - **Paths:** the whole removal plan is preflighted before the first unlink, and each path is re-probed before it is unlinked. The uninstaller never follows symlinks, deletes recursively or removes a path outside the named folder. A refused preflight leaves the removal plan unapplied.
 - **Configuration:** `.agent-personalizer.json` is removed last, only after every path it tracks is gone or, for a pre-existing home file, has had its block removed. An edited file the uninstaller retained keeps the configuration available for review.
 

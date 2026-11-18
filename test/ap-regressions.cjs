@@ -135,26 +135,6 @@ function pty(args, label, timeout, onOutput = () => {}) {
     child.on('close', code => finish(null, code));
   });
 }
-// Reply only after each prompt arrives. Sending every newline at once can lose answers when
-// the installer closes and reopens readline between questions.
-async function interview(d, questions, replies = {}, flags = [], onPrompt = () => {}) {
-  let handled = 0;
-  const asked = [];
-  const result = await pty([CLI, '--dir', d, '--ai', 'claude', '--level', '1', ...flags], 'interview', INTERVIEW_TIMEOUT, (output, child) => {
-    const plain = terminalText(output);
-    if (plain.includes('Installing level ') || plain.includes('agent-personalizer:')) child.stdin.end();
-    if (!plain.endsWith(': ') || plain.length <= handled) return;
-    const line = plain.slice(plain.lastIndexOf('\n') + 1);
-    const q = questions.find(q => line.startsWith(q.ask));
-    if (!q) return;
-    handled = plain.length;
-    asked.push(q.id);
-    onPrompt(q);
-    child.stdin.write((replies[q.id] || '') + '\n');
-  });
-  return { ...result, asked };
-}
-
 const cases = {
   async RERUN() {
     const o = require(path.join(ROOT, 'render', 'onboarding.cjs'));
@@ -251,7 +231,7 @@ const cases = {
     const diff = convergence(d, fresh);
     verify(!diff, 'signature: rerun converges to a fresh install', diff);
     verify(!exists(d, 'rules/40-sign-every-edit.md'), 'an untouched disabled signature rule is removed');
-    verify(['CLAUDE.md', 'AGENTS.md'].every(home => !text(d, home).includes('Sign every edit') && !text(d, home).includes('40-sign-every-edit.md')), 'unchanged signing pointers are removed');
+    verify(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'].every(home => !text(d, home).includes('Sign every edit') && !text(d, home).includes('40-sign-every-edit.md')), 'unchanged signing pointers are removed');
     verify([...files(d)].filter(([name]) => name.endsWith('.md')).every(([, bytes]) => !bytes.includes(Buffer.from('Last edited by:'))), 'untouched notes and rule templates remove signature lines');
     requireCode(render(d, '--check'), 0, 'signature transition check');
     install(d, { signature: 'yes' });
@@ -304,7 +284,7 @@ const cases = {
     verify(!exists(e, 'journal/README.md') && !exists(e, 'new-notes/README.md'), 'untouched notes scaffolds from both runs are removed');
   },
   F5() {
-    const runtime = ['render/render.cjs', 'render/onboarding.cjs', 'render/targets.json', 'check/gate.cjs', 'check/forbidden.example.txt', 'hooks/README.md', 'hooks/claude-code/session-start.sh'];
+    const runtime = ['render/render.cjs', 'render/onboarding.cjs', 'render/targets.json', 'check/gate.cjs', 'check/forbidden.example.txt', 'hooks/README.md', 'hooks/claude-code/session-start.sh', 'hooks/gemini-cli/session-start.sh'];
     const rules = fs.readdirSync(path.join(ROOT, 'rules')).map(name => `rules/${name}`);
     const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     for (const tag of ['v0.5.1', 'v0.6.4']) {

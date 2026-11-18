@@ -168,7 +168,7 @@ In practice: end every note you touch with one line saying who edited it, when, 
 
 The ten-word summary is the audit trail a human reads first. Say what changed, not that something changed.
 
-Name and model as the platform reports them, e.g. `Codex <model-id>`.
+Name and model as the platform reports them, e.g. `Codex <model-id>`, `Cursor <model-id>` or `Hermes <model-id>`.
 
 > Written after: three AIs and one human edited the same file over a month and nobody could say which change came from whom, or which model had written the paragraph that turned out to be wrong.
 > Prevents: unattributable edits in a folder several agents share.

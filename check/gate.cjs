@@ -141,10 +141,50 @@ function* walk(root) {
   }
 }
 
+function redactByFold(text, terms) {
+  const normalized = String(text).normalize('NFC');
+  const foldedTerms = terms.map(fold).filter(Boolean);
+  if (!foldedTerms.length || !normalized) return normalized;
+  const map = [];
+  let lower = '';
+  for (let i = 0; i < normalized.length;) {
+    const cp = normalized.codePointAt(i);
+    const step = cp > 0xffff ? 2 : 1;
+    const chunk = normalized.slice(i, i + step).toLowerCase();
+    for (let k = 0; k < chunk.length; k++) map.push([i, i + step]);
+    lower += chunk;
+    i += step;
+  }
+  const ranges = [];
+  for (const t of foldedTerms) {
+    let idx = lower.indexOf(t);
+    while (idx !== -1) {
+      ranges.push([map[idx][0], map[idx + t.length - 1][1]]);
+      idx = lower.indexOf(t, idx + 1);
+    }
+  }
+  if (!ranges.length) return normalized;
+  ranges.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  const merged = [ranges[0].slice()];
+  for (let i = 1; i < ranges.length; i++) {
+    const prev = merged[merged.length - 1];
+    if (ranges[i][0] <= prev[1]) prev[1] = Math.max(prev[1], ranges[i][1]);
+    else merged.push(ranges[i].slice());
+  }
+  let out = '', pos = 0;
+  for (const [start, end] of merged) {
+    out += normalized.slice(pos, start) + '[redacted]';
+    pos = end;
+  }
+  return out + normalized.slice(pos);
+}
+
+const fold = text => String(text).normalize('NFC').toLowerCase();
+
 function allowedSpans(lineLower, allow) {
   const spans = [];
   for (const a of allow) {
-    const al = a.toLowerCase();
+    const al = fold(a);
     if (!al.length) continue;
     let i = lineLower.indexOf(al);
     while (i !== -1) { spans.push([i, i + al.length]); i = lineLower.indexOf(al, i + al.length); }
@@ -332,19 +372,19 @@ function scan(root, list, listFile, all, history = false) {
     // the PATH first: one scan per item, labelled "(path)", never covered by allow spans of the text
     if (!scannedPaths.has(item.rel) || item.history) {
       if (!item.history) scannedPaths.add(item.rel);
-      const lower = item.rel.toLowerCase(), spans = allowedSpans(lower, list.allow);
+      const lower = fold(item.rel), spans = allowedSpans(lower, list.allow);
       for (const term of list.terms) {
-        const t = term.toLowerCase(); let i = lower.indexOf(t);
+        const t = fold(term); let i = lower.indexOf(t);
         while (i !== -1) { if (!spans.some(([x, y]) => i >= x && i + t.length <= y)) hits.push({ file: item.history ? item.label : `${item.rel} (path)`, line: 0, rule: 'P_LIST' }); i = lower.indexOf(t, i + 1); }
       }
     }
     if (!item.history && isBinary(item.bytes)) continue;
     const lines = item.bytes.toString('utf8').split('\n');
     lines.forEach((line, n) => {
-      const lower = line.toLowerCase();
+      const lower = fold(line);
       const spans = allowedSpans(lower, list.allow);
       for (const term of list.terms) {
-        const t = term.toLowerCase();
+        const t = fold(term);
         let i = lower.indexOf(t);
         while (i !== -1) {
           const inside = spans.some(([a, b]) => i >= a && i + t.length <= b);
@@ -398,7 +438,7 @@ function main() {
     catch (e) { if (e.code === 'ENOENT') list = { terms: [], allow: [] }; else die(`cannot inspect private list (${e.code || 'unknown error'})`); }
   } else list = loadList(listFile);
   const redact = text => {
-    const clean = list.terms.reduce((value, term) => value.replace(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '[redacted]'), text);
+    const clean = redactByFold(text, list.terms);
     return PRIVATE_CLASSES.some(([, pattern]) => pattern.test(clean)) ? '[redacted path]' : clean;
   };
   const { hits, files, skipped } = scan(root, list, listFile, all, history);

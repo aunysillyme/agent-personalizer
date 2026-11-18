@@ -1,8 +1,8 @@
 # Runs the harness (test/run.sh) on every push and pull request, on Linux and macOS.
-# Matrix: Linux and macOS on Node 18, 20, 22 and 24, covering the minimum runtime and current LTS choices, plus a
+# Matrix: Linux on Node 22, 24 and 26 (active LTS) and macOS on Node 24, plus a
 # Windows smoke job that runs the Node entry points (installer, renderer, gate, ESM install) without the sh harness.
 # What it proves: the renderer, installer, gate logic, hook and rollback paths behave exactly as
-# the 101 checks assert, with exact exit codes, on a clean machine that is not the author's.
+# the 102 checks assert, with exact exit codes, on a clean machine that is not the author's.
 # The consumer-install job installs an npm pack tarball on Linux and macOS, then verifies
 # first runs at levels 1 and 2, the ChatGPT paste files, and the installed bin version.
 # What it does NOT run: the privacy gate against the real forbidden list (check 6). That list is
@@ -29,11 +29,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: [18, 20, 22, 24]
+        node: [22, 24, 26]
         exclude:
-          - { os: macos-latest, node: 18 }
-          - { os: macos-latest, node: 20 }
           - { os: macos-latest, node: 22 }
+          - { os: macos-latest, node: 26 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,15 +56,12 @@ jobs:
           node --check test/package-links.cjs
           sh -n test/run.sh
           sh -n test/consumer-install.sh
-      - name: harness (101 checks, exact exit codes)
+      - name: harness (102 checks, exact exit codes)
         run: sh test/run.sh
       - name: Check the Part of a set block (offline)
         run: node scripts/check-set.mjs
       - name: rollback fault injection (cases A-K)
-        run: |
-          T="$(mktemp -d)"
-          cp -R examples/freelance-illustrator/. "$T/"
-          node test/rollback.test.js "$T"
+        run: node test/rollback.test.js
 
   consumer-install:
     strategy:
@@ -79,7 +75,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24
       - name: consumer install from npm pack
         run: sh test/consumer-install.sh
 

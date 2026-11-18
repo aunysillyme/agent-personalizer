@@ -4,8 +4,8 @@ Maintainer notes. Follow the steps below for version sites, rendering, checks an
 
 1. Every change in the release has a `CHANGELOG.md` line under `[Unreleased]`, naming the audit round or issue that produced it where one did.
 2. Move `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`, add the compare link at the bottom, and point the `[Unreleased]` link at `vX.Y.Z...HEAD`.
-3. Set the version in the three places the harness pins together: `package.json`, `const VERSION` in `render/onboarding.cjs` (it builds the docs URL every installed file links to), and the tiers link in `hooks/README.md`.
-4. Re-render the example, because its files carry that version-keyed docs URL: `node render/render.cjs --dir examples/freelance-illustrator`, then the same command with `--check` must print nothing. Skipping this step is the one thing that has turned a release commit red, twice.
+3. Set the version in the four places the harness pins together: `package.json`, `const VERSION` in `render/onboarding.cjs` (it builds the docs URL every installed file links to), the tiers link in `hooks/README.md`, and `website/release-fallback.json` (plus its `publishedAt` date).
+4. Re-render all three example directories (`examples/freelance-illustrator`, `examples/lab-technician`, `examples/product-designer`), because their files carry that version-keyed docs URL: `node render/render.cjs --dir examples/freelance-illustrator`, then the same command with `--check` must print nothing. Skipping this step is the one thing that has turned a release commit red, twice.
 5. Before a public flip, and after any history rewrite, run `node check/gate.cjs --history` with the maintainer private list and review each reported location. On this repo's existing public history it reports known fixture and hash strings, so here it is a review step and its exit code does not gate a release.
 6. `sh test/run.sh` green locally (the count guard included). Push `main`; CI green on that commit.
 7. `git tag -a vX.Y.Z -m "X.Y.Z: <one line>"` and `git push origin main vX.Y.Z`.

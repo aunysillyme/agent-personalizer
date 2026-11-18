@@ -5,9 +5,9 @@ The renderer writes one file per AI. This page says where each AI reads it, and 
 | Rendered file | Who reads it | How it is read |
 |---|---|---|
 | `CLAUDE.md` | Claude Code | Automatically, from the project, or `~/.claude/CLAUDE.md` for every project with `--global`. Nothing to paste. |
-| `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md` and `AGENTS.md`. Paste it wherever the AI has no file access (below). |
-| `AGENTS.md` | Codex CLI, Cursor, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` for all projects. Nothing to paste. |
-| `GEMINI.md` | Gemini CLI | Automatically, from the folder; `--global` writes `~/.gemini/GEMINI.md` for all projects. Nothing to paste. |
+| `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`. Paste it wherever the AI has no file access (below). |
+| `AGENTS.md` | Codex CLI, Cursor, Hermes Agent, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` for all projects. Nothing to paste. |
+| `GEMINI.md` | Gemini CLI and Google Antigravity | Automatically, from the folder; `--global` writes `~/.gemini/GEMINI.md` for all projects (also read by Google Antigravity alongside `~/.gemini/config/GEMINI.md`). Nothing to paste. |
 | `SOUL.md` | Hermes Agent | `--global --ai hermes` appends a marked block to `~/.hermes/SOUL.md`. In a project, use `--ai agents` for `AGENTS.md`. A different `HERMES_HOME` changes where Hermes reads the global file. |
 | `chatgpt-box1.txt`, `chatgpt-box2.txt` and `chatgpt-custom-instructions.md` | ChatGPT | Profile and response text to paste, with a preview and counts. |
 | `system-prompt.md` | anything with a system-prompt field, shared bots, API calls | Paste as the system prompt. Universal rules only, no profile, safe to share. |
@@ -38,7 +38,7 @@ Open Settings → Personalization and enable customization. Copy the exported pr
 - **Response instructions:** `chatgpt-box2.txt` is the plain onboarding and selected rule text.
 - **Preview:** `chatgpt-custom-instructions.md` carries both exports inside fences with their character counts.
 
-The configured budget is 1,500 characters per export in `render/targets.json`; your current interface displays its own limits. With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the selected session rules. Confirmed entries are retained; declined "Never ask again" entries may be shortened to fit the budget. Proposed entries are omitted. The preview reports each count. Over-budget text is written in full and flagged OVER BUDGET; `--strict` refuses the write. Review the text against your displayed limits. For the full onboarding, entries and rule source, create a ChatGPT Project and upload `AGENT_ONBOARDING.md`, `LEARNED.md` and `rules/` as project files.
+The configured baseline budget is 1,500 characters per export in `render/targets.json`: ChatGPT Free and Go accounts cap custom instructions at 1,500 characters, while Plus, Pro, Business, Enterprise and Education accounts allow up to 5,000 characters under Settings → Personalization (`More about you` and `Custom instructions`). With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the selected session rules. Confirmed entries are retained; declined "Never ask again" entries may be shortened to fit the budget. Proposed entries are omitted. The preview reports each count. Over-budget text is written in full and flagged OVER BUDGET; `--strict` refuses the write. Review the text against your account's displayed limits. For the full onboarding, entries and rule source, create a ChatGPT Project and upload `AGENT_ONBOARDING.md`, `LEARNED.md` and `rules/` as project files.
 
 ## Codex CLI
 
@@ -55,9 +55,11 @@ Verified against [OpenAI's Codex AGENTS.md documentation](https://learn.chatgpt.
 
 Reads `AGENTS.md` at the project root. Older setups use `.cursor/rules/`; if yours does, point one rule file at `AGENTS.md` rather than copying its text, so there is one owner.
 
-## Gemini CLI
+## Gemini CLI and Google Antigravity
 
-Reads `GEMINI.md` from the folder (and parent folders). Run the installer with `--ai gemini` and there is nothing to paste.
+Gemini CLI reads `GEMINI.md` from the folder (and parent folders), plus `~/.gemini/GEMINI.md` when installed with `--global --ai gemini`. Project installs also add `.gemini/commands/personalize.toml` for `/personalize`, and level-3 installs provide `hooks/gemini-cli/session-start.sh` for `.gemini/settings.json` (see [`hooks/README.md`](../hooks/README.md)).
+
+Google Antigravity also reads project `GEMINI.md` files (from the workspace root up to the current folder) and `~/.gemini/GEMINI.md` for compatibility; its primary global instruction file is `~/.gemini/config/GEMINI.md`, which enforces a 24,000-byte per-file limit after includes. Use `--compact` if a custom rule set approaches the 20,000-character warning budget.
 
 ## Anything else
 

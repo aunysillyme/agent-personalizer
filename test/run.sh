@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 101 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 102 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -885,11 +885,12 @@ grep -q 'github.com/aunysillyme/agent-personalizer/blob/v[0-9.]*/docs/companions
 [ ! -e "$T/docs" ] && [ ! -e "$T/package.json" ] || fail "fixture assumption: destination has docs/ or package.json"
 pass "(#12) installed files and hints point at public, versioned docs and direct commands"
 
-# 71. version pin: the VERSION literal in the copied onboarding module and the doc URL tag in hooks/README match package.json
+# 71. version pin: the VERSION literal in the copied onboarding module, hooks/README doc URL tag, and website/release-fallback.json match package.json
 v="$(node -p 'require("./package.json").version')"
 grep -q "^const VERSION = '$v';" render/onboarding.cjs || fail "render/onboarding.cjs VERSION is not $v"
 grep -q "blob/v$v/docs/tiers.md" hooks/README.md || fail "hooks/README.md doc link is not pinned to v$v"
-pass "version literal and pinned doc links match package.json ($v)"
+[ "$(node -p 'require("./website/release-fallback.json").version')" = "$v" ] || fail "website/release-fallback.json version is not $v"
+pass "version literal, pinned doc links and release fallback match package.json ($v)"
 
 # 72. requires: frontmatter is validated (bad shape, unknown answer, value not a choice, text question) and applied (rule dropped when the answer differs)
 mk; T="$MK"; cp -R examples/freelance-illustrator/. "$T/" || fail "fixture copy"
@@ -992,7 +993,7 @@ node test/publish-version.test.cjs || fail "trusted-publishing npm version gate"
 grep -q 'push:' .github/workflows/publish.yml && fail "publish.yml runs on push"
 grep -q 'refs/tags/\$TAG:refs/tags/\$TAG' .github/workflows/publish.yml && grep -q 'rev-parse "refs/tags/\$TAG^{commit}"' .github/workflows/publish.yml || fail "publish.yml does not resolve the input through refs/tags"
 grep -q 'ref: \${{ inputs.tag }}' .github/workflows/publish.yml && fail "publish.yml checks out the raw input as a ref"
-grep -q 'node: \[18, 20, 22, 24\]' .github/workflows/harness.yml || fail "harness matrix does not cover 18/20/22/24"
+grep -q 'node: \[22, 24, 26\]' .github/workflows/harness.yml || fail "harness matrix does not cover 22/24/26"
 grep -q 'smoke-windows:' .github/workflows/harness.yml && grep -q 'windows-latest' .github/workflows/harness.yml || fail "no Windows smoke job"
 grep -q '^  consumer-install:' .github/workflows/harness.yml && grep -q 'run: sh test/consumer-install.sh' .github/workflows/harness.yml || fail "no packed consumer-install job"
 node -e '
@@ -1020,7 +1021,7 @@ for (const status of ["success", "failure", "cancelled", "skipped"]) {
 ' || fail "Repository checks wiring or success requirement is wrong"
 grep -q 'run: node test/ap-regressions.cjs core' .github/workflows/harness.yml || fail "Windows does not exercise reruns and uninstall"
 grep -q '^\* text=auto eol=lf' .gitattributes || fail ".gitattributes does not pin LF"
-pass "publish workflow dormant and provenance-ready; Node 18/20/22/24, Windows journeys and consumer install present; Repository checks gates every job; LF pinned"
+pass "publish workflow dormant and provenance-ready; Node 22/24/26, Windows journeys and consumer install present; Repository checks gates every job; LF pinned"
 
 # 81. Numbered suites count their pass lines; reader and learning assertions live within those suites.
 # The quoted suite count matches everywhere it is quoted, including the CI entry point.
@@ -1131,7 +1132,7 @@ expect 0 "full with defaults on rerun" node bin/agent-personalizer.js --dir "$T"
 node -e '
 const o=require("./render/onboarding.cjs");
 if(o.QUESTIONS.some(q=>["name","pronouns","work","focus"].includes(q.id))) throw new Error("legacy identity in question set");
-for (const q of o.QUESTIONS) for(const full of [false,true]) if(o.asks(q,o.defaults(),full)) throw new Error("questionnaire remains");
+if ("asks" in o || o.QUESTIONS.some(q => "ask" in q || "when" in q)) throw new Error("questionnaire remains");
 const a=o.validate({name:"Legacy",pronouns:"they/them",work:"Invented work",focus:"Draft",off_limits:["private"]});
 if(a.name!=="Legacy"||a.off_limits[0]!=="private")throw new Error("legacy answers lost");
 ' || fail "questionnaire or legacy answer regression"
@@ -1382,6 +1383,10 @@ expect 0 "linked worktree install" node bin/agent-personalizer.js --dir "$W" --a
 expect 0 "linked worktree uninstall" node bin/agent-personalizer.js --dir "$W" --uninstall
 cmp "$T/foreign-copy" "$T/.git/hooks/pre-commit" || fail "worktree original not restored"
 pass "precommit gate: staged hit, missing list, clean commit, restoration and refusals"
+
+# 102. Audit 2026-11-17: Gemini CLI v0.42+ sessions/command/hook, Codex memories_v2, gate NFC, global qualify, release fallback and package inventory.
+node test/audit-0100.test.cjs || fail "0.10.0 audit regressions"
+pass "0.10.0 audit: Gemini CLI v0.42+ sessions/command/hook, Codex memories_v2, gate NFC, global qualify, release fallback and package inventory"
 
 node test/security-workflows.test.cjs || fail "workflow security regression"
 node test/security-hardening.test.cjs || fail "history privacy regression"

@@ -33,7 +33,7 @@ export npm_config_cache="$AP_DEMO_WORK/npm-cache"
 export npm_config_update_notifier=false
 export npm_config_audit=false
 export npm_config_fund=false
-mkdir "$AP_DEMO_WORK/project"
+mkdir "$AP_DEMO_WORK/project" "$AP_DEMO_WORK/home"
 
 # Fetch once before capturing. This also proves the exact version is available.
 printf 'Fetching %s for the recording...\n' "$AP_DEMO_PACKAGE"
@@ -67,6 +67,9 @@ time.sleep(0.8)
 pid, master = pty.fork()
 if pid == 0:
     os.chdir(project)
+    demo_home = os.path.join(os.environ["AP_DEMO_WORK"], "home")
+    os.environ["HOME"] = demo_home
+    os.environ["USERPROFILE"] = demo_home
     os.environ["TERM"] = "xterm-256color"
     os.execvp(command[0], command)
 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 110, 0, 0))

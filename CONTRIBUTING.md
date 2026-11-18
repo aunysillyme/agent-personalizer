@@ -10,8 +10,8 @@ Contributions are welcome: a **new AI target**, a **notes tool**, an **example u
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 101 checks, exact exit codes, Linux and macOS
-node test/rollback.test.js "$(mktemp -d)"   # after copying examples/freelance-illustrator into it
+npm test            # sh test/run.sh: 102 checks, exact exit codes, Linux and macOS
+node test/rollback.test.js
 node check/gate.cjs --self-test
 ```
 
@@ -25,7 +25,7 @@ The privacy gate (`check/gate.cjs` against a real list) needs a local `check/for
 
 ## Adding a notes tool or an AI target
 
-- A notes tool is ONE entry in the `TOOL` table at the top of `render/onboarding.cjs` (`kind`, `label`, `name`, `reach`, `posture`); the interview option, the validation and the write section all derive from it. Then a row in `docs/companions.md`, and an installer hint in `bin/agent-personalizer.js` if the tool needs one. Check 60 in the harness iterates every option; add yours to the right loop. Check 74 asserts the interview options equal the table's keys.
+- A notes tool is ONE entry in the `TOOL` table at the top of `render/onboarding.cjs` (`kind`, `label`, `name`, `reach`, `posture`); the saved choice options, validation and write section all derive from it. Then a row in `docs/companions.md`, and an installer hint in `bin/agent-personalizer.js` if the tool needs one. Check 60 in the harness iterates every option; add yours to the right loop. Check 74 asserts the saved options equal the table's keys.
 - An AI target needs an entry in `render/targets.json`, a row in `docs/paste-guide.md`, and updates to the hardcoded AI lists: `AIS` and `AI_LABEL` in `bin/agent-personalizer.js`, the supported targets in `bin/global.cjs`, the learning and contract target lists in `render/render.cjs`, and `SOURCE` in `bin/learn.cjs`. Set the target's supported modes and local session source where applicable. If it has a binding, add `binding:<name>` blocks to the rules that need one; unknown binding names are refused.
 
 ## Pull requests

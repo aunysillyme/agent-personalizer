@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveHome } = require('./home.cjs');
+const { sha256 } = require('./cli-util.cjs');
 const crypto = require('crypto');
 const readline = require('readline');
 const renderer = require('../render/render.cjs');
@@ -93,7 +94,12 @@ function quote(text) {
 function label(text, terms = []) {
   const clean = String(text).replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').replace(/agent-personalizer:/g, 'agent-personalizer&#58;');
   const folded = clean.normalize('NFC').toLowerCase();
-  return terms.some(term => folded.includes(String(term).normalize('NFC').toLowerCase())) ? '[private path]' : clean;
+  const collapsed = folded.replace(/\s+/g, '');
+  return terms.some(raw => {
+    const term = String(raw).normalize('NFC').toLowerCase().trim();
+    const tight = term.replace(/\s+/g, '');
+    return (term && folded.includes(term)) || (tight && collapsed.includes(tight));
+  }) ? '[private path]' : clean;
 }
 function shownFile(file, home, terms) {
   const relative = path.relative(home, file);
@@ -137,7 +143,6 @@ function replace(root, rel, text) {
   } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
 }
 
-const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function canOverwrite(cfg, prior, rel) {
   if (!prior.exists) return true;
   if (!cfg.installed || !Object.hasOwn(cfg.installed, rel)) return false;
@@ -182,7 +187,9 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   console.log(`Files checked: ${data.filesChecked}. Files read: ${data.filesRead.length}. Sessions: ${data.sessions.length}. Memory notes: ${data.memories.length}.`);
   console.log(`Skipped by reason: ${Object.entries(data.skipped).map(([reason, count]) => `${reason}: ${count}`).join(', ') || 'none'}`);
   console.log(`Digest: ${path.join(root, DIGEST)}`);
-  console.log('Next: open your AI in this folder. It asks up to 5 questions from this digest, one at a time (in Claude Code, /personalize starts them).');
+  console.log(cfg.global
+    ? 'Next: open a new AI session in any project. It asks up to 5 questions from this digest, one at a time.'
+    : 'Next: open your AI in this folder. It asks up to 5 questions from this digest, one at a time (in Claude Code and Gemini CLI, /personalize starts them).');
   return true;
 }
 

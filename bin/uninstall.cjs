@@ -8,8 +8,8 @@ const renderer = require('../render/render.cjs');
 const onboarding = require('../render/onboarding.cjs');
 const TARGETS = require('../render/targets.json');
 const { installPlan, recordedHash, validateInventory } = require('./install-plan.cjs');
+const { sha256 } = require('./cli-util.cjs');
 const CONFIG = '.agent-personalizer.json';
-const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function refuse(message) { throw new renderer.Refusal(message); }
 // Install appends "\n" + block + "\n" to a pre-existing file that ends in a newline
@@ -92,7 +92,7 @@ function run(dir, dry) {
   // The renderer consults this path even at level 1. Validate it before rendering.
   const notesScaffolded = !!probe(`${base}/README.md`);
   const recipe = installPlan({ answers, level, targets: cfg.targets, notesScaffolded }).plan;
-  const homeNames = new Set(['CLAUDE.md', 'AGENTS.md']);
+  const homeNames = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']);
   const expected = new Map();
   for (const p of recipe) {
     if (homeNames.has(p.rel) || p.rel === 'LEARNED.md') continue; // entries always belong to the user
@@ -308,7 +308,7 @@ function run(dir, dry) {
     }
     console.log(`kept   ${CONFIG} (tracked files remain; review the kept paths above)`);
   }
-  if (level >= 3) console.log('Manual step: remove any SessionStart entry for hooks/claude-code/session-start.sh from .claude/settings.json or ~/.claude/settings.json if you registered it. Settings are kept.');
+  if (level >= 3) console.log('Manual step: remove any SessionStart entry for hooks/claude-code/session-start.sh or hooks/gemini-cli/session-start.sh from .claude/settings.json, ~/.claude/settings.json, .gemini/settings.json or ~/.gemini/settings.json if you registered it. Settings are kept.');
 }
 
 module.exports = { uninstall };

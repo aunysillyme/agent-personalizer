@@ -17,7 +17,7 @@
   DOCS points at the matching tag on GitHub so an installed copy never links to a file the
   destination does not have.
 */
-const VERSION = '0.9.1';
+const VERSION = '0.10.0';
 const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}/docs`;
 
 /* THE single source for notes tools. Add a tool here and nowhere else: the saved choice option, the
@@ -72,52 +72,49 @@ const NOTES_PENDING_MARK = 'no local notes folder yet, so no folder rules yet';
 const notesLater = (base) => `\`--level 2\` creates \`${base}/\``;
 
 const LEGACY = [
-  { id: 'name', ask: 'What should the AI call you?', type: 'text', default: 'the user' },
-  { id: 'pronouns', ask: 'Your pronouns (leave blank to skip)', type: 'text', default: '' },
-  { id: 'work', ask: 'What you do, in one line', type: 'text', default: '' },
-  { id: 'focus', ask: 'Your current focus, one or two projects', type: 'text', default: '' },
+  { id: 'name', type: 'text', default: 'the user' },
+  { id: 'pronouns', type: 'text', default: '' },
+  { id: 'work', type: 'text', default: '' },
+  { id: 'focus', type: 'text', default: '' },
 ];
 const QUESTIONS = [
-  { id: 'tone', ask: 'How direct should the AI be?', type: 'choice', default: 'direct',
+  { id: 'tone', type: 'choice', default: 'direct',
     options: [['direct', 'direct answers, no hedging, say what you think'], ['balanced', 'direct but soften disagreement'], ['gentle', 'lead with what works before what does not']] },
-  { id: 'length', ask: 'How long should replies be?', type: 'choice', default: 'short',
+  { id: 'length', type: 'choice', default: 'short',
     options: [['short', 'short by default, detail on request'], ['adaptive', 'as long as the question needs'], ['thorough', 'complete every time']] },
-  { id: 'mistakes', ask: 'When the AI is wrong, how should it handle it?', type: 'choice', default: 'one-line',
+  { id: 'mistakes', type: 'choice', default: 'one-line',
     options: [['one-line', 'state the correction in one line and move on'], ['brief', 'correction plus one line on the cause'], ['full', 'correction plus the full cause']] },
-  { id: 'unsure', ask: 'When the AI is unsure, what should it do?', type: 'choice', default: 'ask-when-it-changes-the-build',
+  { id: 'unsure', type: 'choice', default: 'ask-when-it-changes-the-build',
     options: [['ask-when-it-changes-the-build', 'settle facts itself; ask only when the answer changes what gets built', 'settle facts yourself; ask only when the answer changes what gets built'], ['ask-first', 'ask before doing anything uncertain'], ['assume-and-say', 'proceed on a stated assumption, never ask']] },
-  { id: 'lead_with', ask: 'What should a reply open with?', type: 'choice', default: 'verdict',
+  { id: 'lead_with', type: 'choice', default: 'verdict',
     options: [['verdict', 'the answer or the verdict'], ['summary', 'a one-paragraph summary'], ['context', 'the context, then the answer']] },
-  { id: 'structure', ask: 'How should replies be shaped?', type: 'choice', default: 'bullets',
+  { id: 'structure', type: 'choice', default: 'bullets',
     options: [['bullets', 'lead-in line, then bullets, one item per line'], ['prose', 'short paragraphs'], ['tables-when-comparing', 'bullets by default, a table when comparing three or more things']] },
-  { id: 'evidence', ask: 'Where should evidence for a claim go?', type: 'choice', default: 'inline',
+  { id: 'evidence', type: 'choice', default: 'inline',
     options: [['inline', 'in the reply: paths, counts, dates'], ['linked', 'a link to where it lives'], ['none', 'not needed']] },
-  { id: 'never', ask: 'Words, punctuation or habits the AI must never use (comma-separated, blank for none)', type: 'list', default: [] },
-  { id: 'read_first', ask: 'Files the AI reads first, in order (comma-separated)', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md'] },
-  { id: 'notes_tool', ask: 'Where do your notes live?', type: 'choice', default: 'folder',
+  { id: 'never', type: 'list', default: [] },
+  { id: 'read_first', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md'] },
+  { id: 'notes_tool', type: 'choice', default: 'folder',
     options: Object.entries(TOOL).map(([k, t]) => [k, t.label]) },
-  { id: 'obsidian_tc', ask: 'Do you use obsidian-tc, the governed MCP?', type: 'choice', default: 'no', when: (a) => a.notes_tool === 'obsidian',
+  { id: 'obsidian_tc', type: 'choice', default: 'no',
     options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
-  { id: 'notes_tool_name', ask: 'The name of that tool', type: 'text', default: '', when: (a) => a.notes_tool === 'other' },
-  { id: 'notes_path', ask: 'Where inside it: the folder path (Obsidian, Logseq, plain folder), or the workspace / notebook / folder name (Notion, Google Docs, Apple Notes, others)', type: 'text', default: 'notes' },
-  { id: 'tracker', ask: 'Your task tracker, if the AI should read it ("none" to skip)', type: 'text', default: 'none' },
-  { id: 'write_policy', ask: 'How freely may the AI write into your notes?', type: 'choice', default: 'notes-freely',
+  { id: 'notes_tool_name', type: 'text', default: '' },
+  { id: 'notes_path', type: 'text', default: 'notes' },
+  { id: 'tracker', type: 'text', default: 'none' },
+  { id: 'write_policy', type: 'choice', default: 'notes-freely',
     options: [['notes-freely', 'anywhere under the notes folder, under the folder rules'], ['logs-and-inbox-only', 'only the session log, decisions log and inbox'], ['ask-before-every-write', 'ask before every write']] },
-  { id: 'file_naming', ask: 'File naming for anything the AI creates', type: 'choice', default: 'kebab-case',
+  { id: 'file_naming', type: 'choice', default: 'kebab-case',
     options: [['kebab-case', 'my-note-title.md'], ['snake_case', 'my_note_title.md'], ['any', 'no rule']] },
-  { id: 'signature', ask: 'Should every AI edit end with a signature line (who, model, date, what changed)?', type: 'choice', default: 'yes',
+  { id: 'signature', type: 'choice', default: 'yes',
     options: [['yes', 'one line, overwritten each edit'], ['no', 'no signature']] },
-  { id: 'off_limits', ask: 'Folders or topics that never enter shared output (comma-separated, blank for none)', type: 'list', default: [] },
-  { id: 'always_ask', ask: 'Actions the AI must always ask before (comma-separated from: delete, publish, send, spend, settings, standing-rules; blank for all)', type: 'multi',
+  { id: 'off_limits', type: 'list', default: [] },
+  { id: 'always_ask', type: 'multi',
     default: ['delete', 'publish', 'send', 'spend', 'settings', 'standing-rules'],
     options: [['delete', 'deleting or overwriting anything'], ['publish', 'publishing or posting anything public'], ['send', 'sending a message on your behalf'], ['spend', 'spending money'], ['settings', 'changing account or system settings'], ['standing-rules', 'creating a standing rule, schedule or automation']] },
 ];
 
 const SETTINGS = [...LEGACY, ...QUESTIONS];
 const IDS = new Set(SETTINGS.map(q => q.id));
-// The installer asks only which AIs and whether it may read sessions.
-const QUICK = [];
-function asks() { return false; }
 /* only the answers that differ from the defaults: what the installer stores, so the config reads as
    "what this person chose" and a future default applies to everyone who never chose otherwise */
 /* PINNED answers are always stored, default or not: they govern what the AI may touch, so a future
@@ -129,15 +126,6 @@ function defaults() {
   const a = {};
   for (const q of SETTINGS) a[q.id] = Array.isArray(q.default) ? [...q.default] : q.default;
   return a;
-}
-
-/* Interview defaults preserve even an empty saved answer. Asked answers override saved values;
-   package defaults fill only missing keys. Validation remains the caller's final step. */
-function interviewDefault(q, saved) {
-  return saved && Object.hasOwn(saved, q.id) ? saved[q.id] : q.default;
-}
-function interviewAnswers(saved, asked = {}) {
-  return { ...defaults(), ...saved, ...asked };
 }
 
 /* Strict validation: unknown keys, wrong types and unknown choices are errors, never defaults.
@@ -176,21 +164,12 @@ function validate(input) {
   const reserved = out.notes_path.split('/').find(segment => ['.git', '.github', 'node_modules'].includes(segment.toLowerCase()));
   if (kindOf(out) === 'disk' && reserved)
     throw new Error(`"notes_path" must not contain the reserved segment "${reserved}"`);
-  const owned = ['.agent-personalizer', '.agent-personalizer.json', '.claude', 'render', 'rules', 'check', 'hooks', 'USER.md', 'LEARNED.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'AGENT_ONBOARDING.md', 'system-prompt.md', 'chatgpt-custom-instructions.md', 'chatgpt-box1.txt', 'chatgpt-box2.txt'];
+  const owned = ['.agent-personalizer', '.agent-personalizer.json', '.claude', '.gemini', 'render', 'rules', 'check', 'hooks', 'USER.md', 'LEARNED.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'AGENT_ONBOARDING.md', 'system-prompt.md', 'chatgpt-custom-instructions.md', 'chatgpt-box1.txt', 'chatgpt-box2.txt'];
   if (kindOf(out) === 'disk' && owned.some(p => out.notes_path.toLowerCase() === p.toLowerCase() || out.notes_path.toLowerCase().startsWith(p.toLowerCase() + '/')))
     throw new Error('"notes_path" must be outside agent-personalizer tool-owned paths, including .agent-personalizer/');
   return out;
 }
 const SAFE_REL = /^(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9._ -]+)*$/;
-
-/* Parse one typed interview answer (a string) for a question; '' means the default. */
-function parseAnswer(q, raw) {
-  const s = String(raw).trim();
-  if (s === '') return Array.isArray(q.default) ? [...q.default] : q.default;
-  if (q.type === 'text') return s;
-  if (q.type === 'choice') return s;
-  return s.split(',').map(x => x.trim()).filter(Boolean);
-}
 
 const label = (q, v) => { const o = q.options && q.options.find(x => x[0] === v); return o ? o[1] : v; };
 /* The interview asks the HUMAN about the AI, so an option's label is third person ("settle facts
@@ -552,4 +531,8 @@ After the questions are answered (or no real patterns exist), add the full diges
 As you work, on the second correction of the same thing, ask once, naming both moments, "Make it a rule?" Save a yes or no with the same status and re-render. Check confirmed and declined entries before asking.`;
 }
 
-module.exports = { parseLearned, entriesBlock, learningProcedure, LEGACY, QUESTIONS, QUICK, PINNED, TOOL, VERSION, DOCS, FALLBACK, NOTES_PENDING_MARK, notesPending, asks, defaults, interviewDefault, interviewAnswers, sparse, validate, parseAnswer, renderUser, renderOnboarding, contractBlock, compactProfile, compactProfileFromUser, kindOf, baseFor };
+function geminiPersonalizeToml() {
+  return `description = "Review the session learning digest and ask up to 5 preference questions."\nprompt = '''\n${learningProcedure()}\n'''\n`;
+}
+
+module.exports = { parseLearned, entriesBlock, learningProcedure, geminiPersonalizeToml, LEGACY, QUESTIONS, PINNED, TOOL, VERSION, DOCS, FALLBACK, notesPending, defaults, sparse, validate, renderUser, renderOnboarding, contractBlock, compactProfile, compactProfileFromUser, kindOf, baseFor };

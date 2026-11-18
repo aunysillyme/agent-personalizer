@@ -19,6 +19,9 @@ For learned entries, `LEARNED.md` owns the current status; a summary in the prof
 ## binding:agents
 `USER.md` sits next to `AGENTS.md`. Read it before the first tool call.
 
+## binding:gemini
+`USER.md` sits next to `GEMINI.md`. In Gemini CLI and Google Antigravity, `GEMINI.md` loads automatically; read `USER.md` before the first tool call.
+
 ## origin
 Written after: an AI produced a week of correctly formatted, well-reasoned work in the wrong voice, for the wrong audience, because the profile lived in a file nothing told it to open. A second week went to an AI that knew the person well and still wrote into the wrong folder, because nothing told it where writes were allowed.
 Prevents: fluent output aimed at nobody in particular.

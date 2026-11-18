@@ -43,13 +43,13 @@ The saved AI selection chooses the sources. The reader takes up to 20 of the new
 | Selected target | Local source |
 |---|---|
 | `claude` | Claude Code: `~/.claude/projects/<project>/<session>.jsonl`, directly inside each project folder |
-| `agents` | Codex: `~/.codex/sessions/**/rollout-*.jsonl`, plus `~/.codex/memories/*.md` |
-| `gemini` | Gemini CLI: `~/.gemini/tmp/<hash>/chats/session-*.jsonl` and the older `logs.json` |
+| `agents` | Codex: `~/.codex/sessions/**/rollout-*.jsonl`, plus `~/.codex/memories/*.md` and `~/.codex/memories_v2/**/*.md` |
+| `gemini` | Gemini CLI: `~/.gemini/tmp/<slug-or-hash>/chats/session-*.jsonl` (and `.json`), `~/.cache/.gemini/tmp/<slug>/chats/` when sandboxed, and older `logs.json` |
 | `chatgpt`, `prompt` | No local session reader |
 
-By default, only sessions associated with the `--dir` folder or one of its subfolders are included. Claude Code and Codex sessions are matched by their recorded working directory; Gemini CLI uses the SHA-256 project folder it creates from that path. If a session does not provide enough path information to match it safely, it is skipped. Use `npx agent-personalizer learn --dir . --all-projects` to include sessions from every project.
+By default, only sessions associated with the `--dir` folder or one of its subfolders are included. Claude Code and Codex sessions are matched by their recorded working directory; Gemini CLI resolves project slugs from `~/.gemini/projects.json` and `.project_root` markers, with its legacy SHA-256 project folder as a fallback. If a session does not provide enough path information to match it safely, it is skipped. Use `npx agent-personalizer learn --dir . --all-projects` to include sessions from every project.
 
-The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. These memory notes are global to your Codex account, not limited to this folder. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Messages and memory notes over 2,000 characters are dropped whole. Gemini chat snapshots replace earlier messages; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
+The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. These memory notes are global to your Codex account, not limited to this folder. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Messages and memory notes over 2,000 characters are dropped whole. Gemini chat records reconstruct final conversation state across append-only records, snapshots, patches and rewinds; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
 
 The reader streams session files, skips oversized lines and stops a file at its size limit. Symlinks, unreadable files, other-project sessions and unknown or malformed formats are skipped and counted. Codex session headers are inspected to determine their project; message content from other projects is not scanned. The terminal lists files read and skip counts; message text is never printed there. Vendor format changes may mean fewer usable sessions until the reader is updated.
 
@@ -65,7 +65,7 @@ Messages and memory notes that look like secrets are dropped whole and counted u
 
 ## What your AI asks and keeps
 
-Start your AI in the installed folder. Claude Code has `/personalize`; Codex and Gemini CLI receive the same procedure in their home files. At level 3, the session-start contract points to `/personalize` while a digest has not been handled.
+Start your AI in the installed folder. Claude Code and Gemini CLI have `/personalize`; Codex receives the same procedure in its home file. At level 3, the session-start contract points to `/personalize` (or the home-file procedure for `agents`) while a digest has not been handled.
 
 Each question includes a count and one short quote, such as "You've asked me to shorten replies 3 times this week. Make it a rule?" Fewer real patterns means fewer questions. Entries already confirmed or declined are never asked again.
 
@@ -97,10 +97,10 @@ npx agent-personalizer --uninstall --dir .
 
 ## How the loop closes
 
-The installed home files carry the learning procedure; Claude Code also gets `.claude/commands/personalize.md`. At level 3, the session-start contract points at `/personalize` while a digest id is unasked. Your AI asks the questions, writes the statuses and digest id to `LEARNED.md`, then re-renders. Only current confirmed entries apply. A summary in `USER.md` can lag until an installer re-run; `LEARNED.md` owns entry status.
+The installed home files carry the learning procedure; Claude Code also gets `.claude/commands/personalize.md` and Gemini CLI gets `.gemini/commands/personalize.toml`. At level 3, the session-start contract points at `/personalize` (or the home-file procedure for `agents`) while a digest id is unasked. Your AI asks the questions, writes the statuses and digest id to `LEARNED.md`, then re-renders. Only current confirmed entries apply. A summary in `USER.md` can lag until an installer re-run; `LEARNED.md` owns entry status.
 
 Nothing watches the digest or verifies model behaviour in the background. You can verify the files with `npx agent-personalizer --dir .`, then at level 3, `node render/render.cjs --dir . --check`. A clean check exits 0; drift exits 1; invalid input exits 2. Check `LEARNED.md` for the approved or declined line and the digest id under `## Asked`. Re-paste ChatGPT's boxes after changes. With no shell, the AI tells you to run the re-render command.
 
-The reader uses Node 18 built-ins and no network. Formats, unreadable files, symlinks, oversized lines and private matches are counted as skips. The digest header records the selected sources, files and counts; the terminal lists read paths without message text. Report a reader failure or leak through the channels in [SECURITY.md](../SECURITY.md).
+The reader uses Node 22 built-ins and no network. Formats, unreadable files, symlinks, oversized lines and private matches are counted as skips. The digest header records the selected sources, files and counts; the terminal lists read paths without message text. Report a reader failure or leak through the channels in [SECURITY.md](../SECURITY.md).
 
 The installer does not upload the digest. Other software can sync or share its containing folder; choose a private local folder if you want the copy to stay on this computer. The local `LEARNED.md` is the source of truth for entries; generated blocks and paste files are checked copies, and the digest is disposable evidence.

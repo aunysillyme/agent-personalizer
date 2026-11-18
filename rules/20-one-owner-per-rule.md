@@ -19,6 +19,9 @@ Pointer form in `CLAUDE.md`: a one-line rule followed by `[owner: rules/<file>.m
 ## binding:agents
 Pointer form in `AGENTS.md`: a one-line rule followed by `[owner: rules/<file>.md]`.
 
+## binding:gemini
+Pointer form in `GEMINI.md`: a one-line rule followed by `[owner: rules/<file>.md]`.
+
 ## origin
 Written after: a routing rule was corrected in its owning document and, four days later, four other surfaces still carried the old version. One of them was quoted back to the user as if her own decision had been the reverse. The drift detector was green throughout, because it checked each surface against the rule as last recorded, not against the owner.
 Prevents: the same rule disagreeing with itself in five places.

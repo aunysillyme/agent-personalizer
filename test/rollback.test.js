@@ -19,12 +19,18 @@
      case J: a backup copy creates then throws         -> backup removed, target never replaced
      case K: backup chmod fails under umask 077        -> target keeps its mode, backup dropped
    Case A also runs under umask 077 and asserts the restored target keeps its 0666 mode.
-   usage: node test/rollback.test.js <project-dir-copy-of-the-example>   exit 0 = both cases behaved */
+   usage: node test/rollback.test.js [<project-dir-copy-of-the-example>]   exit 0 = all cases behaved */
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const dir = process.argv[2];
-if (!dir) { console.error('need a project dir'); process.exit(2); }
-const render = require(path.join(__dirname, '..', 'render', 'render.cjs'));
+const root = path.resolve(__dirname, '..');
+const ownTmp = !process.argv[2];
+const dir = ownTmp ? fs.mkdtempSync(path.join(os.tmpdir(), 'ap-rollback-')) : path.resolve(process.argv[2]);
+if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+if (!fs.existsSync(path.join(dir, 'USER.md'))) {
+  fs.cpSync(path.join(root, 'examples', 'freelance-illustrator'), dir, { recursive: true });
+}
+const render = require(path.join(root, 'render', 'render.cjs'));
 
 function snapshot(names) { const o = {}; for (const n of names) o[n] = fs.existsSync(path.join(dir, n)) ? fs.readFileSync(path.join(dir, n)) : null; return o; }
 function same(a, b) { return (a === null && b === null) || (a && b && a.equals(b)); }
@@ -159,4 +165,5 @@ process.umask(um);
 say(r.code === 2, `K: exit 2 (got ${r.code})`);
 say((fs.statSync(path.join(dir, 'CLAUDE.md')).mode & 0o777) === 0o666, `K: never-replaced target keeps 0666 (got ${(fs.statSync(path.join(dir, 'CLAUDE.md')).mode & 0o777).toString(8)})`);
 say(temps().length === 0, 'K: no leftovers');
+if (ownTmp) fs.rmSync(dir, { recursive: true, force: true });
 process.exit(ok ? 0 : 1);
