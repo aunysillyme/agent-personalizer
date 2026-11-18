@@ -137,7 +137,7 @@ const cases = {
     assert.equal(doc.match(/```text\n([\s\S]*?)\n```/)[1], consentScreen());
     for (const allProjects of [false, true]) {
       const screen = consentScreen({ allProjects });
-      assert(/global to your Codex account/.test(screen) && /not limited to this folder/.test(screen));
+      assert(/local Codex memory notes/i.test(screen) && /this machine/.test(screen) && /not just this folder/.test(screen));
       assert(/messages that look like secrets are skipped/i.test(screen));
     }
     assert(doc.includes('~/.agent-personalizer/check/forbidden.local.txt'));

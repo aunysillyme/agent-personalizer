@@ -18,8 +18,8 @@ that Claude Code, Codex and Gemini CLI still keep, to find corrections you repea
   · Other people's details in there? Add their names to your private list first.
   · Delete it any time: npx agent-personalizer learn --forget
     (your AI app's own history stays as it is)
-  · Codex's own memory notes are included when you choose Codex.
-    They are global to your Codex account, not limited to this folder.
+  · Local Codex memory notes from your Codex home are included when you choose Codex.
+    They span sessions on this machine (or connected host), not just this folder.
   · When your AI reads the file, its provider sees these messages again.
   · Work or client accounts: check your agreement before reusing their sessions.
   · Not affiliated with Anthropic, OpenAI or Google. Their formats can change.
@@ -43,13 +43,13 @@ The saved AI selection chooses the sources. The reader takes up to 20 of the new
 | Selected target | Local source |
 |---|---|
 | `claude` | Claude Code: `~/.claude/projects/<project>/<session>.jsonl`, directly inside each project folder |
-| `agents` | Codex: `~/.codex/sessions/**/rollout-*.jsonl`, plus `~/.codex/memories/*.md` and `~/.codex/memories_v2/**/*.md` |
+| `agents` | Codex: `~/.codex/sessions/**/rollout-*.jsonl`, plus `~/.codex/memories/*.md` and `~/.codex/memories_v2/**/*.md` (or under `$CODEX_HOME` when set) |
 | `gemini` | Gemini CLI: `~/.gemini/tmp/<slug-or-hash>/chats/session-*.jsonl` (and `.json`), `~/.cache/.gemini/tmp/<slug>/chats/` when sandboxed, and older `logs.json` |
 | `chatgpt`, `prompt` | No local session reader |
 
 By default, only sessions associated with the `--dir` folder or one of its subfolders are included. Claude Code and Codex sessions are matched by their recorded working directory; Gemini CLI resolves project slugs from `~/.gemini/projects.json` and `.project_root` markers, with its legacy SHA-256 project folder as a fallback. If a session does not provide enough path information to match it safely, it is skipped. Use `npx agent-personalizer learn --dir . --all-projects` to include sessions from every project.
 
-The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. These memory notes are global to your Codex account, not limited to this folder. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Messages and memory notes over 2,000 characters are dropped whole. Gemini chat records reconstruct final conversation state across append-only records, snapshots, patches and rewinds; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
+The digest contains typed user messages and, when Codex is selected, up to 20 of the newest Codex memory files in a separate section. These memory notes live in the local Codex store for this machine or connected host (`~/.codex` or `$CODEX_HOME`), so they span local Codex work beyond this folder rather than syncing across your OpenAI account. AI replies, tool output, reasoning, automation sessions and injected context are dropped. Messages and memory notes over 2,000 characters are dropped whole. Gemini chat records reconstruct final conversation state across append-only records, snapshots, patches and rewinds; a message repeated in the chat and logs is included once. The all-projects option affects session history; the memory file limit still applies.
 
 The reader streams session files, skips oversized lines and stops a file at its size limit. Symlinks, unreadable files, other-project sessions and unknown or malformed formats are skipped and counted. Codex session headers are inspected to determine their project; message content from other projects is not scanned. The terminal lists files read and skip counts; message text is never printed there. Vendor format changes may mean fewer usable sessions until the reader is updated.
 
@@ -81,7 +81,7 @@ Each question includes a count and one short quote, such as "You've asked me to 
 - digest: <ISO timestamp>
 ```
 
-Confirmed entries reach `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, the ChatGPT paste exports and the session-start contract. Declined entries become a "Never ask again" list; the ChatGPT list may be shortened to fit its budget. Proposed entries render nowhere. The shareable system prompt carries no entries.
+Confirmed entries reach `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, global `SOUL.md` when Hermes is selected, the ChatGPT paste exports and the session-start contract. Declined entries become a "Never ask again" list; ChatGPT exports include the complete declined list in full, flag `OVER BUDGET` in the preview when a box exceeds its target limit, and refuse to write when `--strict` is passed. Proposed entries render nowhere. The shareable system prompt carries no entries.
 
 After recording answers, the AI marks the digest as asked and re-renders. If it has no shell, it asks you to run `npx agent-personalizer --dir .`. At level 3 you can run `node render/render.cjs --dir .` and `node render/render.cjs --dir . --check`. Re-paste changed ChatGPT exports. As you work, a second correction of the same thing prompts one evidence-backed "Make it a rule?" question.
 

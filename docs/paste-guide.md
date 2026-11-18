@@ -5,8 +5,8 @@ The renderer writes one file per AI. This page says where each AI reads it, and 
 | Rendered file | Who reads it | How it is read |
 |---|---|---|
 | `CLAUDE.md` | Claude Code | Automatically, from the project, or `~/.claude/CLAUDE.md` for every project with `--global`. Nothing to paste. |
-| `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`. Paste it wherever the AI has no file access (below). |
-| `AGENTS.md` | Codex CLI, Cursor, Hermes Agent, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` for all projects. Nothing to paste. |
+| `AGENT_ONBOARDING.md` | any AI | Named as the second thing to read in `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`. Paste or upload it where the AI does not read your local folder directly (below). |
+| `AGENTS.md` | Codex CLI, Cursor, Hermes Agent, and other agents that adopted the AGENTS.md convention | Automatically, from the repository root; `--global` writes `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md` when `CODEX_HOME` is set) for all projects. Nothing to paste. |
 | `GEMINI.md` | Gemini CLI and Google Antigravity | Automatically, from the folder; `--global` writes `~/.gemini/GEMINI.md` for all projects (also read by Google Antigravity alongside `~/.gemini/config/GEMINI.md`). Nothing to paste. |
 | `SOUL.md` | Hermes Agent | `--global --ai hermes` appends a marked block to `~/.hermes/SOUL.md`. In a project, use `--ai agents` for `AGENTS.md`. A different `HERMES_HOME` changes where Hermes reads the global file. |
 | `chatgpt-box1.txt`, `chatgpt-box2.txt` and `chatgpt-custom-instructions.md` | ChatGPT | Profile and response text to paste, with a preview and counts. |
@@ -32,24 +32,25 @@ Re-paste after every re-render. `--check` verifies the files on disk; it cannot 
 
 ## ChatGPT
 
-Open Settings → Personalization and enable customization. Copy the exported profile and response instructions into the fields your current interface provides, checking its displayed limits.
+Open Settings → Personalization (or Settings → Customize ChatGPT on iOS and Android) and enable customization. Copy the exported profile and response instructions into the fields your current interface provides, checking its displayed limits.
 
 - **Profile:** `chatgpt-box1.txt` is the plain profile text. An edited or pre-existing `USER.md` is its source too. Confirmed entries from `LEARNED.md` reach the ChatGPT exports.
 - **Response instructions:** `chatgpt-box2.txt` is the plain onboarding and selected rule text.
 - **Preview:** `chatgpt-custom-instructions.md` carries both exports inside fences with their character counts.
 
-The configured baseline budget is 1,500 characters per export in `render/targets.json`: ChatGPT Free and Go accounts cap custom instructions at 1,500 characters, while Plus, Pro, Business, Enterprise and Education accounts allow up to 5,000 characters under Settings → Personalization (`More about you` and `Custom instructions`). With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the selected session rules. Confirmed entries are retained; declined "Never ask again" entries may be shortened to fit the budget. Proposed entries are omitted. The preview reports each count. Over-budget text is written in full and flagged OVER BUDGET; `--strict` refuses the write. Review the text against your account's displayed limits. For the full onboarding, entries and rule source, create a ChatGPT Project and upload `AGENT_ONBOARDING.md`, `LEARNED.md` and `rules/` as project files.
+The configured baseline budget is 1,500 characters per export in `render/targets.json`: ChatGPT Free and Go accounts cap Custom Instructions at 1,500 characters, while Plus, Pro, Business, Enterprise and Edu accounts allow up to 5,000 characters under Settings → Personalization (`More about you` and `Custom instructions`; `Customize ChatGPT` on mobile). With onboarding answers, box 1 compacts the generated profile while its structure still parses, and preserves custom profile text in full when it does not. Box 2 places the onboarding block (always-ask, off-limits, write policy, then style) before the selected session rules. Confirmed entries and declined "Never ask again" entries are both appended in full; nothing is truncated silently. Proposed entries are omitted. The preview reports each count; over-budget text is written in full and flagged `OVER BUDGET`, while `--strict` refuses the write. Review the text against your account's displayed limits. Account-level Custom Instructions do not read your local project folder directly, whereas file access in ChatGPT depends on the surface, uploads and enabled tools; for the full onboarding, entries and rule source in a ChatGPT Project, upload `AGENT_ONBOARDING.md`, `LEARNED.md` and `rules/` as project files (or add Project instructions under Project settings).
 
 ## Codex CLI
 
 Run the installer at the repo root, then start Codex in that project. Codex builds its instruction chain once per run:
 
-- **Global guidance:** the first non-empty `AGENTS.override.md` or `AGENTS.md` in the Codex home directory, normally `~/.codex`.
+- **Global guidance:** the first non-empty `AGENTS.override.md` or `AGENTS.md` in the Codex home directory (`~/.codex`, or `$CODEX_HOME` when set). `--global --ai agents` writes to that effective Codex home and warns without modifying `AGENTS.override.md` when a non-empty override shadows `AGENTS.md`.
 - **Project guidance:** files from the repository root down to the working directory are merged in that order. Deeper files take precedence over earlier guidance. With no project root, discovery checks the working directory.
-- **Per directory:** `AGENTS.override.md` is tried before `AGENTS.md`, followed by configured fallback filenames. At most one file is selected per directory.
+- **Per directory:** `AGENTS.override.md` is tried before `AGENTS.md`, followed by configured fallback filenames. At most one file is selected per directory; project installs warn if a non-empty `AGENTS.override.md` in the target folder shadows `AGENTS.md`.
 - **Size cap:** the combined guidance has a default limit of 32 KiB, configurable with `project_doc_max_bytes`.
+- **Verify in a fresh session:** run `codex --ask-for-approval never "Summarize the current instructions."` (or `"List the instruction sources you loaded."`) from your repository root, check `echo $CODEX_HOME` if global guidance is missing, or inspect `codex -c log_dir=./.codex-log` (`./.codex-log/codex-tui.log`) to confirm which instruction files loaded.
 
-Verified against [OpenAI's Codex AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md) on 2026-10-05. Restart Codex after an update so it rebuilds the instruction chain.
+Verified against [OpenAI's Codex AGENTS.md documentation](https://developers.openai.com/codex/guides/agents-md) on 2026-11-18. Restart Codex after an update so it rebuilds the instruction chain.
 
 ## Cursor
 

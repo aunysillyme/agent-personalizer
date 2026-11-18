@@ -84,13 +84,13 @@ For every project, install one global level-1 profile:
 npx agent-personalizer --global --ai claude,agents,gemini,hermes --yes
 ```
 
-The source lives in `~/.agent-personalizer/`; marked blocks go to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` and `~/.hermes/SOUL.md` for the selected targets. User text outside the blocks stays byte for byte. For Hermes in a project, use `--ai agents` for `AGENTS.md`. `--global` supports these four targets and level 1; it excludes `--dir`. Re-run with `--global`, learn across all projects with `learn --global`, and remove owned global content with `--global --uninstall`. See [global installation](docs/install.md#every-project-with-one-profile).
+The source lives in `~/.agent-personalizer/`; marked blocks go to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`), `~/.gemini/GEMINI.md` and `~/.hermes/SOUL.md` for the selected targets. User text outside the blocks stays byte for byte. For Hermes in a project, use `--ai agents` for `AGENTS.md`. `--global` supports these four targets and level 1; it excludes `--dir`. Re-run with `--global`, learn across all projects with `learn --global`, and remove owned global content with `--global --uninstall`. See [global installation](docs/install.md#every-project-with-one-profile).
 
 Levels 1 and 2 carry the Core 5: read the profile first, evidence before assertion, output style, act or ask, and ask before it repeats. Level 3 retains all eleven, with each target's existing surface and signature selection.
 
 Node 24 or 26 (active LTS) is recommended; 22 or later runs. Published on npm with provenance. [Installation](docs/install.md) covers scripted answers, every flag, notes tools and manual copying.
 
-The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls and send no telemetry. Project writes stay inside the folder you name; global writes use the profile and selected home paths above. Edited source files are preserved and named.
+The tool runs locally after `npx` fetches the package. The installer and renderer make no network calls and send no telemetry. Project writes stay inside the folder you name, except inside a Git work tree where install updates the enclosing repository's Git `info/exclude` (and `hooks/pre-commit` only when you pass `--precommit` at level 3; see [preflight and writes](docs/guarantees.md#preflight-and-writes)). Global writes (`--global`) use only `~/.agent-personalizer/` and the selected AI home paths above. Edited source files are preserved and named.
 
 ## Privacy
 
@@ -150,7 +150,7 @@ Select your notes tool through saved onboarding answers or an answers file:
 npx agent-personalizer --dir . --answers my-answers.json
 ```
 
-[Companion setup](docs/companions.md) explains notes connectors and how to turn onboarding answers into tool permissions and approval steps.
+[Companion setup](docs/companions.md) explains notes connectors and how to apply onboarding answers to operations routed through a configured companion.
 
 | Tool | What it gives you |
 |---|---|
@@ -215,7 +215,7 @@ Contributions are welcome: a new AI target, a notes tool, an example user, or a 
 
 Pull requests are accepted under the [contributor license agreement](CLA.md); the checkbox in the pull request template records your agreement.
 
-The harness (`test/run.sh: 102 checks`) tests exact exit codes and adversarial fixtures. The real forbidden-list check stays local and prints a skip when the private list is absent.
+The harness (`test/run.sh: 103 checks`) tests exact exit codes and adversarial fixtures. The real forbidden-list check stays local and prints a skip when the private list is absent.
 
 ## License
 

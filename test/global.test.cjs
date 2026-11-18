@@ -26,7 +26,7 @@ function write(folder, rel, bytes) {
 }
 function run(folder, args, expected = 0, extra = {}) {
   const out = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8',
-    env: { ...process.env, HOME: folder, USERPROFILE: folder, HERMES_HOME: '', ...extra } });
+    env: { ...process.env, HOME: folder, USERPROFILE: folder, HERMES_HOME: '', CODEX_HOME: '', ...extra } });
   assert.equal(out.status, expected, `${args.join(' ')}\n${out.stdout}${out.stderr}`);
   return out.stdout + out.stderr;
 }
@@ -168,7 +168,7 @@ fs.renameSync = function(from, to) {
 };
 `);
   const failed = spawnSync(process.execPath, [cli, ...install], { cwd: root, encoding: 'utf8',
-    env: { ...process.env, HOME: rollback, USERPROFILE: rollback, NODE_OPTIONS: `--require ${fault}` } });
+    env: { ...process.env, HOME: rollback, USERPROFILE: rollback, HERMES_HOME: '', CODEX_HOME: '', NODE_OPTIONS: `--require ${fault}` } });
   assert.notEqual(failed.status, 0, failed.stdout + failed.stderr);
   assert.match(failed.stdout + failed.stderr, /injected second global target rename failure/);
   assert.deepEqual(snapshot(rollback), beforeFailure, 'Second-target failure restores the first, file mode, source files and created directories.');

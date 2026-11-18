@@ -2,7 +2,7 @@
 // Consent separates project inspection from access to the AI apps' private history.
 const fs = require('fs');
 const path = require('path');
-const { resolveHome } = require('./home.cjs');
+const { resolveHome, resolveCodexHome } = require('./home.cjs');
 const { sha256 } = require('./cli-util.cjs');
 const crypto = require('crypto');
 const readline = require('readline');
@@ -28,8 +28,8 @@ that Claude Code, Codex and Gemini CLI still keep, to find corrections you repea
   · Other people's details in there? Add their names to your private list first.
   · Delete it any time: npx agent-personalizer learn --forget
     (your AI app's own history stays as it is)
-  · Codex's own memory notes are included when you choose Codex.
-    They are global to your Codex account, not limited to this folder.
+  · Local Codex memory notes from your Codex home are included when you choose Codex.
+    They span sessions on this machine (or connected host), not just this folder.
   · When your AI reads the file, its provider sees these messages again.
   · Work or client accounts: check your agreement before reusing their sessions.
   · Not affiliated with Anthropic, OpenAI or Google. Their formats can change.
@@ -163,7 +163,8 @@ async function learn({ dir = '.', yes = false, consented = false, allProjects = 
   const entries = renderer.readLearned(root);
   const sources = [...new Set((cfg.targets || []).map(target => SOURCE[target]).filter(Boolean))];
   const home = resolveHome();
-  const data = await require('./sessions.cjs').readSessions({ home, projectDir: root, allProjects, sources, limit: 20, privateTerms: terms });
+  const codexHome = sources.includes('codex') ? resolveCodexHome(home) : path.join(home, '.codex');
+  const data = await require('./sessions.cjs').readSessions({ home, codexHome, projectDir: root, allProjects, sources, limit: 20, privateTerms: terms });
   const now = new Date().toISOString();
   const text = digestText(data, entries, { sources, home, terms, now });
   const folder = probe(root, FOLDER, 'dir');

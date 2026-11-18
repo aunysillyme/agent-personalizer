@@ -70,6 +70,8 @@ if pid == 0:
     demo_home = os.path.join(os.environ["AP_DEMO_WORK"], "home")
     os.environ["HOME"] = demo_home
     os.environ["USERPROFILE"] = demo_home
+    os.environ["CODEX_HOME"] = ""
+    os.environ["HERMES_HOME"] = ""
     os.environ["TERM"] = "xterm-256color"
     os.execvp(command[0], command)
 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 110, 0, 0))

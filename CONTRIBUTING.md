@@ -10,7 +10,7 @@ Contributions are welcome: a **new AI target**, a **notes tool**, an **example u
 ## Running the checks
 
 ```bash
-npm test            # sh test/run.sh: 102 checks, exact exit codes, Linux and macOS
+npm test            # sh test/run.sh: 103 checks, exact exit codes, Linux and macOS
 node test/rollback.test.js
 node check/gate.cjs --self-test
 ```

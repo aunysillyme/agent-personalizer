@@ -1,8 +1,8 @@
 # Companion tools
 
-This repo tells an AI *how to behave with you*. Two companions govern *what it can touch* and *what it is allowed to carry*. Neither is required; both make the onboarding answers enforceable instead of advisory.
+This repo tells an AI *how to behave with you*. Two optional companions govern operations routed through them. Properly configured, they enforce folder ACLs, approval gates or context receipts on calls through that companion; they do not block direct filesystem tools, shell commands or other connectors unless your host's own tool permissions or OS sandbox restrict those paths.
 
-| Your saved setting | What enforces it without a companion | With a companion |
+| Your saved setting | Without a companion | Through a configured companion |
 |---|---|---|
 | **Always ask before** delete / publish / send / spend | the AI remembering | obsidian-tc: destructive tools fail closed until a human confirms |
 | **Off limits** folders | the AI remembering | obsidian-tc: folder ACL deny, per caller |
@@ -27,7 +27,7 @@ npx obsidian-tc /path/to/vault
 ```
 Lexical search and every note tool work immediately; semantic and graph retrieval need an embeddings backend (Ollama by default). Also ships as a Docker image, an `.mcpb` bundle, and standalone binaries.
 
-**How it pairs with this repo.** Answer `notes_tool: obsidian` and `obsidian_tc: yes` and the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through obsidian-tc rather than the filesystem; your **off-limits** and **always-ask** answers become the folder ACL and the human-in-the-loop list you configure there. Same intent, now enforced. Answer `obsidian_tc: no` (the default) and the AI works on the vault folder directly, with the onboarding file naming what obsidian-tc would add.
+**How it pairs with this repo.** Answer `notes_tool: obsidian` and `obsidian_tc: yes` and the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through obsidian-tc rather than the filesystem; your **off-limits** and **always-ask** answers map to the folder ACL and human-in-the-loop list you configure in obsidian-tc. Calls routed through obsidian-tc enforce those rules; disable or sandbox raw filesystem and shell access in your AI host if you want the agent confined to that door. Answer `obsidian_tc: no` (the default) and the AI works on the vault folder directly, with the onboarding file naming what obsidian-tc would add.
 
 ---
 
@@ -43,7 +43,7 @@ Lexical search and every note tool work immediately; semantic and graph retrieva
 - **Write policy** "logs and inbox only" or "ask before every write" is the Layer's rule that memory writes remain proposals until approved.
 - **Off limits** is the Layer's vault stage: originals that never enter a bundle.
 - **Always ask before** is the Layer's decide stage: allow, reduce, approve or deny by action and recipient.
-Running several agents is where it earns its keep (the hand-off layer, which this repo does not install): each delegation carries a purpose-bound bundle and returns a receipt, so you can answer "who saw what, and why" after the fact. The repo's `AGENT_ONBOARDING.md` is the human-readable policy; the Context Layer is how you make a machine enforce and record it.
+Running several agents is where it earns its keep (the hand-off layer, which this repo does not install): each delegation carries a purpose-bound bundle and returns a receipt, so you can answer "who saw what, and why" after the fact. The repo's `AGENT_ONBOARDING.md` is the human-readable policy; the Context Layer enforces and records it for context bundles and actions mediated by the Layer, alongside whatever host permissions or sandboxing govern direct local tools.
 
 ---
 
@@ -51,7 +51,7 @@ Running several agents is where it earns its keep (the hand-off layer, which thi
 
 | `notes_tool` answer | How an AI reaches it | Write posture rendered into the onboarding file |
 |---|---|---|
-| `obsidian` | obsidian-tc (above) when `obsidian_tc: yes`, else the vault folder on disk | your write policy, enforced by obsidian-tc's ACL when configured |
+| `obsidian` | obsidian-tc (above) when `obsidian_tc: yes`, else the vault folder on disk | your write policy; enforced on obsidian-tc calls when its ACL is configured (host permissions still govern direct disk tools) |
 | `logseq` / `folder` | the folder on disk | your write policy, under each folder's README |
 | `notion` | Notion's own MCP connector | writes only into the pages or databases you name; the AI proposes new top-level pages, never creates them unasked |
 | `google-docs` | the Google Drive / Docs connector | the AI drafts into a doc named for the topic and never edits a shared doc's existing text without being asked |

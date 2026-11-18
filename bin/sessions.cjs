@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { resolveHome } = require('./home.cjs');
+const { resolveHome, resolveCodexHome, walkRealChain } = require('./home.cjs');
 const crypto = require('node:crypto');
 
 const MAX_LINE = 8 * 1024 * 1024;
@@ -221,8 +221,19 @@ async function discover(home, sources, state) {
     }
   }
   if (sources.has('codex')) {
-    const app = path.join(home, '.codex');
-    if (await statPath(app, 'directory', state)) {
+    let app = state.codexHome || path.join(home, '.codex');
+    let chainOk = true;
+    if (app !== path.join(home, '.codex')) {
+      try {
+        const chain = walkRealChain(app, { allowDarwinRootLink: true, action: 'skipped' });
+        if (chain.missingDirs.length) chainOk = false;
+        else app = chain.dir;
+      } catch (err) {
+        bump(state, /is a symlink/.test(err.message) ? 'symlink' : 'non_regular');
+        chainOk = false;
+      }
+    }
+    if (chainOk && await statPath(app, 'directory', state)) {
       async function walk(dir) {
         for (const name of await children(dir, state)) {
           const file = path.join(dir, name);
@@ -269,10 +280,26 @@ async function discover(home, sources, state) {
 }
 
 async function safeOpen(file, state) {
-  // Recheck each path within HOME immediately before opening to catch replaced links.
-  const relative = path.relative(state.home, file);
-  if (relative.startsWith(`..${path.sep}`) || relative === '..' || path.isAbsolute(relative)) return null;
-  let current = state.home;
+  // Recheck each path within HOME (or active CODEX_HOME) immediately before opening to catch replaced links.
+  let codexRoot = null;
+  if (state.codexHome && state.codexHome !== path.join(state.home, '.codex')) {
+    try {
+      const chain = walkRealChain(state.codexHome, { allowDarwinRootLink: true, action: 'skipped' });
+      if (!chain.missingDirs.length) codexRoot = chain.dir;
+    } catch { return null; }
+  }
+  const roots = codexRoot ? [codexRoot, state.home] : [state.home];
+  let baseRoot = null, relative = null;
+  for (const candidateRoot of roots) {
+    const rel = path.relative(candidateRoot, file);
+    if (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel)) {
+      baseRoot = candidateRoot;
+      relative = rel;
+      break;
+    }
+  }
+  if (!baseRoot) return null;
+  let current = baseRoot;
   if (!await statPath(current, 'directory', state)) return null;
   const parts = relative.split(path.sep);
   for (const name of parts.slice(0, -1)) {
@@ -602,12 +629,16 @@ async function readMemory(file, state) {
   return { file: file.file, text, date: new Date(file.mtimeMs).toISOString() };
 }
 
-async function readSessions({ home = resolveHome(), projectDir = process.cwd(), allProjects = false, sources = [], limit = 20, privateTerms = [] } = {}) {
+async function readSessions({ home, codexHome, projectDir = process.cwd(), allProjects = false, sources = [], limit = 20, privateTerms = [] } = {}) {
   const selectedSources = new Set(Array.isArray(sources) ? sources.filter(source => SOURCES.has(source)) : []);
   const maximum = Number.isInteger(limit) && limit >= 0 ? Math.min(limit, 20) : 20;
   projectDir = path.resolve(projectDir);
+  const resolvedHome = path.resolve(resolveHome(home));
+  const resolvedCodexHome = codexHome !== undefined
+    ? path.resolve(resolveCodexHome(resolvedHome, codexHome))
+    : (home === undefined ? path.resolve(resolveCodexHome(resolvedHome)) : path.join(resolvedHome, '.codex'));
   const state = {
-    home: path.resolve(resolveHome(home)), projectDir, allProjects,
+    home: resolvedHome, codexHome: resolvedCodexHome, projectDir, allProjects,
     geminiProjectHash: crypto.createHash('sha256').update(projectDir).digest('hex'),
     candidates: [], memoryFiles: [], filesRead: [], filesChecked: 0, skipped: {},
     privateTerms: Array.isArray(privateTerms) ? privateTerms.filter(term => typeof term === 'string' && fold(term).trim()).map(fold) : []

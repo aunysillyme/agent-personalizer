@@ -6,6 +6,15 @@ Every entry names the adversarial audit round that produced it where one did. Au
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-18
+
+### Fixed
+
+- Respect `CODEX_HOME` for `--global --ai agents` (install, re-run, atomic rollback, `learn` and `--uninstall`), pre-selection and session discovery, and warn without modifying `AGENTS.override.md` when a non-empty override shadows `AGENTS.md` (#51).
+- Replace blanket ChatGPT file-access copy with surface-specific wording, and describe Codex memory notes as local to the machine or connected host (`~/.codex` or `$CODEX_HOME`) rather than global to an account (#52).
+- Document the enclosing Git `info/exclude` (and level-3 `--precommit`) exception to the project write boundary in `README.md` (#53).
+- Align `docs/learning.md` and `docs/paste-guide.md` with full declined-entry ChatGPT exports and `OVER BUDGET` / `--strict` behavior, and scope `docs/companions.md` enforcement claims to operations routed through the configured companion (#54).
+
 ## [0.10.0] - 2026-11-18
 
 ### Added
@@ -393,7 +402,8 @@ Thirteen issues (#3 to #15) filed against `5972b32` by an independent installati
 - Installer: safe destination resolution, strict options, duplicate `--ai` refused, `--dir` created one level at a time.
 - Harness: exact exit codes, adversarial fixtures, fault injection for the rollback path.
 
-[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/aunysillyme/agent-personalizer/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/aunysillyme/agent-personalizer/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/aunysillyme/agent-personalizer/compare/v0.8.7...v0.9.0

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check in this repo, and proof that each one can fail. 102 checks. Exact exit codes are
+# Every check in this repo, and proof that each one can fail. 103 checks. Exact exit codes are
 # asserted (render drift = 1, refusals and setup errors = 2), never "any non-zero".
 # exit 0 = all pass. Any non-zero = read the line above it.
 set -u
@@ -1387,6 +1387,10 @@ pass "precommit gate: staged hit, missing list, clean commit, restoration and re
 # 102. Audit 2026-11-17: Gemini CLI v0.42+ sessions/command/hook, Codex memories_v2, gate NFC, global qualify, release fallback and package inventory.
 node test/audit-0100.test.cjs || fail "0.10.0 audit regressions"
 pass "0.10.0 audit: Gemini CLI v0.42+ sessions/command/hook, Codex memories_v2, gate NFC, global qualify, release fallback and package inventory"
+
+# 103. Issues #51-#54: CODEX_HOME + AGENTS.override.md warning, ChatGPT/Codex wording, Git write-boundary docs and companion/overflow docs.
+node test/audit-0101.test.cjs || fail "0.10.1 issue regressions"
+pass "0.10.1 issues #51-#54: CODEX_HOME and override warning, ChatGPT/Codex wording, Git exclude boundary and companion/overflow docs"
 
 node test/security-workflows.test.cjs || fail "workflow security regression"
 node test/security-hardening.test.cjs || fail "history privacy regression"

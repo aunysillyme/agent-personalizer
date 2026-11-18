@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { resolveHome } = require('./home.cjs');
+const { resolveHome, resolveCodexHome, walkRealChain, hasNonEmptyOverride } = require('./home.cjs');
 const { sha256, parseCliArgs } = require('./cli-util.cjs');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
@@ -157,7 +157,7 @@ function resolveDestination(dir) {
 
 
 // One transaction for project and global plans: snapshot before writes, replace atomically, restore on failure.
-async function commitPlan(root, { writes, removals = [], outputPaths, prepare, finalize }) {
+async function commitPlan(root, { writes, removals = [], external = [], outputPaths, prepare, finalize }) {
   for (const rel of outputPaths) {
     let parent = path.posix.dirname(rel);
     while (parent !== '.') {
@@ -182,7 +182,38 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
     while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
     try { fs.accessSync(ancestor, fs.constants.W_OK); } catch (_) { die(`${rel}: parent is not writable; nothing was written`); }
   }
-  if (prepare) prepare(newDirectories);
+  const savedExternal = new Map(), externalNewDirs = [];
+  const checkExternalBase = base => {
+    try {
+      const chain = walkRealChain(base, { allowDarwinRootLink: false, action: 'nothing was written' });
+      if (chain.missingDirs.length) die(`${base} does not exist; nothing was written`);
+    } catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
+  };
+  for (const ext of external) {
+    checkExternalBase(ext.base);
+    const full = path.join(ext.base, ...(ext.missingDirs || []), ext.file);
+    ext.full = full;
+    if (savedExternal.has(full)) die(`${full}: duplicate external target; nothing was written`);
+    let st = null;
+    try { st = fs.lstatSync(full); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (st) {
+      if (st.isSymbolicLink()) die(`${full} is a symlink; refusing to write through it`);
+      if (!st.isFile()) die(`${full} is not a regular file; nothing was written`);
+      savedExternal.set(full, { bytes: fs.readFileSync(full), mode: st.mode & 0o777, dev: st.dev, ino: st.ino });
+    } else savedExternal.set(full, null);
+    try { fs.accessSync(ext.base, fs.constants.W_OK); } catch (_) { die(`${full}: parent is not writable; nothing was written`); }
+    let cur = ext.base;
+    for (const part of ext.missingDirs || []) {
+      cur = path.join(cur, part);
+      let dirSt = null;
+      try { dirSt = fs.lstatSync(cur); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      if (dirSt) {
+        if (dirSt.isSymbolicLink()) die(`${cur} is a symlink; refusing to write through it`);
+        if (!dirSt.isDirectory()) die(`${cur} exists and is not a directory`);
+      } else if (!externalNewDirs.includes(cur)) externalNewDirs.push(cur);
+    }
+  }
+  if (prepare) prepare(newDirectories, externalNewDirs);
   const replace = (rel, bytes, mode) => {
     const destination = safeDest(root, rel);
     const tmp = path.join(path.dirname(destination.full), `.${path.basename(rel)}.${crypto.randomBytes(8).toString('hex')}.agent-personalizer.tmp`);
@@ -193,6 +224,18 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
       fs.renameSync(tmp, destination.full);
     } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
   };
+  const replaceExternal = (full, bytes, mode) => {
+    checkExternalBase(path.dirname(full));
+    const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${crypto.randomBytes(8).toString('hex')}.agent-personalizer.tmp`);
+    try {
+      fs.writeFileSync(tmp, bytes, { flag: 'wx', ...(mode === undefined ? {} : { mode }) });
+      if (mode !== undefined) fs.chmodSync(tmp, mode);
+      let st = null;
+      try { st = fs.lstatSync(full); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      if (st && st.isSymbolicLink()) die(`${full} is a symlink; refusing to write through it`);
+      fs.renameSync(tmp, full);
+    } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
+  };
   const assertSaved = rel => {
     const destination = probe(root, rel), before = saved.get(rel);
     if (!!before !== destination.exists) die(`${rel} changed during preflight; nothing was written`);
@@ -201,11 +244,41 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
       if (info.dev !== before.dev || info.ino !== before.ino || !fs.readFileSync(destination.full).equals(before.bytes)) die(`${rel} changed during preflight; nothing was written`);
     }
   };
+  const assertSavedExternal = full => {
+    let dirExists = true;
+    try {
+      const chain = walkRealChain(path.dirname(full), { allowDarwinRootLink: false, action: 'nothing was written' });
+      dirExists = chain.missingDirs.length === 0;
+    } catch (e) { if (e instanceof markers.Refusal) die(e.message); throw e; }
+    let st = null;
+    if (dirExists) {
+      try { st = fs.lstatSync(full); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    }
+    if (st && st.isSymbolicLink()) die(`${full} is a symlink; refusing to write through it`);
+    const before = savedExternal.get(full);
+    if (!!before !== !!st) die(`${full} changed during preflight; nothing was written`);
+    if (before && (st.dev !== before.dev || st.ino !== before.ino || !fs.readFileSync(full).equals(before.bytes))) die(`${full} changed during preflight; nothing was written`);
+  };
   committing = true;
-  const touched = new Set();
+  const touched = new Set(), touchedExternal = [], touchedExternalDirs = [];
   try {
     for (const rel of outputPaths) assertSaved(rel);
+    for (const full of savedExternal.keys()) assertSavedExternal(full);
+    for (const dir of externalNewDirs) {
+      let st = null;
+      try { st = fs.lstatSync(dir); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      if (st) die(`${dir} changed during preflight; nothing was written`);
+      fs.mkdirSync(dir);
+      touchedExternalDirs.push(dir);
+    }
     for (const p of removals) { assertSaved(p.rel); fs.unlinkSync(probe(root, p.rel).full); touched.add(p.rel); if (p.report) console.log(p.report); }
+    for (const ext of external) {
+      assertSavedExternal(ext.full);
+      touchedExternal.push(ext.full);
+      if (ext.remove) fs.unlinkSync(ext.full);
+      else replaceExternal(ext.full, ext.bytes, savedExternal.get(ext.full)?.mode);
+      if (ext.report) console.log(ext.report);
+    }
     for (const p of writes) {
       assertSaved(p.rel);
       touched.add(p.rel);
@@ -218,12 +291,29 @@ async function commitPlan(root, { writes, removals = [], outputPaths, prepare, f
     if (finalize) await finalize();
   } catch (e) {
     const incomplete = [];
+    for (const full of [...touchedExternal].reverse()) {
+      try {
+        checkExternalBase(path.dirname(full));
+        const before = savedExternal.get(full);
+        let st = null;
+        try { st = fs.lstatSync(full); } catch (_) { st = null; }
+        if (st && st.isSymbolicLink()) throw new Error('refusing symlink during restore');
+        if (before) replaceExternal(full, before.bytes, before.mode);
+        else if (st) fs.unlinkSync(full);
+      } catch (failure) { incomplete.push(`${full}: ${failure.message}`); }
+    }
     for (const rel of [...touched].reverse()) {
       try {
         const before = saved.get(rel), destination = probe(root, rel);
         if (before) replace(rel, before.bytes, before.mode);
         else if (destination.exists) fs.unlinkSync(destination.full);
       } catch (failure) { incomplete.push(`${rel}: ${failure.message}`); }
+    }
+    for (const dir of [...touchedExternalDirs].reverse()) {
+      try {
+        const chain = walkRealChain(dir, { allowDarwinRootLink: false, action: 'nothing was written' });
+        if (!chain.missingDirs.length && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+      } catch (failure) { incomplete.push(`${dir}/: ${failure.message}`); }
     }
     for (const rel of [...newDirectories].sort((a, b) => b.split('/').length - a.split('/').length)) {
       try { const destination = probe(root, rel); if (destination.exists && fs.readdirSync(destination.full).length === 0) fs.rmdirSync(destination.full); }
@@ -278,8 +368,16 @@ async function main() {
     let home;
     try { home = resolveHome(); }
     catch (e) { if (!(e instanceof markers.Refusal)) throw e; }
-    const found = home ? [['.claude', 'claude'], ['.codex', 'agents'], ['.gemini', 'gemini']]
-      .filter(([folder]) => fs.existsSync(path.join(home, folder))).map(([, ai]) => ai) : [];
+    let codexDir = null;
+    if (home) {
+      try { codexDir = resolveCodexHome(home); }
+      catch (e) { if (!(e instanceof markers.Refusal)) throw e; }
+    }
+    const found = home ? [
+      [path.join(home, '.claude'), 'claude'],
+      ...(codexDir ? [[codexDir, 'agents']] : []),
+      [path.join(home, '.gemini'), 'gemini'],
+    ].filter(([folder]) => fs.existsSync(folder)).map(([, ai]) => ai) : [];
     ais = await ask('\nAIs', ais || (found.length ? found.join(',') : 'claude,agents'));
   }
   if (!/^[1-4]$/.test(String(level))) die('level must be 1, 2 or 3 (4 is accepted as 3)');
@@ -596,6 +694,9 @@ async function main() {
   });
 
   require('./git-exclude.cjs').protect(root);
+  if (targets.includes('agents') && hasNonEmptyOverride(root)) {
+    console.warn(`Warning: ${path.join(root, 'AGENTS.override.md')} is non-empty and overrides ${path.join(root, 'AGENTS.md')} in Codex; Codex ignores AGENTS.md in that directory while AGENTS.override.md has content.`);
+  }
 
   if (interactive && !cfgExists && !learnRequested) console.log('Nothing was read. Run npx agent-personalizer learn any time.');
 
