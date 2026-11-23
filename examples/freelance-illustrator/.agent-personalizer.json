@@ -47,7 +47,7 @@
       "standing-rules"
     ],
     "notes_tool": "obsidian",
-    "obsidian_tc": "yes"
+    "reliquary_tc": "yes"
   },
   "installed": {
     "CLAUDE.md": "4a303e42182c9affef6bcf14cd77045fae24f02ff8f1fef7e1f84e8c03aef2f2",

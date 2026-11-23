@@ -26,10 +26,10 @@ const DOCS = `https://github.com/aunysillyme/agent-personalizer/blob/v${VERSION}
    readonly = no agent door today, so writes fall back to a local folder; other = named by the user,
    conservative posture. p = location escaped for a code span, q = location escaped for prose. */
 const TOOL = {
-  'obsidian':    { kind: 'disk', label: 'an Obsidian vault (pairs with obsidian-tc, see the companions doc)', name: 'Obsidian',
+  'obsidian':    { kind: 'disk', label: 'an Obsidian vault (pairs with reliquary-tc, see the companions doc)', name: 'Obsidian',
                    reach: (p, q, n, tc) => tc
-                    ? `the vault at \`${p}/\`, through **obsidian-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see ${DOCS}/companions.md`
-                    : `the vault at \`${p}/\` as plain files (obsidian-tc is not installed; ${DOCS}/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null },
+                    ? `the vault at \`${p}/\`, through **reliquary-tc** (governed MCP: folder ACLs, human-in-the-loop confirmation for destructive tools, audit log) rather than raw filesystem access; see ${DOCS}/companions.md`
+                    : `the vault at \`${p}/\` as plain files (reliquary-tc is not installed; ${DOCS}/companions.md explains what it would add: folder ACLs, human-in-the-loop confirmation, an audit log)`, posture: null },
   'notion':      { kind: 'cloud', label: 'Notion', name: 'Notion', unit: 'page', reach: (p, q) => `the workspace "${q}" through Notion's own MCP connector`, posture: 'Write only into the pages or databases named in this file. Propose a new top-level page; never create one unasked.' },
   'google-docs': { kind: 'cloud', label: 'Google Docs / Drive', name: 'Google Docs', unit: 'doc', reach: (p, q) => `"${q}" through the Google Drive / Docs connector`, posture: 'Draft into a doc named for the topic. Never edit the existing text of a shared doc without being asked.' },
   'apple-notes': { kind: 'cloud', label: 'Apple Notes', name: 'Apple Notes', unit: 'note', reach: (p, q) => `the "${q}" folder through a separately installed local Apple Notes MCP (not built into any AI app; the user installs and connects it)`, posture: 'Read, and create new notes. Never edit or delete an existing note.' },
@@ -40,7 +40,7 @@ const TOOL = {
   'other':       { kind: 'other', label: 'something else (name it in the next answer)', name: null, reach: (p, q) => `"${q}"`, posture: 'Ask before the first write into it, and say which tool and location you mean. Until told otherwise, write only to the local fallback folder below.' },
 };
 /* name comes back RAW and is md-escaped exactly once at each prose render site */
-const toolFor = (a) => { const t = TOOL[a.notes_tool]; return { kind: t.kind, unit: t.unit, posture: t.posture, name: t.name || a.notes_tool_name || 'an unnamed notes tool', reach: t.reach(esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.obsidian_tc === 'yes') }; };
+const toolFor = (a) => { const t = TOOL[a.notes_tool]; return { kind: t.kind, unit: t.unit, posture: t.posture, name: t.name || a.notes_tool_name || 'an unnamed notes tool', reach: t.reach(esc(a.notes_path), md(a.notes_path), a.notes_tool_name || '', a.reliquary_tc === 'yes') }; };
 const FALLBACK = 'notes';
 /* kind without rendering anything (safe before validation completes) */
 const kindOf = (a) => TOOL[a.notes_tool].kind;
@@ -96,7 +96,7 @@ const QUESTIONS = [
   { id: 'read_first', type: 'list', default: ['USER.md', 'AGENT_ONBOARDING.md'] },
   { id: 'notes_tool', type: 'choice', default: 'folder',
     options: Object.entries(TOOL).map(([k, t]) => [k, t.label]) },
-  { id: 'obsidian_tc', type: 'choice', default: 'no',
+  { id: 'reliquary_tc', type: 'choice', default: 'no',
     options: [['no', 'not installed; the AI works on the vault folder directly'], ['yes', 'installed and connected; the AI reaches the vault through it']] },
   { id: 'notes_tool_name', type: 'text', default: '' },
   { id: 'notes_path', type: 'text', default: 'notes' },
@@ -402,7 +402,7 @@ function writesLine(a, opts) {
   const where = t.kind === 'cloud' ? `${md(t.name)} "${md(a.notes_path)}" through its connector, no filesystem writes`
     : t.kind === 'readonly' ? `${md(t.name)} is read-only for you; the local fallback folder is ${esc(FALLBACK)}/`
     : t.kind === 'other' ? `${md(t.name)} is unknown here: ask before the first write there; local fallback folder ${esc(FALLBACK)}/ meanwhile`
-    : `${md(t.name)} at ${esc(a.notes_path)}/${a.notes_tool === 'obsidian' && a.obsidian_tc === 'yes' ? ', through obsidian-tc' : ''}`;
+    : `${md(t.name)} at ${esc(a.notes_path)}/${a.notes_tool === 'obsidian' && a.reliquary_tc === 'yes' ? ', through reliquary-tc' : ''}`;
   return `Writes: ${WRITE_POLICY[a.write_policy]}. Notes: ${where}.`;
 }
 function contractBlock(a, opts) {
@@ -419,7 +419,7 @@ function contractBlock(a, opts) {
       '## How to work with this person', '',
       `Always ask before: ${a.always_ask.join(', ') || 'nothing declared'}.`,
       a.off_limits.length ? `Off limits in any output: ${a.off_limits.map(md).join(', ')}.` : null,
-      notesPending(a, opts) ? a.write_policy === 'notes-freely' ? 'Writes: no notes folder yet. Create nothing unasked. Once it exists, under its rules; nowhere else unasked.' : `Writes: no notes folder yet. ${WRITE_POLICY_PENDING[a.write_policy]}.` : kindOf(a) === 'disk' && a.write_policy === 'notes-freely' ? `Writes: under ${esc(a.notes_path)}/ rules only, nowhere else unasked. Notes: ${md(toolFor(a).name)}${a.obsidian_tc === 'yes' && a.notes_tool === 'obsidian' ? ', through obsidian-tc' : ''}.` : writesLine(a, opts),
+      notesPending(a, opts) ? a.write_policy === 'notes-freely' ? 'Writes: no notes folder yet. Create nothing unasked. Once it exists, under its rules; nowhere else unasked.' : `Writes: no notes folder yet. ${WRITE_POLICY_PENDING[a.write_policy]}.` : kindOf(a) === 'disk' && a.write_policy === 'notes-freely' ? `Writes: under ${esc(a.notes_path)}/ rules only, nowhere else unasked. Notes: ${md(toolFor(a).name)}${a.reliquary_tc === 'yes' && a.notes_tool === 'obsidian' ? ', through reliquary-tc' : ''}.` : writesLine(a, opts),
       `Tone: ${tone}. Length: ${length}. Wrong: ${mistakes}. Unsure: ${unsure}.`,
       `Open with ${lead}; ${structure}; ${evidence}.${a.signature === 'yes' ? ' Sign note edits: one Last edited by line, overwritten.' : ''}`,
       a.never.length ? `Never: ${a.never.map(md).join('; ')}.` : null,

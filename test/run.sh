@@ -599,7 +599,7 @@ pass "--contract refuses malformed stored config with no output"
 
 # 60. notes_tool: all nine options render a consistent write section; companions doc ships; unknown tool refused
 [ -f docs/companions.md ] || fail "docs/companions.md missing"
-grep -q 'obsidian-tc' docs/companions.md && grep -q 'sierracatalina.com/context-layer' docs/companions.md || fail "companions doc missing a companion"
+grep -q 'reliquary-tc' docs/companions.md && grep -q 'sierracatalina.com/context-layer' docs/companions.md || fail "companions doc missing a companion"
 mk; T="$MK"; mk; F="$MK"
 # Level 2, because these assertions are about the notes_tool TABLE and every path they name has to be
 # on disk to be named at all: a level-1 install creates no folders, so it renders the pending shape
@@ -620,18 +620,18 @@ for tool in obsidian logseq folder; do
   grep -q 'index page of' "$T/$tool/USER.md" && fail "$tool: USER.md points at an external index for a disk tool"
   node render/render.cjs --dir "$T/$tool" --contract --contract-target claude | grep -q 'at MyVault/' || fail "$tool: contract line wrong"
 done
-# obsidian without obsidian-tc (default): plain files, companion recommended, contract does not claim obsidian-tc
-grep -q 'as plain files (obsidian-tc is not installed' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian without tc: plain-files line missing"
+# obsidian without reliquary-tc (default): plain files, companion recommended, contract does not claim reliquary-tc
+grep -q 'as plain files (reliquary-tc is not installed' "$T/obsidian/AGENT_ONBOARDING.md" || fail "obsidian without tc: plain-files line missing"
 grep -q 'rather than raw filesystem access' "$T/obsidian/AGENT_ONBOARDING.md" && fail "obsidian without tc: rendered as mandatory"
-grep -q 'set obsidian_tc to yes through --answers' "$F/obsidian.hint" || fail "obsidian without tc: hint should recommend installing it"
-node render/render.cjs --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through obsidian-tc' && fail "contract claims obsidian-tc when not installed"
-# obsidian with obsidian-tc
-printf '{"notes_tool": "obsidian", "obsidian_tc": "yes", "notes_path": "MyVault"}' > "$F/tc.json"
+grep -q 'set reliquary_tc to yes through --answers' "$F/obsidian.hint" || fail "obsidian without tc: hint should recommend installing it"
+node render/render.cjs --dir "$T/obsidian" --contract --contract-target claude | grep -q 'through reliquary-tc' && fail "contract claims reliquary-tc when not installed"
+# obsidian with reliquary-tc
+printf '{"notes_tool": "obsidian", "reliquary_tc": "yes", "notes_path": "MyVault"}' > "$F/tc.json"
 node bin/agent-personalizer.js --dir "$T/tc" --ai claude --level 2 --answers "$F/tc.json" --yes > "$F/tc.hint" 2>&1 || fail "install obsidian with tc"   # level 2: the contract names the vault path, which must exist
-grep -q 'through \*\*obsidian-tc\*\*' "$T/tc/AGENT_ONBOARDING.md" || fail "obsidian with tc: route line missing"
-grep -q 'routes the AI through obsidian-tc' "$F/tc.hint" || fail "obsidian with tc: hint missing"
-node render/render.cjs --dir "$T/tc" --contract --contract-target claude | grep -q 'through obsidian-tc' || fail "contract missing the obsidian-tc line"
-grep -q 'obsidian-tc' "$T/folder/AGENT_ONBOARDING.md" && fail "folder render mentions obsidian-tc"
+grep -q 'through \*\*reliquary-tc\*\*' "$T/tc/AGENT_ONBOARDING.md" || fail "obsidian with tc: route line missing"
+grep -q 'routes the AI through reliquary-tc' "$F/tc.hint" || fail "obsidian with tc: hint missing"
+node render/render.cjs --dir "$T/tc" --contract --contract-target claude | grep -q 'through reliquary-tc' || fail "contract missing the reliquary-tc line"
+grep -q 'reliquary-tc' "$T/folder/AGENT_ONBOARDING.md" && fail "folder render mentions reliquary-tc"
 # cloud tools: connector named, no filesystem instructions, posture present
 for tool in notion google-docs apple-notes; do
   render_tool "$tool" ', "notes_path": "Studio Wiki"'
