@@ -732,9 +732,9 @@ async function main() {
   if (level >= 3) steps.push('Register hooks/claude-code/session-start.sh or hooks/gemini-cli/session-start.sh (see hooks/README.md) and copy check/forbidden.example.txt to check/forbidden.local.txt.');
   console.log('\nNext:');
   steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
-  if (answers.notes_tool === 'obsidian') console.log(answers.obsidian_tc === 'yes'
-    ? `\nCompanion: the onboarding file routes the AI through obsidian-tc; configure its folder ACLs from your off-limits answer and its human-in-the-loop list from your always-ask answer. See ${DOCS}/companions.md`
-    : `\nCompanion: your notes are an Obsidian vault and the AI will work on the folder directly. obsidian-tc would give it governed access (folder ACLs, human-in-the-loop, audit log): \`npx obsidian-tc /path/to/vault\`, then set obsidian_tc to yes through --answers. See ${DOCS}/companions.md`);
+  if (answers.notes_tool === 'obsidian') console.log(answers.reliquary_tc === 'yes'
+    ? `\nCompanion: the onboarding file routes the AI through reliquary-tc; configure its folder ACLs from your off-limits answer and its human-in-the-loop list from your always-ask answer. See ${DOCS}/companions.md`
+    : `\nCompanion: your notes are an Obsidian vault and the AI will work on the folder directly. reliquary-tc would give it governed access (folder ACLs, human-in-the-loop, audit log): \`npx reliquary-tc /path/to/vault\`, then set reliquary_tc to yes through --answers. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'notion' || answers.notes_tool === 'google-docs') console.log(`\nCompanion: connect ${answers.notes_tool === 'notion' ? 'Notion' : 'Google Drive / Docs'} through your AI's own connector settings (where the app offers one); the onboarding file already names the door and the write posture, and tells the AI to make no filesystem writes for these notes. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'apple-notes') console.log(`\nCompanion: Apple Notes needs a separately installed local Apple Notes MCP; no AI app ships one built in. Until you connect one, the onboarding file already limits the AI to reading and creating new notes. See ${DOCS}/companions.md`);
   else if (answers.notes_tool === 'other') console.log(`\nNote: "${answers.notes_tool_name || 'your notes tool'}" is unknown to this kit; the onboarding file tells the AI to ask before its first write there and to use the local fallback folder notes/ meanwhile.`);

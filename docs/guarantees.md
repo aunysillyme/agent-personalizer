@@ -79,7 +79,7 @@ The onboarding manual tells the AI where it may write, what is off limits and wh
 
 To make those answers govern tool access, configure a [companion](companions.md):
 
-- **obsidian-tc:** folder access controls and human approval for destructive Obsidian operations.
+- **reliquary-tc:** folder access controls and human approval for destructive Obsidian operations.
 - **The Context Layer:** purpose-bound context, approval decisions and receipts for actions and disclosures.
 
 These controls live in the companion's configuration and apply to calls routed through that companion; direct filesystem, shell or other connector access still depends on your AI host's tool permissions and sandbox. Saved onboarding answers record the policy and render the instructions that refer to it.

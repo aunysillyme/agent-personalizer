@@ -4,16 +4,16 @@ This repo tells an AI *how to behave with you*. Two optional companions govern o
 
 | Your saved setting | Without a companion | Through a configured companion |
 |---|---|---|
-| **Always ask before** delete / publish / send / spend | the AI remembering | obsidian-tc: destructive tools fail closed until a human confirms |
-| **Off limits** folders | the AI remembering | obsidian-tc: folder ACL deny, per caller |
-| **Write policy** (freely / logs and inbox only / ask first) | the AI remembering | obsidian-tc: per-folder read / write / delete scopes; Context Layer: memory writes stay proposals until approved |
+| **Always ask before** delete / publish / send / spend | the AI remembering | reliquary-tc: destructive tools fail closed until a human confirms |
+| **Off limits** folders | the AI remembering | reliquary-tc: folder ACL deny, per caller |
+| **Write policy** (freely / logs and inbox only / ask first) | the AI remembering | reliquary-tc: per-folder read / write / delete scopes; Context Layer: memory writes stay proposals until approved |
 | **Evidence inline** | the AI citing what it read | Context Layer: every disclosure and action leaves a receipt |
 
 ---
 
-## obsidian-tc (for Obsidian vaults)
+## reliquary-tc (for Obsidian vaults)
 
-**What it is.** A governed MCP server over Obsidian vaults: https://github.com/The-40-Thieves/obsidian-tc (AGPL-3.0). Its own README states the problem it exists for: an agent with raw filesystem access to a vault "can do real damage", and most Obsidian MCP servers hand that access over with an API key between the agent and everything you have written.
+**What it is.** A governed MCP server over Obsidian vaults: https://github.com/The-40-Thieves/reliquary-tc (AGPL-3.0). Its own README states the problem it exists for: an agent with raw filesystem access to a vault "can do real damage", and most Obsidian MCP servers hand that access over with an API key between the agent and everything you have written.
 
 **What it adds** (its words, condensed):
 - **Governed writes**: every call runs through auth → scopes → folder ACL → read-only kill switch → idempotency → throttle → human-in-the-loop confirmation → audit log. You decide which folders an agent may read, write or delete, per vault and per caller; destructive operations fail closed until a human approves.
@@ -23,11 +23,11 @@ This repo tells an AI *how to behave with you*. Two optional companions govern o
 
 **Try it**:
 ```bash
-npx obsidian-tc /path/to/vault
+npx reliquary-tc /path/to/vault
 ```
 Lexical search and every note tool work immediately; semantic and graph retrieval need an embeddings backend (Ollama by default). Also ships as a Docker image, an `.mcpb` bundle, and standalone binaries.
 
-**How it pairs with this repo.** Answer `notes_tool: obsidian` and `obsidian_tc: yes` and the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through obsidian-tc rather than the filesystem; your **off-limits** and **always-ask** answers map to the folder ACL and human-in-the-loop list you configure in obsidian-tc. Calls routed through obsidian-tc enforce those rules; disable or sandbox raw filesystem and shell access in your AI host if you want the agent confined to that door. Answer `obsidian_tc: no` (the default) and the AI works on the vault folder directly, with the onboarding file naming what obsidian-tc would add.
+**How it pairs with this repo.** Answer `notes_tool: obsidian` and `reliquary_tc: yes` and the rendered `AGENT_ONBOARDING.md` tells the AI to reach the vault through reliquary-tc rather than the filesystem; your **off-limits** and **always-ask** answers map to the folder ACL and human-in-the-loop list you configure in reliquary-tc. Calls routed through reliquary-tc enforce those rules; disable or sandbox raw filesystem and shell access in your AI host if you want the agent confined to that door. Answer `reliquary_tc: no` (the default) and the AI works on the vault folder directly, with the onboarding file naming what reliquary-tc would add.
 
 ---
 
@@ -51,7 +51,7 @@ Running several agents is where it earns its keep (the hand-off layer, which thi
 
 | `notes_tool` answer | How an AI reaches it | Write posture rendered into the onboarding file |
 |---|---|---|
-| `obsidian` | obsidian-tc (above) when `obsidian_tc: yes`, else the vault folder on disk | your write policy; enforced on obsidian-tc calls when its ACL is configured (host permissions still govern direct disk tools) |
+| `obsidian` | reliquary-tc (above) when `reliquary_tc: yes`, else the vault folder on disk | your write policy; enforced on reliquary-tc calls when its ACL is configured (host permissions still govern direct disk tools) |
 | `logseq` / `folder` | the folder on disk | your write policy, under each folder's README |
 | `notion` | Notion's own MCP connector | writes only into the pages or databases you name; the AI proposes new top-level pages, never creates them unasked |
 | `google-docs` | the Google Drive / Docs connector | the AI drafts into a doc named for the topic and never edits a shared doc's existing text without being asked |

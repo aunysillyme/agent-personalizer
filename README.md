@@ -154,7 +154,7 @@ npx agent-personalizer --dir . --answers my-answers.json
 
 | Tool | What it gives you |
 |---|---|
-| [obsidian-tc](https://github.com/The-40-Thieves/obsidian-tc) | Governed Obsidian access: configure folder permissions from your off-limits answer and human approval from your always-ask answer. |
+| [reliquary-tc](https://github.com/The-40-Thieves/reliquary-tc) | Governed Obsidian access: configure folder permissions from your off-limits answer and human approval from your always-ask answer. |
 | [The Context Layer](https://sierracatalina.com/context-layer) | Purpose-bound context with receipts; its decide and vault stages apply your write policy and off-limits boundaries. |
 
 ## Common questions
